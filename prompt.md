@@ -1,10 +1,11 @@
 prompt
-VS Code의 Gemini Pro Extension을 활용하여 효율적으로 개발하실 수 있도록, 3단계 마일스톤으로 나누어 프롬프트를 작성했습니다.
-이 프롬프트들은 복사(Copy) -> 붙여넣기(Paste) 하시면 바로 코드를 생성해 주도록 최적화되어 있습니다.
-📂 사전 준비 (Project Structure)
-먼저 프로젝트 폴더를 하나 만들고, 터미널에서 아래와 같이 폴더를 구분해 주세요.
- * frontend/ : React 앱
- * backend/ : FastAPI 서버
+```
+VS Code의 Gemini Pro Extension을 활용하여 효율적으로 개발하실 수 있도록, 3단계 마일스톤으로 나누어 프롬프트를 작성했습니다.    
+이 프롬프트들은 복사(Copy) -> 붙여넣기(Paste) 하시면 바로 코드를 생성해 주도록 최적화되어 있습니다.    
+📂 사전 준비 (Project Structure)    
+먼저 프로젝트 폴더를 하나 만들고, 터미널에서 아래와 같이 폴더를 구분해 주세요.    
+ * frontend/ : React 앱.   
+ * backend/ : FastAPI 서버    
 1단계: 기본 골격 및 3D 에디터 (Primitive Shape & State)
 목표: React + Three.js 환경을 구축하고, 박스/원통으로 로봇의 관절 구조(Parent-Child)를 시각화하며, 웹상에서 조인트를 움직여보는 단계입니다.
 📋 Prompt 1-1: Frontend 프로젝트 설정 및 3D 뷰어
@@ -108,3 +109,4 @@ FastAPI 백엔드에 'Export ROS Package' 기능을 추가하려고 해. Jinja2 
  * 한 번에 하나씩: 위 프롬프트를 한 번에 다 넣지 마시고, 1-1이 완료되고 코드가 정상 작동하면 1-2를 넣으세요.
  * 파일 분리: Gemini가 코드를 너무 길게 짜주면 "이 부분을 components/Sidebar.tsx로 분리해 줘"라고 요청하여 코드를 깔끔하게 유지하세요.
  * 에러 발생 시: 에러 로그를 그대로 복사해서 "이런 에러가 나는데 고쳐줘"라고 하면 아주 잘 고쳐줍니다.
+```
