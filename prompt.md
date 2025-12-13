@@ -1,112 +1,63 @@
-prompt
-```
-VS Code의 Gemini Pro Extension을 활용하여 효율적으로 개발하실 수 있도록, 3단계 마일스톤으로 나누어 프롬프트를 작성했습니다.    
-이 프롬프트들은 복사(Copy) -> 붙여넣기(Paste) 하시면 바로 코드를 생성해 주도록 최적화되어 있습니다.    
-📂 사전 준비 (Project Structure)    
-먼저 프로젝트 폴더를 하나 만들고, 터미널에서 아래와 같이 폴더를 구분해 주세요.    
- * frontend/ : React 앱.   
- * backend/ : FastAPI 서버    
-1단계: 기본 골격 및 3D 에디터 (Primitive Shape & State)
-목표: React + Three.js 환경을 구축하고, 박스/원통으로 로봇의 관절 구조(Parent-Child)를 시각화하며, 웹상에서 조인트를 움직여보는 단계입니다.
-📋 Prompt 1-1: Frontend 프로젝트 설정 및 3D 뷰어
-(VS Code에서 frontend 폴더를 열고 입력하세요)
-현재 폴더에 React, Vite, TypeScript, Tailwind CSS, React Three Fiber(R3F), Drei, Leva, Zustand를 사용하는 로봇 URDF 빌더 웹 앱의 기본 구조를 만들어줘.
-
-요구사항:
-1. `useRobotStore` (Zustand): 로봇의 링크와 조인트 데이터를 트리 구조로 관리.
-   - 초기 데이터: Base Link(Box 형태) 하나만 존재.
-   - 각 링크/조인트는 고유 ID, position, rotation, type, shape(box/cylinder), dimensions 속성을 가짐.
-2. `RobotVisualizer` (R3F Component): Store의 데이터를 기반으로 재귀적(Recursive)으로 로봇을 렌더링.
-   - Link는 <Box> 또는 <Cylinder> 메쉬로 렌더링.
-   - Joint는 <Group>으로 감싸고, Drei의 <TransformControls>를 사용하거나 Leva 패널을 통해 로컬 회전(Rotation)을 제어할 수 있어야 함.
-3. `App.tsx`: 화면을 좌측(트리 구조 및 추가 버튼), 중앙(3D Canvas), 우측(속성 편집기)으로 3분할 레이아웃 적용.
-
-위 내용을 구현하는 핵심 코드들(App.tsx, store.ts, RobotVisualizer.tsx)을 작성해 줘.
-
-📋 Prompt 1-2: 인터랙티브 UI (조인트/링크 추가 기능)
-(위 코드가 생성된 후 이어서 입력)
-이제 좌측 패널과 우측 패널의 기능을 구현해 줘.
-
-1. 좌측 패널 (Hierarchy & Actions):
-   - 현재 로봇의 계층 구조를 트리 리스트로 보여줘.
-   - 각 항목 옆에 'Add Child Joint' 또는 'Add Child Link' 버튼을 추가해 줘.
-   - 버튼 클릭 시 `useRobotStore`에 새로운 조인트/링크 객체가 추가되고 3D 화면에 즉시 박스/원통이 붙어서 나타나야 함.
-2. 우측 패널 (Inspector):
-   - 3D 뷰나 좌측 트리에서 특정 링크/조인트를 클릭하면 'Selected' 상태가 됨.
-   - 선택된 항목의 크기(Dimension), 색상, 조인트 각도 등을 수정할 수 있는 입력 폼(Input)을 보여줘.
-   - 입력 값이 바뀌면 3D 모델이 실시간으로 업데이트되도록 바인딩해 줘.
-
-> ✅ 확인 포인트 (Checklist)
->  * npm run dev 실행 시 화면이 뜨는가?
->  * 'Add' 버튼을 누르면 회색 박스/원통이 계속 이어져서 생성되는가?
->  * 우측 패널에서 슬라이더를 움직이면 관절이 꺾이는가?
-> 
-2단계: STL 파일 업로드 및 서버 연동 (Backend & STL)
-목표: Python 백엔드를 구축하여 기구팀이 만든 STL 파일을 업로드하고, 3D 뷰어의 박스를 실제 STL 모델로 교체합니다.
-📋 Prompt 2-1: FastAPI 백엔드 구축 및 파일 업로드
-(VS Code에서 backend 폴더를 열고 입력하세요)
-Python FastAPI를 사용하여 백엔드 서버를 구축해 줘.
-
-요구사항:
-1. `main.py`: 기본 서버 파일. CORS 설정(프론트엔드 5173 포트 허용) 포함.
-2. STL 파일 업로드 API (`POST /upload`):
-   - 사용자가 STL 파일을 업로드하면 서버의 `static/meshes/` 폴더에 저장.
-   - 저장된 파일에 접근할 수 있는 정적 파일 URL을 반환 (예: `http://localhost:8000/static/meshes/base_link.stl`).
-3. 프로젝트 구조를 잡고, `uvicorn`으로 실행 가능한 코드를 작성해 줘.
-
-📋 Prompt 2-2: 프론트엔드 STL 로더 연동
-(다시 frontend 코드로 돌아와서 입력)
-프론트엔드의 `Inspector` (우측 패널) 컴포넌트와 `RobotVisualizer`를 수정해서 STL 기능을 추가해 줘.
-
-1. 우측 패널 수정:
-   - 링크(Link) 선택 시 'Upload STL' 버튼 추가.
-   - 파일을 선택하면 백엔드(`http://localhost:8000/upload`)로 전송.
-   - 서버로부터 받은 URL을 해당 링크의 `meshUrl` 속성에 저장.
-2. 3D 뷰어 수정:
-   - 링크 데이터에 `meshUrl`이 있으면, 기존 Box/Cylinder 대신 R3F의 `useLoader`와 `STLLoader`를 사용하여 해당 STL 파일을 렌더링.
-   - STL 로딩 중 에러를 방지하기 위해 `<Suspense>` 처리도 포함해 줘.
-
-> ✅ 확인 포인트 (Checklist)
->  * backend에서 서버 실행(uvicorn main:app --reload), frontend 실행 상태인가?
->  * 웹 UI에서 STL 파일을 업로드하면 backend/static/meshes 폴더에 파일이 생기는가?
->  * 업로드 직후 웹 3D 화면의 박스가 멋진 로봇 부품으로 변하는가?
-> 
-3단계: ROS 패키지 구조화 및 Export (URDF/Xacro/MJCF)
-목표: 현재 작업물을 SW팀이 바로 쓸 수 있는 형태(ZIP)로 내보냅니다.
-📋 Prompt 3-1: URDF/Xacro 생성 및 ROS 패키지 패킹 (Backend)
-(백엔드 코드 작업)
-FastAPI 백엔드에 'Export ROS Package' 기능을 추가하려고 해. Jinja2 템플릿을 사용할 거야.
-
-요구사항:
-1. 데이터 수신: 프론트엔드에서 현재 로봇의 전체 JSON 트리 데이터(링크, 조인트, STL 파일명 등)를 `POST /export`로 받음.
-2. 파일 생성 로직 (`export_manager.py` 등):
-   - 임시 폴더에 ROS 패키지 표준 구조 생성 (`urdf/`, `meshes/`, `launch/`, `rviz/`, `CMakeLists.txt`, `package.xml`).
-   - **URDF 생성:** JSON 트리를 순회하며 표준 URDF XML 작성.
-   - **Xacro 생성:** 주요 수치(길이, 질량)를 `<xacro:property>`로 뺀 `.xacro` 파일도 같이 생성.
-   - **Launch 파일:** `robot_state_publisher`와 `rviz`를 실행하는 `display.launch` 자동 생성.
-   - **Meshes:** 사용자가 업로드했던 STL 파일들을 이 패키지의 `meshes/` 폴더로 복사.
-3. 압축 및 반환: 생성된 전체 폴더를 ZIP으로 압축하여 클라이언트에게 다운로드 제공.
-
-위 로직을 수행하는 파이썬 코드와 템플릿 예시를 작성해 줘.
-
-📋 Prompt 3-2: MuJoCo(MJCF) 변환 기능 추가 (Advanced)
-(백엔드 코드 작업 - 옵션)
-방금 만든 Export 기능에 MuJoCo(MJCF) 포맷 지원도 추가해 줘.
-
-1. URDF to MJCF 변환:
-   - 사용자가 보낸 로봇 데이터 혹은 생성된 URDF를 기반으로 `mujoco` 호환 XML을 생성하는 로직 추가.
-   - MuJoCo는 조인트 정의 방식이 조금 다르므로(body 안에 joint 포함), 이를 고려해 재귀적으로 XML 태그를 생성하는 함수를 만들어줘.
-2. 결과물 포함:
-   - ZIP 파일 내보낼 때 `mujoco/` 폴더를 만들고 그 안에 `robot.xml` (MJCF 파일)을 같이 포함시켜 줘.
-
-> ✅ 확인 포인트 (Checklist)
->  * 프론트엔드에 'Download Package' 버튼을 만들고 백엔드 API를 호출했는가?
->  * 다운로드된 ZIP 파일을 풀었을 때 urdf, meshes, launch 폴더가 예쁘게 들어있는가?
->  * 터미널에서 check_urdf robot.urdf (ROS 설치 시) 명령어로 문법 오류가 없는지 확인.
->  * 생성된 display.launch를 실행했을 때 RViz가 뜨고 로봇이 보이는가?
-> 
-💡 Tip: VS Code Gemini Pro Extension 사용 팁
- * 한 번에 하나씩: 위 프롬프트를 한 번에 다 넣지 마시고, 1-1이 완료되고 코드가 정상 작동하면 1-2를 넣으세요.
- * 파일 분리: Gemini가 코드를 너무 길게 짜주면 "이 부분을 components/Sidebar.tsx로 분리해 줘"라고 요청하여 코드를 깔끔하게 유지하세요.
- * 에러 발생 시: 에러 로그를 그대로 복사해서 "이런 에러가 나는데 고쳐줘"라고 하면 아주 잘 고쳐줍니다.
-```
+네, 아주 좋은 접근입니다. VS Code Gemini Pro Extension에게 **"우리가 만들려는 전체 그림(Master Plan)"**을 한 번에 명확히 주입하고, 단계별로 코드를 짜게 하는 것이 가장 효율적입니다.
+앞서 논의한 다중 분기(Branching), 가상 링크(Virtual Link), STL 로드, ROS 패키지 Export 기능을 모두 통합하여 하나의 마스터 프롬프트로 정리했습니다.
+이 내용을 복사해서 Gemini에게 전달하시면 됩니다.
+📋 RobotLinkForge 개발을 위한 마스터 프롬프트
+아래 내용을 VS Code 채팅창에 그대로 붙여넣으세요.
+Role: 너는 React, Three.js(R3F), Python(FastAPI)에 능숙한 풀스택 로보틱스 툴 개발자야.
+Goal: 기구 개발자와 SW 개발자가 협업할 수 있는 웹 기반 로봇 모델링 도구 **'RobotLinkForge'**를 구축하려고 해.
+이 툴은 사용자가 웹에서 로봇의 관절(Joint)과 링크(Link)를 조립하고, STL 파일을 입히고, 최종적으로 시뮬레이션 가능한 ROS 패키지(URDF/MJCF)로 내보내는 기능을 제공해야 해.
+우리는 아래의 4단계 마일스톤으로 개발을 진행할 거야. 각 단계의 요구사항을 숙지하고, 내가 요청할 때마다 해당 단계의 코드를 작성해 줘.
+🛠️ 기술 스택 (Tech Stack)
+ * Frontend: React, Vite, TypeScript, Tailwind CSS, Zustand (State Management)
+ * 3D Graphics: React Three Fiber (R3F), Drei, Leva
+ * Backend: Python FastAPI
+ * Data Format: URDF 표준을 따르는 JSON 트리 구조
+📅 단계별 상세 요구사항 (Milestones)
+Step 1: 핵심 데이터 구조 및 3D 뷰어 (Core & Visualizer)
+가장 중요한 단계야. 로봇 손(Hand)처럼 한 링크에서 여러 손가락이 뻗어 나가는 '다중 분기(Multi-Branching)' 구조를 지원해야 해.
+ * Zustand Store (useRobotStore):
+   * Link Interface:
+     * id (UUID), name, visual ({ type: 'box' | 'cylinder' | 'sphere' | 'none', dimensions, color, meshUrl })
+     * childJoints: string[] (이 링크에 연결된 자식 조인트들의 ID 리스트 -> 다중 분기 지원 핵심)
+   * Joint Interface:
+     * id, name, type (revolute, fixed, prismatic 등)
+     * parentLinkId, childLinkId
+     * origin: { xyz: [x,y,z], rpy: [r,p,y] } (부모 링크로부터의 상대적 위치/회전 오프셋)
+     * axis, limits, currentValue (현재 각도)
+   * 기능: visual type이 'none'일 경우 메쉬는 그리지 않지만 좌표계 연결은 유지해야 함 (가상 링크 지원).
+ * 3D Visualizer (RobotVisualizer Component):
+   * BaseLink부터 시작하여 재귀적(Recursive)으로 렌더링.
+   * 렌더링 로직: Link 렌더링 -> childJoints 순회 -> 각 Joint의 origin만큼 이동/회전한 <Group> 생성 -> Joint 축 표시 -> 연결된 Child Link 렌더링 (재귀).
+Step 2: 인터랙티브 에디터 UI (GUI)
+ * Layout: 좌측(트리), 중앙(3D 뷰), 우측(인스펙터).
+ * Hierarchy Tree (Left):
+   * 트리 구조 시각화.
+   * Link 선택 시: [+] Add Joint 버튼 노출. (클릭 시 새로운 Joint와 Child Link 생성).
+   * 삭제 기능: 하위 트리 전체 삭제 (Cascade Delete).
+ * Inspector (Right):
+   * Joint 선택 시: Origin (XYZ, RPY) 정밀 수정 입력창, Joint Limit, 테스트용 슬라이더 제공.
+   * Link 선택 시: Visual Type 변경 (Box <-> None), 색상 변경.
+   * 실시간 반영: 입력 즉시 3D 뷰어 업데이트.
+Step 3: STL 파일 업로드 및 백엔드 연동
+ * Backend (FastAPI):
+   * POST /upload: STL 파일을 받아 static/meshes/에 저장하고 접근 URL 반환.
+ * Frontend:
+   * Inspector에 'Upload STL' 버튼 추가.
+   * 업로드 완료 시 해당 Link의 visual.type을 'mesh'로 변경하고 meshUrl 업데이트.
+   * R3F에서 useLoader(STLLoader, url)를 통해 렌더링.
+Step 4: ROS 패키지 Export (Final)
+ * Backend Logic:
+   * POST /export: 전체 로봇 JSON 데이터를 수신.
+   * ROS 표준 패키지 구조 생성: urdf/, meshes/, launch/, rviz/, CMakeLists.txt, package.xml.
+   * URDF Generation: JSON 트리를 순회하며 XML 생성 (STL 경로를 package://...로 자동 변환).
+   * RViz & Launch: display.launch (Joint State Publisher GUI + Robot State Publisher + RViz) 자동 생성.
+ * Output: 생성된 폴더를 .zip으로 압축하여 다운로드 제공.
+작업 지시:
+위의 Step 1 (핵심 데이터 구조 및 3D 뷰어) 부터 코드를 작성해 줘.
+App.tsx, store.ts, RobotVisualizer.tsx 파일을 중심으로 작성하고, 다중 분기와 가상 링크(Visual None)가 잘 작동하도록 신경 써줘.
+💡 사용 가이드
+ * 위 내용을 복사해서 Gemini에게 붙여넣으세요.
+ * Gemini가 Step 1 코드를 작성해주면, 프로젝트에 적용하고 실행해보세요.
+   * 확인 포인트: 화면에 박스가 뜨는지, Add Joint를 여러 번 눌렀을 때 가지치기가 되는지 확인.
+ * Step 1이 잘 돌아가면, 채팅창에 "이제 Step 2 UI 기능을 구현해 줘" 라고 입력하세요. (이미 마스터 프롬프트에 내용이 있어서 찰떡같이 알아듣습니다.)
+ * 이어서 Step 3, Step 4도 순차적으로 요청하시면 됩니다.
