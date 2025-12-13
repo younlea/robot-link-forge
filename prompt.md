@@ -1,6 +1,8 @@
 네, 아주 좋은 접근입니다. VS Code Gemini Pro Extension에게 **"우리가 만들려는 전체 그림(Master Plan)"**을 한 번에 명확히 주입하고, 단계별로 코드를 짜게 하는 것이 가장 효율적입니다.
 앞서 논의한 다중 분기(Branching), 가상 링크(Virtual Link), STL 로드, ROS 패키지 Export 기능을 모두 통합하여 하나의 마스터 프롬프트로 정리했습니다.
 이 내용을 복사해서 Gemini에게 전달하시면 됩니다.
+
+```
 📋 RobotLinkForge 개발을 위한 마스터 프롬프트
 아래 내용을 VS Code 채팅창에 그대로 붙여넣으세요.
 Role: 너는 React, Three.js(R3F), Python(FastAPI)에 능숙한 풀스택 로보틱스 툴 개발자야.
@@ -61,3 +63,10 @@ App.tsx, store.ts, RobotVisualizer.tsx 파일을 중심으로 작성하고, 다�
    * 확인 포인트: 화면에 박스가 뜨는지, Add Joint를 여러 번 눌렀을 때 가지치기가 되는지 확인.
  * Step 1이 잘 돌아가면, 채팅창에 "이제 Step 2 UI 기능을 구현해 줘" 라고 입력하세요. (이미 마스터 프롬프트에 내용이 있어서 찰떡같이 알아듣습니다.)
  * 이어서 Step 3, Step 4도 순차적으로 요청하시면 됩니다.
+
+
+```
+
+
+
+
