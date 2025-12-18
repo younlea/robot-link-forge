@@ -133,5 +133,87 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             selectedItem: { id: newJoint.id, type: 'joint' }
         }
     })
-  }
+  },
+
+  // --- Save/Load Functionality ---
+  saveRobot: async () => {
+    const { links, joints, baseLinkId } = getState();
+    const robotData = {
+      links,
+      joints,
+      baseLinkId,
+    };
+    const jsonString = JSON.stringify(robotData, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+
+    // Modern approach: File System Access API
+    if ('showSaveFilePicker' in window) {
+      try {
+        const handle = await window.showSaveFilePicker({
+          suggestedName: 'robot-model.json',
+          types: [{
+            description: 'JSON Files',
+            accept: { 'application/json': ['.json'] },
+          }],
+        });
+        const writable = await handle.createWritable();
+        await writable.write(blob);
+        await writable.close();
+        return; // Success
+      } catch (err) {
+        // Handle cancellation or errors
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          console.log('Save dialog was cancelled.');
+        } else {
+          console.error('Error saving file:', err);
+        }
+        return; // Exit on error or cancellation
+      }
+    }
+
+    // Fallback approach for older browsers
+    const fileName = prompt("Enter a filename for your robot model:", "robot-model.json");
+    if (fileName) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName.endsWith('.json') ? fileName : `${fileName}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+  },
+
+  loadRobot: (file: File) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const jsonString = event.target?.result;
+        if (typeof jsonString !== 'string') {
+          throw new Error('File could not be read as text.');
+        }
+        const robotData = JSON.parse(jsonString);
+        // Basic validation
+        if (robotData.links && robotData.joints && robotData.baseLinkId) {
+          setState({
+            links: robotData.links,
+            joints: robotData.joints,
+            baseLinkId: robotData.baseLinkId,
+            selectedItem: { id: null, type: null }, // Deselect after loading
+          });
+        } else {
+          throw new Error('Invalid robot data format.');
+        }
+      } catch (error) {
+        console.error("Failed to load and parse robot data:", error);
+        alert("Failed to load robot file. Please check the console for details.");
+      }
+    };
+    reader.onerror = (error) => {
+        console.error("Error reading file:", error);
+        alert("Error reading file.");
+    }
+    reader.readAsText(file);
+  },
 }));

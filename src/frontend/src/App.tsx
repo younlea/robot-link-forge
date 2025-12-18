@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import React from 'react';
 import { Canvas, ThreeEvent } from '@react-three/fiber';
 import { Grid } from '@react-three/drei';
 import RobotVisualizer from './components/RobotVisualizer';
@@ -8,13 +9,10 @@ import { CameraManager } from './components/CameraManager';
 import { CameraUI } from './components/CameraUI';
 
 function App() {
-  const { selectItem } = useRobotStore.getState();
+  const { selectItem } = useRobotStore();
 
   const handleCanvasClick = (event: ThreeEvent<MouseEvent>) => {
     event.stopPropagation();
-    // This check is problematic because the grid is an intersection.
-    // A better way is to check if a selectable object was clicked.
-    // For now, we clear selection only on a true miss.
     if (event.intersections.length === 0 || event.intersections[0].object?.name === 'grid') {
       selectItem(null, null);
     }

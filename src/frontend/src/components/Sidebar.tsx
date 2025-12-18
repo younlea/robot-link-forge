@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useRobotStore } from '../store';
 import { RobotLink, RobotJoint, JointType } from '../types';
-import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d } from 'lucide-react';
+import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen } from 'lucide-react';
 
 // --- Reusable Input Components (with fixes) ---
 const NumberInput = ({ label, value, onChange, step = 0.01 }: { label: string, value: number, onChange: (val: number) => void, step?: number }) => {
@@ -198,12 +198,57 @@ const GlobalJointController = () => {
 
 
 const Sidebar = () => {
-    const { selectedItem, links, joints, selectItem } = useRobotStore();
+    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot } = useRobotStore();
     const selectedLink = selectedItem.type === 'link' ? links[selectedItem.id!] : null;
     const selectedJoint = selectedItem.type === 'joint' ? joints[selectedItem.id!] : null;
+    
+    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const handleLoadClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (file) {
+            loadRobot(file);
+        }
+        // Reset file input to allow loading the same file again
+        if(event.target) {
+            event.target.value = '';
+        }
+    };
+
 
     return (
         <div className="absolute top-0 right-0 h-screen w-80 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 border-l border-gray-700 overflow-y-auto">
+            {/* File Operations */}
+            <div className="pb-4 mb-4 border-b border-gray-700">
+                <h2 className="text-xl font-bold">Robot Link Forge</h2>
+                <div className="flex space-x-2 mt-2">
+                    <button 
+                        onClick={() => saveRobot()}
+                        className="flex-1 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 p-2 rounded text-sm"
+                    >
+                       <Save className="mr-2 h-4 w-4" /> Save
+                    </button>
+                    <button 
+                        onClick={handleLoadClick}
+                        className="flex-1 flex items-center justify-center bg-gray-600 hover:bg-gray-700 p-2 rounded text-sm"
+                    >
+                       <FolderOpen className="mr-2 h-4 w-4" /> Load
+                    </button>
+                     <input
+                        type="file"
+                        ref={fileInputRef}
+                        onChange={handleFileChange}
+                        className="hidden"
+                        accept=".json,application/json"
+                    />
+                </div>
+            </div>
+
+            {/* Inspector / Global Controls */}
             <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold">{selectedItem.id ? 'Inspector' : 'Global Controls'}</h2>
                 {selectedItem.id && (
