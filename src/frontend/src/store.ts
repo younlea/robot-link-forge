@@ -18,6 +18,7 @@ const createInitialState = (): RobotState => {
     joints: {},
     baseLinkId: baseLinkId,
     selectedItem: { id: baseLinkId, type: 'link' },
+    cameraMode: 'rotate', // Default camera mode
   };
 };
 
@@ -46,10 +47,27 @@ const createDefaultLink = (): RobotLink => ({
     childJoints: [],
 });
 
-export const useRobotStore = create<RobotState & RobotActions>((setState) => ({
+export const useRobotStore = create<RobotState & RobotActions>((setState, getState) => ({
   ...createInitialState(),
+  cameraControls: null,
+
+  setCameraControls: (controls) => setState({ cameraControls: controls }),
+
+  zoomIn: () => {
+    // Dolly forward to zoom in. The value is a distance in world units.
+    // A negative value moves the camera closer to the target.
+    getState().cameraControls?.dolly(-0.5, true);
+  },
+
+  zoomOut: () => {
+    // Dolly backward to zoom out.
+    // A positive value moves the camera away from the target.
+    getState().cameraControls?.dolly(0.5, true);
+  },
 
   selectItem: (id, type) => setState({ selectedItem: { id, type } }),
+  setCameraMode: (mode) => setState({ cameraMode: mode }),
+
 
   updateJoint: (id, path, value) => {
     setState((state) => {

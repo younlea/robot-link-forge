@@ -1,4 +1,5 @@
 // src/frontend/src/types.ts
+import type { CameraControls } from '@react-three/drei';
 
 export type Visual = {
   type: 'box' | 'cylinder' | 'sphere' | 'none';
@@ -53,6 +54,12 @@ export interface RobotJoint {
     lower: number;
     upper: number;
   };
+
+  // Physical relationship to parent
+  origin: {
+    xyz: [number, number, number];
+    rpy: [number, number, number];
+  };
 }
 
 export type SelectedItem = {
@@ -65,6 +72,8 @@ export interface RobotState {
   joints: Record<string, RobotJoint>;
   baseLinkId: string;
   selectedItem: SelectedItem;
+  cameraMode: 'rotate' | 'pan';
+  cameraControls: CameraControls | null;
 }
 
 export interface RobotActions {
@@ -77,4 +86,10 @@ export interface RobotActions {
   
   // Selection
   selectItem: (id: string | null, type: 'link' | 'joint' | null) => void;
+
+  // Camera Control
+  setCameraMode: (mode: 'rotate' | 'pan') => void;
+  setCameraControls: (controls: CameraControls | null) => void;
+  zoomIn: () => void;
+  zoomOut: () => void;
 }

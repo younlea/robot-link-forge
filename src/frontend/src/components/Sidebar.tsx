@@ -1,4 +1,3 @@
-// src/frontend/src/components/Sidebar.tsx
 import React, { useState, useEffect } from 'react';
 import { useRobotStore } from '../store';
 import { RobotLink, RobotJoint, JointType } from '../types';
@@ -12,11 +11,12 @@ const NumberInput = ({ label, value, onChange, step = 0.01 }: { label: string, v
         if (parseFloat(strValue) !== value) {
             setStrValue(value.toString());
         }
-    }, [value, strValue]);
+    }, [value]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         setStrValue(val);
+        // Allow negative sign
         if (val === '' || val === '-') {
             onChange(0);
         } else {
@@ -27,7 +27,12 @@ const NumberInput = ({ label, value, onChange, step = 0.01 }: { label: string, v
         }
     };
     
-    const handleBlur = () => { setStrValue(value.toString()); }
+    const handleBlur = () => {
+        // If the user leaves the input empty or with just a '-', reset to the last valid value.
+        if (strValue === '' || strValue === '-') {
+            setStrValue(value.toString());
+        }
+    }
 
     return (
         <div className="flex items-center justify-between mb-2">
@@ -94,8 +99,8 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                     className="text-lg font-bold bg-transparent focus:bg-gray-800 rounded p-1 -m-1 w-full"/>
             </div>
             
-            <Vector3Input label="Origin XYZ" value={joint.origin?.xyz || [0,0,0]} onChange={(p, v) => updateJoint(joint.id, `origin.${p}`, v)} path="xyz" />
-            <Vector3Input label="Origin RPY" value={joint.origin?.rpy || [0,0,0]} onChange={(p, v) => updateJoint(joint.id, `origin.${p}`, v)} path="rpy" />
+            <Vector3Input label="Origin XYZ" value={joint.origin?.xyz || [0,0,0]} onChange={(p, v) => updateJoint(joint.id, `origin.xyz${p.substring(p.indexOf('['))}`, v)} path="xyz" />
+            <Vector3Input label="Origin RPY" value={joint.origin?.rpy || [0,0,0]} onChange={(p, v) => updateJoint(joint.id, `origin.rpy${p.substring(p.indexOf('['))}`, v)} path="rpy" />
 
             <div>
                 <label className="text-xs text-gray-400">Joint Type</label>
@@ -117,7 +122,7 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
             )}
             {joint.type === 'prismatic' && (
                  <div className="p-2 bg-gray-900/50 rounded">
-                    <Vector3Input label="Axis" value={joint.axis} onChange={(p, v) => updateJoint(joint.id, p, v)} path="axis" />
+                    <Vector3Input label="Axis" value={joint.axis} onChange={(p, v) => updateJoint(joint.id, `axis${p.substring(p.indexOf('['))}`, v)} path="axis" />
                 </div>
             )}
 
@@ -149,6 +154,49 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
 };
 
 // --- Main Sidebar Component ---
+
+// --- Global Joint Controller (Default View) ---
+const GlobalJointController = () => {
+    const { joints, updateJoint, selectItem } = useRobotStore();
+    const jointList = Object.values(joints).filter(j => j.type !== 'fixed');
+
+    if (jointList.length === 0) {
+        return <p className="text-gray-400">No movable joints in the robot. Add a joint to begin.</p>;
+    }
+
+    return (
+        <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-gray-300">Robot Pose Controller</h3>
+            {jointList.map((joint) => (
+                <div key={joint.id} className="p-2 bg-gray-900/50 rounded">
+                    <p 
+                        className="text-md font-semibold mb-2 cursor-pointer hover:text-blue-400"
+                        onClick={() => selectItem(joint.id, 'joint')}
+                        title="Click to inspect this joint"
+                    >
+                        {joint.name}
+                    </p>
+                    <div className="space-y-2">
+                        {joint.type === 'rotational' && joint.dof.roll && (
+                            <div><label className="text-xs flex justify-between"><span>Roll</span> <span>{joint.currentValues.roll.toFixed(2)}</span></label><input type="range" min={-Math.PI} max={Math.PI} step={0.01} value={joint.currentValues.roll} onChange={e => updateJoint(joint.id, 'currentValues.roll', parseFloat(e.target.value))} className="w-full"/></div>
+                        )}
+                        {joint.type === 'rotational' && joint.dof.pitch && (
+                            <div><label className="text-xs flex justify-between"><span>Pitch</span> <span>{joint.currentValues.pitch.toFixed(2)}</span></label><input type="range" min={-Math.PI} max={Math.PI} step={0.01} value={joint.currentValues.pitch} onChange={e => updateJoint(joint.id, 'currentValues.pitch', parseFloat(e.target.value))} className="w-full"/></div>
+                        )}
+                        {joint.type === 'rotational' && joint.dof.yaw && (
+                            <div><label className="text-xs flex justify-between"><span>Yaw</span> <span>{joint.currentValues.yaw.toFixed(2)}</span></label><input type="range" min={-Math.PI} max={Math.PI} step={0.01} value={joint.currentValues.yaw} onChange={e => updateJoint(joint.id, 'currentValues.yaw', parseFloat(e.target.value))} className="w-full"/></div>
+                        )}
+                        {joint.type === 'prismatic' && (
+                             <div><label className="text-xs flex justify-between"><span>Displacement</span> <span>{joint.currentValues.displacement.toFixed(2)}</span></label><input type="range" min={-1} max={1} step={0.01} value={joint.currentValues.displacement} onChange={e => updateJoint(joint.id, 'currentValues.displacement', parseFloat(e.target.value))} className="w-full"/></div>
+                        )}
+                    </div>
+                </div>
+            ))}
+        </div>
+    );
+};
+
+
 const Sidebar = () => {
     const { selectedItem, links, joints, selectItem } = useRobotStore();
     const selectedLink = selectedItem.type === 'link' ? links[selectedItem.id!] : null;
@@ -157,16 +205,16 @@ const Sidebar = () => {
     return (
         <div className="absolute top-0 right-0 h-screen w-80 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 border-l border-gray-700 overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">Inspector</h2>
+                <h2 className="text-xl font-bold">{selectedItem.id ? 'Inspector' : 'Global Controls'}</h2>
                 {selectedItem.id && (
-                    <button onClick={() => selectItem(null, null)} title="Deselect"
+                    <button onClick={() => selectItem(null, null)} title="Deselect and show Global Controls"
                         className="flex items-center text-sm bg-gray-700 hover:bg-gray-600 p-2 rounded">
                         <Move3d className="h-4 w-4" />
                     </button>
                 )}
             </div>
 
-            {!selectedItem.id && <p className="text-gray-400">Select a Link or Joint in the 3D view.</p>}
+            {!selectedItem.id && <GlobalJointController />}
             {selectedLink && <LinkInspector link={selectedLink} />}
             {selectedJoint && <JointInspector joint={selectedJoint} />}
         </div>

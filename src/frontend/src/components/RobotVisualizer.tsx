@@ -118,7 +118,15 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
                 
                 if (end.lengthSq() < 0.0001) return null; // Avoid zero-length cylinder
 
-                const length = start.distanceTo(end);
+                const JOINT_VISUAL_RADIUS = 0.02; // Matches the Sphere args in JointWrapper
+                const GAP_OFFSET = JOINT_VISUAL_RADIUS * 1.5; // Create a visible gap
+
+                const originalLength = start.distanceTo(end);
+                const length = Math.max(0, originalLength - (GAP_OFFSET * 2)); // Don't allow negative length
+                
+                // If the link is too short to be visible, don't render it.
+                if (length <= 0) return null;
+
                 const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
 
                 const orientation = new THREE.Quaternion();
@@ -173,13 +181,13 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
 
 // --- Main Visualizer with Gizmo Logic ---
 const RobotVisualizer: React.FC = () => {
-  const { baseLinkId, selectedItem, updateJoint } = useRobotStore();
-  const orbitControls = useThree(state => state.controls) as any;
-
-  const [objectRefs] = useState(() => new Map<string, THREE.Object3D>());
+  const { baseLinkId, selectedItem, updateJoint, cameraMode, setCameraMode } = useRobotStore();
+  // We get the camera controls via the new manager, not useThree, to avoid conflicts
+  // const orbitControls = useThree(state => state.controls) as any; 
+  const { scene } = useThree();
   const transformControlsRef = useRef<any>(null!);
-  const [gizmoMode, setGizmoMode] = useState<GizmoMode>("translate");
-  
+  const [objectRefs] = useState(() => new Map<string, THREE.Object3D>());
+
   const registerRef: RegisterRef = (id, ref) => {
     if (ref) objectRefs.set(id, ref);
     else objectRefs.delete(id);
@@ -197,14 +205,23 @@ const RobotVisualizer: React.FC = () => {
         controls.visible = false;
     }
     
+    // This logic to disable camera controls during object dragging is now more complex
+    // because the controls are managed in CameraManager. We'll handle this with a new state.
+    // For now, we focus on the main task. A simple way is to check the `dragging` property.
     if (controls) {
+        // Guard against race condition: cameraControls might not be set yet.
+        const cameraControls = (scene.userData.cameraControls as any);
+        if (!cameraControls) {
+          return;
+        }
+
         const callback = (event: any) => {
-            if (orbitControls) orbitControls.enabled = !event.value
+            if (cameraControls) cameraControls.enabled = !event.value
         };
         controls.addEventListener('dragging-changed', callback);
         return () => controls.removeEventListener('dragging-changed', callback);
     }
-  }, [selectedItem, objectRefs, orbitControls]);
+  }, [selectedItem, objectRefs, scene]);
 
   const handleObjectChange = () => {
     const controls = transformControlsRef.current;
@@ -222,12 +239,14 @@ const RobotVisualizer: React.FC = () => {
     <>
       <Html position={[-4, 2, 0]} wrapperClass="w-32">
         <div className="bg-gray-800 bg-opacity-80 p-1 rounded-lg flex justify-around">
-            <button onClick={() => setGizmoMode("translate")} className={`p-2 rounded ${gizmoMode==='translate' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`}> <Move size={16}/> </button>
-            <button onClick={() => setGizmoMode("rotate")} className={`p-2 rounded ${gizmoMode==='rotate' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`}> <RotateCw size={16}/> </button>
+            {/* These buttons now control the CAMERA mode, not the transform gizmo */}
+            <button onClick={() => setCameraMode("pan")} className={`p-2 rounded ${cameraMode==='pan' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`}> <Move size={16}/> </button>
+            <button onClick={() => setCameraMode("rotate")} className={`p-2 rounded ${cameraMode==='rotate' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`}> <RotateCw size={16}/> </button>
         </div>
       </Html>
       {baseLinkId && <RecursiveLink linkId={baseLinkId} registerRef={registerRef} />}
-      <TransformControls ref={transformControlsRef} onObjectChange={handleObjectChange} mode={gizmoMode} />
+      {/* The transform gizmo is independent. Let's default it to translate. The user can cycle with 'e' key. */}
+      <TransformControls ref={transformControlsRef} onObjectChange={handleObjectChange} mode={"translate"} />
     </>
   );
 };
