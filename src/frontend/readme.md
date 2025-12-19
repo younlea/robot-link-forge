@@ -18,6 +18,18 @@ wget -qO- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
 ```
 After installation, close and reopen your terminal.
 
+**Troubleshooting: `nvm: command not found`**
+
+If you open a new terminal after installation and see `nvm: command not found`, it means the nvm script was not correctly added to your shell's startup file. You can fix this by manually adding the following lines to your shell configuration file (e.g., `~/.bashrc`, `~/.zshrc`):
+
+```bash
+export NVM_DIR="$HOME/.nvm"
+[ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+[ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"
+```
+
+Then, reload your shell configuration by running `source ~/.bashrc` (or your respective file, like `source ~/.zshrc`) or by opening a new terminal.
+
 **Install and Use Node.js:**
 ```bash
 # Install the latest Long-Term Support (LTS) version of Node.js
