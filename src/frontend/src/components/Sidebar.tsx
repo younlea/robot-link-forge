@@ -328,7 +328,7 @@ const Sidebar = () => {
                         ref={fileInputRef}
                         onChange={handleFileChange}
                         className="hidden"
-                        accept=".zip,application/zip"
+                        accept=".zip,application/zip,.json,application/json"
                     />
                 </div>
             </div>

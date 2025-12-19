@@ -349,54 +349,79 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
   },
 
   loadRobot: async (file: File) => {
-    if (!file.name.toLowerCase().endsWith('.zip')) {
-        alert("Invalid file type. Please upload a '.zip' file created by RobotLinkForge.");
-        return;
+    // Handle legacy .json files
+    if (file.name.toLowerCase().endsWith('.json')) {
+        try {
+            const jsonString = await file.text();
+            const robotData = JSON.parse(jsonString);
+
+            if (!robotData.links || !robotData.joints || !robotData.baseLinkId) {
+                throw new Error('Invalid robot data format in JSON file.');
+            }
+            // Simple state overwrite for old format
+            setState({
+                links: robotData.links,
+                joints: robotData.joints,
+                baseLinkId: robotData.baseLinkId,
+                selectedItem: { id: null, type: null },
+            });
+        } catch (error) {
+            console.error("Failed to load and parse legacy JSON file:", error);
+            alert(`Failed to load JSON project. Error: ${error.message}`);
+        }
+        return; // End execution here
     }
-    try {
-        const zip = await JSZip.loadAsync(file);
-        const sceneFile = zip.file('robot-scene.json');
-        
-        if (!sceneFile) {
-            throw new Error("'robot-scene.json' not found in the zip archive.");
-        }
 
-        const jsonString = await sceneFile.async('string');
-        const robotData = JSON.parse(jsonString);
+    // Handle new .zip archives
+    if (file.name.toLowerCase().endsWith('.zip')) {
+        try {
+            const zip = await JSZip.loadAsync(file);
+            const sceneFile = zip.file('robot-scene.json');
+            
+            if (!sceneFile) {
+                throw new Error("'robot-scene.json' not found in the zip archive.");
+            }
 
-        if (!robotData.links || !robotData.joints || !robotData.baseLinkId) {
-            throw new Error('Invalid robot data format in robot-scene.json.');
-        }
+            const jsonString = await sceneFile.async('string');
+            const robotData = JSON.parse(jsonString);
 
-        const meshFolder = zip.folder('meshes');
-        
-        // Create local URLs for all meshes in the zip
-        if (meshFolder) {
-             for (const link of Object.values(robotData.links as Record<string, RobotLink>)) {
-                if (link.visual.type === 'mesh' && link.visual.meshUrl) {
-                    const meshFile = meshFolder.file(link.visual.meshUrl.replace('meshes/', ''));
-                    if (meshFile) {
-                        const blob = await meshFile.async('blob');
-                        // Replace relative path with a local, temporary URL
-                        link.visual.meshUrl = URL.createObjectURL(blob);
-                    } else {
-                        console.warn(`Mesh file not found in zip: ${link.visual.meshUrl}`);
-                        link.visual.meshUrl = null; // Mark as missing
+            if (!robotData.links || !robotData.joints || !robotData.baseLinkId) {
+                throw new Error('Invalid robot data format in robot-scene.json.');
+            }
+
+            const meshFolder = zip.folder('meshes');
+            
+            // Create local URLs for all meshes in the zip
+            if (meshFolder) {
+                for (const link of Object.values(robotData.links as Record<string, RobotLink>)) {
+                    if (link.visual.type === 'mesh' && link.visual.meshUrl) {
+                        const meshFile = meshFolder.file(link.visual.meshUrl.replace('meshes/', ''));
+                        if (meshFile) {
+                            const blob = await meshFile.async('blob');
+                            link.visual.meshUrl = URL.createObjectURL(blob);
+                        } else {
+                            console.warn(`Mesh file not found in zip: ${link.visual.meshUrl}`);
+                            link.visual.meshUrl = null; // Mark as missing
+                        }
                     }
                 }
             }
+
+            setState({
+                links: robotData.links,
+                joints: robotData.joints,
+                baseLinkId: robotData.baseLinkId,
+                selectedItem: { id: null, type: null },
+            });
+
+        } catch (error) {
+            console.error("Failed to load and parse robot data:", error);
+            alert(`Failed to load robot project. Please check the console for details. Error: ${error.message}`);
         }
-
-        setState({
-            links: robotData.links,
-            joints: robotData.joints,
-            baseLinkId: robotData.baseLinkId,
-            selectedItem: { id: null, type: null },
-        });
-
-    } catch (error) {
-        console.error("Failed to load and parse robot data:", error);
-        alert(`Failed to load robot project. Please check the console for details. Error: ${error.message}`);
+        return; // End execution here
     }
+
+    // If file type is neither .zip nor .json
+    alert("Invalid file type. Please upload a '.zip' or '.json' file created by RobotLinkForge.");
   },
 }));
