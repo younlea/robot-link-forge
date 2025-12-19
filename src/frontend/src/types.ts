@@ -39,6 +39,11 @@ export type JointValues = {
   displacement: number;
 }
 
+export type Limit = {
+  lower: number;
+  upper: number;
+};
+
 export interface RobotJoint {
   id: string;
   name: string;
@@ -57,10 +62,12 @@ export interface RobotJoint {
   // Current values for sliders
   currentValues: JointValues;
 
-  // Limits
-  limit?: {
-    lower: number;
-    upper: number;
+  // Limits for each potential degree of freedom
+  limits: {
+    roll: Limit;
+    pitch: Limit;
+    yaw: Limit;
+    displacement: Limit;
   };
 
   // Physical relationship to parent

@@ -55,6 +55,78 @@ const Vector3Input = ({ label, value, onChange, path }: { label: string, value: 
     </div>
 );
 
+const Vector3RadianDegreeInput = ({ label, value, onChange, path }: { label: string, value: [number, number, number], onChange: (path: string, val: any) => void, path: string }) => (
+    <div className="p-2 bg-gray-900/50 rounded">
+        <div className="flex justify-between items-center mb-1">
+            <p className="text-sm font-semibold">{label}</p>
+            <div className="flex w-3/4 space-x-1">
+                <span className="text-xs text-gray-400 w-1/2 text-center">Rad</span>
+                <span className="text-xs text-gray-400 w-1/2 text-center">Deg</span>
+            </div>
+        </div>
+        <RadianDegreeInput label="R (X)" radValue={value[0]} onRadChange={(v) => onChange(`${path}[0]`, v)} />
+        <RadianDegreeInput label="P (Y)" radValue={value[1]} onRadChange={(v) => onChange(`${path}[1]`, v)} />
+        <RadianDegreeInput label="Y (Z)" radValue={value[2]} onRadChange={(v) => onChange(`${path}[2]`, v)} />
+    </div>
+);
+
+const RadianDegreeInput = ({ label, radValue, onRadChange }: { label: string, radValue: number, onRadChange: (rad: number) => void }) => {
+    const toDegrees = (rad: number) => (rad * 180) / Math.PI;
+    const toRadians = (deg: number) => (deg * Math.PI) / 180;
+
+    const [radStr, setRadStr] = useState(radValue.toFixed(3));
+    const [degStr, setDegStr] = useState(toDegrees(radValue).toFixed(1));
+
+    useEffect(() => {
+        // Update local state when the external radValue changes
+        if (parseFloat(radStr) !== radValue) {
+            setRadStr(radValue.toFixed(3));
+            setDegStr(toDegrees(radValue).toFixed(1));
+        }
+    }, [radValue]);
+
+    const handleRadChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setRadStr(val);
+        if (val === '' || val === '-') {
+            onRadChange(0);
+            setDegStr('0.0');
+        } else {
+            const num = parseFloat(val);
+            if (!isNaN(num)) {
+                onRadChange(num);
+                setDegStr(toDegrees(num).toFixed(1));
+            }
+        }
+    };
+    
+    const handleDegChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setDegStr(val);
+         if (val === '' || val === '-') {
+            onRadChange(0);
+            setRadStr('0.000');
+        } else {
+            const num = parseFloat(val);
+            if (!isNaN(num)) {
+                const rad = toRadians(num);
+                onRadChange(rad);
+                setRadStr(rad.toFixed(3));
+            }
+        }
+    };
+
+    return (
+         <div className="flex items-center justify-between mb-2">
+            <label className="text-xs text-gray-400 w-1/4">{label}</label>
+            <div className="flex w-3/4 space-x-1">
+                <input type="number" step={0.01} value={radStr} onChange={handleRadChange} onFocus={e => e.target.select()} className="w-1/2 bg-gray-900 rounded p-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" title="Radians" />
+                <input type="number" step={1} value={degStr} onChange={handleDegChange} onFocus={e => e.target.select()} className="w-1/2 bg-gray-900 rounded p-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500" title="Degrees" />
+            </div>
+        </div>
+    );
+};
+
 const Checkbox = ({ label, checked, onChange }: { label: string, checked: boolean, onChange: (val: boolean) => void }) => (
     <label className="flex items-center space-x-2 cursor-pointer">
         <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} className="h-4 w-4 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"/>
@@ -124,8 +196,8 @@ const LinkInspector = ({ link }: { link: RobotLink }) => {
                          <h4 className="text-md font-semibold text-gray-300 border-t border-gray-700 pt-3">Mesh Properties</h4>
                          <p className="text-xs text-gray-400 truncate">URL: {link.visual.meshUrl || 'N/A'}</p>
                          <Vector3Input label="Mesh Scale" value={link.visual.meshScale || [1,1,1]} onChange={(p, v) => updateLink(link.id, `visual.meshScale${p.substring(p.indexOf('['))}`, v)} path="meshScale" />
-                         <Vector3Input label="Mesh Origin XYZ" value={link.visual.meshOrigin?.xyz || [0,0,0]} onChange={(p, v) => updateLink(link.id, `visual.meshOrigin.xyz${p.substring(p.indexOf('['))}`, v)} path="meshOrigin.xyz" />
-                         <Vector3Input label="Mesh Origin RPY" value={link.visual.meshOrigin?.rpy || [0,0,0]} onChange={(p, v) => updateLink(link.id, `visual.meshOrigin.rpy${p.substring(p.indexOf('['))}`, v)} path="meshOrigin.rpy" />
+                         <Vector3Input label="Mesh Origin XYZ" value={link.visual.meshOrigin?.xyz || [0,0,0]} onChange={(p, v) => updateLink(link.id, `visual.meshOrigin.xyz${p.substring(p.indexOf('['))}`, v)} path="xyz" />
+                         <Vector3RadianDegreeInput label="Mesh Origin RPY" value={link.visual.meshOrigin?.rpy || [0,0,0]} onChange={(p, v) => updateLink(link.id, `visual.meshOrigin.rpy${p.substring(p.indexOf('['))}`, v)} path="rpy" />
                          <button onClick={() => fitMeshToLink(link.id)} title="Auto-scales the mesh to match the link's length (defined by its child joint). Assumes the mesh's main axis is Y." className="flex items-center justify-center w-full bg-teal-600 hover:bg-teal-700 p-2 rounded text-sm">
                             <LinkIcon className="mr-2 h-4 w-4" /> Fit to Link Length
                         </button>
@@ -164,7 +236,7 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
             </div>
             
             <Vector3Input label="Origin XYZ" value={joint.origin?.xyz || [0,0,0]} onChange={(p, v) => updateJoint(joint.id, `origin.xyz${p.substring(p.indexOf('['))}`, v)} path="xyz" />
-            <Vector3Input label="Origin RPY" value={joint.origin?.rpy || [0,0,0]} onChange={(p, v) => updateJoint(joint.id, `origin.rpy${p.substring(p.indexOf('['))}`, v)} path="rpy" />
+            <Vector3RadianDegreeInput label="Origin RPY" value={joint.origin?.rpy || [0,0,0]} onChange={(p, v) => updateJoint(joint.id, `origin.rpy${p.substring(p.indexOf('['))}`, v)} path="rpy" />
 
             <div>
                 <label className="text-xs text-gray-400">Joint Type</label>
@@ -174,128 +246,279 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                 </select>
             </div>
 
-            {joint.type === 'rotational' && (
-                <div className="p-2 bg-gray-900/50 rounded">
-                    <p className="text-sm font-semibold mb-2">Degrees of Freedom</p>
-                    <div className="flex justify-around">
-                        <Checkbox label="Roll (X)" checked={joint.dof.roll} onChange={v => updateJoint(joint.id, 'dof.roll', v)} />
-                        <Checkbox label="Pitch (Y)" checked={joint.dof.pitch} onChange={v => updateJoint(joint.id, 'dof.pitch', v)} />
-                        <Checkbox label="Yaw (Z)" checked={joint.dof.yaw} onChange={v => updateJoint(joint.id, 'dof.yaw', v)} />
-                    </div>
-                </div>
-            )}
-            {joint.type === 'prismatic' && (
-                 <div className="p-2 bg-gray-900/50 rounded">
-                    <Vector3Input label="Axis" value={joint.axis} onChange={(p, v) => updateJoint(joint.id, `axis${p.substring(p.indexOf('['))}`, v)} path="axis" />
-                </div>
-            )}
+                        {joint.type === 'rotational' && (
 
-            {joint.type !== 'fixed' && (
-                <div className="p-2 bg-gray-900/50 rounded">
-                    <p className="text-sm font-semibold mb-2">Limits</p>
-                    <NumberInput 
-                        label="Lower" 
-                        value={joint.limit?.lower ?? -Math.PI} 
-                        onChange={v => updateJoint(joint.id, 'limit.lower', v)} 
-                    />
-                    <NumberInput 
-                        label="Upper" 
-                        value={joint.limit?.upper ?? Math.PI} 
-                        onChange={v => updateJoint(joint.id, 'limit.upper', v)}
-                    />
-                </div>
-            )}
-            
-            {/* Action Buttons */}
-            <div className="space-y-2 pt-2 border-t border-gray-700">
-                 {joint.childLinkId && (
-                    <>
-                        <input type="file" ref={stlInputRef} onChange={handleFileChange} className="hidden" accept=".stl" />
-                        <button onClick={handleStlUploadClick} title="Applies a mesh to the child link of this joint" className="flex items-center justify-center w-full bg-purple-600 hover:bg-purple-700 p-2 rounded text-sm">
-                            <Upload className="mr-2 h-4 w-4" /> Upload STL to Child Link
-                        </button>
-                    </>
-                )}
-                {!joint.childLinkId && (
-                     <button onClick={() => addChainedJoint(joint.id)} className="flex items-center justify-center w-full bg-green-600 hover:bg-green-700 p-2 rounded text-sm">
-                        <LinkIcon className="mr-2 h-4 w-4" /> Add Chained Joint
-                    </button>
-                )}
-            </div>
+                            <div className="p-2 bg-gray-900/50 rounded space-y-3">
 
-            {joint.type !== 'fixed' && (
-                <div className="p-2 bg-gray-900/50 rounded space-y-2">
-                    <p className="text-sm font-semibold">Test Driver</p>
-                    {joint.type === 'rotational' && joint.dof.roll && (
-                        <div><label className="text-xs">Roll</label><input type="range" min={joint.limit?.lower ?? -Math.PI} max={joint.limit?.upper ?? Math.PI} step={0.01} value={joint.currentValues.roll} onChange={e => updateJoint(joint.id, 'currentValues.roll', parseFloat(e.target.value))} className="w-full"/></div>
-                    )}
-                    {joint.type === 'rotational' && joint.dof.pitch && (
-                        <div><label className="text-xs">Pitch</label><input type="range" min={joint.limit?.lower ?? -Math.PI} max={joint.limit?.upper ?? Math.PI} step={0.01} value={joint.currentValues.pitch} onChange={e => updateJoint(joint.id, 'currentValues.pitch', parseFloat(e.target.value))} className="w-full"/></div>
-                    )}
-                    {joint.type === 'rotational' && joint.dof.yaw && (
-                        <div><label className="text-xs">Yaw</label><input type="range" min={joint.limit?.lower ?? -Math.PI} max={joint.limit?.upper ?? Math.PI} step={0.01} value={joint.currentValues.yaw} onChange={e => updateJoint(joint.id, 'currentValues.yaw', parseFloat(e.target.value))} className="w-full"/></div>
-                    )}
-                    {joint.type === 'prismatic' && (
-                         <div><label className="text-xs">Displacement</label><input type="range" min={joint.limit?.lower ?? -1} max={joint.limit?.upper ?? 1} step={0.01} value={joint.currentValues.displacement} onChange={e => updateJoint(joint.id, 'currentValues.displacement', parseFloat(e.target.value))} className="w-full"/></div>
-                    )}
-                </div>
-            )}
-        </div>
-    );
-};
+                                <div>
 
-// --- Main Sidebar Component ---
+                                    <p className="text-sm font-semibold mb-2">Degrees of Freedom</p>
 
-// --- Global Joint Controller (Default View) ---
-const GlobalJointController = () => {
-    const { joints, updateJoint, selectItem, resetJointsToZero } = useRobotStore();
-    const jointList = Object.values(joints).filter(j => j.type !== 'fixed');
+                                    <div className="flex justify-around">
 
-    if (jointList.length === 0) {
-        return <p className="text-gray-400">No movable joints in the robot. Add a joint to begin.</p>;
-    }
+                                        <Checkbox label="Roll (X)" checked={joint.dof.roll} onChange={v => updateJoint(joint.id, 'dof.roll', v)} />
 
-    return (
-        <div className="space-y-4">
-            <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-300">Robot Pose Controller</h3>
-                <button 
-                    onClick={resetJointsToZero} 
-                    title="Reset all joint values to zero"
-                    className="flex items-center text-sm bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded"
-                >
-                    <RotateCcw className="mr-2 h-4 w-4" />
-                    Reset Pose
-                </button>
-            </div>
-            {jointList.map((joint) => (
-                <div key={joint.id} className="p-2 bg-gray-900/50 rounded">
-                    <p 
-                        className="text-md font-semibold mb-2 cursor-pointer hover:text-blue-400"
-                        onClick={() => selectItem(joint.id, 'joint')}
-                        title="Click to inspect this joint"
-                    >
-                        {joint.name}
-                    </p>
-                    <div className="space-y-2">
-                        {joint.type === 'rotational' && joint.dof.roll && (
-                            <div><label className="text-xs flex justify-between"><span>Roll</span> <span>{joint.currentValues.roll.toFixed(2)}</span></label><input type="range" min={joint.limit?.lower ?? -Math.PI} max={joint.limit?.upper ?? Math.PI} step={0.01} value={joint.currentValues.roll} onChange={e => updateJoint(joint.id, 'currentValues.roll', parseFloat(e.target.value))} className="w-full"/></div>
+                                        <Checkbox label="Pitch (Y)" checked={joint.dof.pitch} onChange={v => updateJoint(joint.id, 'dof.pitch', v)} />
+
+                                        <Checkbox label="Yaw (Z)" checked={joint.dof.yaw} onChange={v => updateJoint(joint.id, 'dof.yaw', v)} />
+
+                                    </div>
+
+                                </div>
+
+                                
+
+                                {(joint.dof.roll || joint.dof.pitch || joint.dof.yaw) && (
+
+                                <div className="pt-2 border-t border-gray-800">
+
+                                     <div className="flex justify-between items-center mb-2">
+
+                                        <p className="text-sm font-semibold">Limits</p>
+
+                                        <div className="flex w-3/4 space-x-1">
+
+                                            <span className="text-xs text-gray-400 w-1/2 text-center">Rad</span>
+
+                                            <span className="text-xs text-gray-400 w-1/2 text-center">Deg</span>
+
+                                        </div>
+
+                                    </div>
+
+                                    {joint.dof.roll && <>
+
+                                        <RadianDegreeInput label="Roll Lower" radValue={joint.limits.roll.lower} onRadChange={v => updateJoint(joint.id, 'limits.roll.lower', v)} />
+
+                                        <RadianDegreeInput label="Roll Upper" radValue={joint.limits.roll.upper} onRadChange={v => updateJoint(joint.id, 'limits.roll.upper', v)} />
+
+                                    </>}
+
+                                    {joint.dof.pitch && <>
+
+                                         <RadianDegreeInput label="Pitch Lower" radValue={joint.limits.pitch.lower} onRadChange={v => updateJoint(joint.id, 'limits.pitch.lower', v)} />
+
+                                         <RadianDegreeInput label="Pitch Upper" radValue={joint.limits.pitch.upper} onRadChange={v => updateJoint(joint.id, 'limits.pitch.upper', v)} />
+
+                                    </>}
+
+                                    {joint.dof.yaw && <>
+
+                                         <RadianDegreeInput label="Yaw Lower" radValue={joint.limits.yaw.lower} onRadChange={v => updateJoint(joint.id, 'limits.yaw.lower', v)} />
+
+                                         <RadianDegreeInput label="Yaw Upper" radValue={joint.limits.yaw.upper} onRadChange={v => updateJoint(joint.id, 'limits.yaw.upper', v)} />
+
+                                    </>}
+
+                                </div>
+
+                                )}
+
+                            </div>
+
                         )}
-                        {joint.type === 'rotational' && joint.dof.pitch && (
-                            <div><label className="text-xs flex justify-between"><span>Pitch</span> <span>{joint.currentValues.pitch.toFixed(2)}</span></label><input type="range" min={joint.limit?.lower ?? -Math.PI} max={joint.limit?.upper ?? Math.PI} step={0.01} value={joint.currentValues.pitch} onChange={e => updateJoint(joint.id, 'currentValues.pitch', parseFloat(e.target.value))} className="w-full"/></div>
-                        )}
-                        {joint.type === 'rotational' && joint.dof.yaw && (
-                            <div><label className="text-xs flex justify-between"><span>Yaw</span> <span>{joint.currentValues.yaw.toFixed(2)}</span></label><input type="range" min={joint.limit?.lower ?? -Math.PI} max={joint.limit?.upper ?? Math.PI} step={0.01} value={joint.currentValues.yaw} onChange={e => updateJoint(joint.id, 'currentValues.yaw', parseFloat(e.target.value))} className="w-full"/></div>
-                        )}
+
                         {joint.type === 'prismatic' && (
-                             <div><label className="text-xs flex justify-between"><span>Displacement</span> <span>{joint.currentValues.displacement.toFixed(2)}</span></label><input type="range" min={joint.limit?.lower ?? -1} max={joint.limit?.upper ?? 1} step={0.01} value={joint.currentValues.displacement} onChange={e => updateJoint(joint.id, 'currentValues.displacement', parseFloat(e.target.value))} className="w-full"/></div>
+
+                            <div className="p-2 bg-gray-900/50 rounded space-y-3">
+
+                                <Vector3Input label="Axis" value={joint.axis} onChange={(p, v) => updateJoint(joint.id, `axis${p.substring(p.indexOf('['))}`, v)} path="axis" />
+
+                                <div className="pt-2 border-t border-gray-800">
+
+                                    <p className="text-sm font-semibold mb-2">Limits</p>
+
+                                    <NumberInput label="Lower" value={joint.limits.displacement.lower} onChange={v => updateJoint(joint.id, 'limits.displacement.lower', v)} />
+
+                                    <NumberInput label="Upper" value={joint.limits.displacement.upper} onChange={v => updateJoint(joint.id, 'limits.displacement.upper', v)} />
+
+                                </div>
+
+                            </div>
+
                         )}
+
+            
+
+                        {/* Action Buttons */}
+
+                        <div className="space-y-2 pt-2 border-t border-gray-700">
+
+                             {joint.childLinkId && (
+
+                                <>
+
+                                    <input type="file" ref={stlInputRef} onChange={handleFileChange} className="hidden" accept=".stl" />
+
+                                    <button onClick={handleStlUploadClick} title="Applies a mesh to the child link of this joint" className="flex items-center justify-center w-full bg-purple-600 hover:bg-purple-700 p-2 rounded text-sm">
+
+                                        <Upload className="mr-2 h-4 w-4" /> Upload STL to Child Link
+
+                                    </button>
+
+                                </>
+
+                            )}
+
+                            {!joint.childLinkId && (
+
+                                 <button onClick={() => addChainedJoint(joint.id)} className="flex items-center justify-center w-full bg-green-600 hover:bg-green-700 p-2 rounded text-sm">
+
+                                    <LinkIcon className="mr-2 h-4 w-4" /> Add Chained Joint
+
+                                </button>
+
+                            )}
+
+                        </div>
+
+            
+
+                        {joint.type !== 'fixed' && (
+
+                            <div className="p-2 bg-gray-900/50 rounded space-y-2">
+
+                                <p className="text-sm font-semibold">Test Driver</p>
+
+                                {joint.type === 'rotational' && joint.dof.roll && (
+
+                                    <div><label className="text-xs">Roll</label><input type="range" min={joint.limits.roll.lower} max={joint.limits.roll.upper} step={0.01} value={joint.currentValues.roll} onChange={e => updateJoint(joint.id, 'currentValues.roll', parseFloat(e.target.value))} className="w-full"/></div>
+
+                                )}
+
+                                {joint.type === 'rotational' && joint.dof.pitch && (
+
+                                    <div><label className="text-xs">Pitch</label><input type="range" min={joint.limits.pitch.lower} max={joint.limits.pitch.upper} step={0.01} value={joint.currentValues.pitch} onChange={e => updateJoint(joint.id, 'currentValues.pitch', parseFloat(e.target.value))} className="w-full"/></div>
+
+                                )}
+
+                                {joint.type === 'rotational' && joint.dof.yaw && (
+
+                                    <div><label className="text-xs">Yaw</label><input type="range" min={joint.limits.yaw.lower} max={joint.limits.yaw.upper} step={0.01} value={joint.currentValues.yaw} onChange={e => updateJoint(joint.id, 'currentValues.yaw', parseFloat(e.target.value))} className="w-full"/></div>
+
+                                )}
+
+                                {joint.type === 'prismatic' && (
+
+                                     <div><label className="text-xs">Displacement</label><input type="range" min={joint.limits.displacement.lower} max={joint.limits.displacement.upper} step={0.01} value={joint.currentValues.displacement} onChange={e => updateJoint(joint.id, 'currentValues.displacement', parseFloat(e.target.value))} className="w-full"/></div>
+
+                                )}
+
+                            </div>
+
+                        )}
+
                     </div>
-                </div>
-            ))}
-        </div>
-    );
-};
+
+                );
+
+            };
+
+            
+
+            // --- Main Sidebar Component ---
+
+            
+
+            // --- Global Joint Controller (Default View) ---
+
+            const GlobalJointController = () => {
+
+                const { joints, updateJoint, selectItem, resetJointsToZero } = useRobotStore();
+
+                const jointList = Object.values(joints).filter(j => j.type !== 'fixed');
+
+            
+
+                if (jointList.length === 0) {
+
+                    return <p className="text-gray-400">No movable joints in the robot. Add a joint to begin.</p>;
+
+                }
+
+            
+
+                return (
+
+                    <div className="space-y-4">
+
+                        <div className="flex justify-between items-center">
+
+                            <h3 className="text-lg font-semibold text-gray-300">Robot Pose Controller</h3>
+
+                            <button 
+
+                                onClick={resetJointsToZero} 
+
+                                title="Reset all joint values to zero"
+
+                                className="flex items-center text-sm bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded"
+
+                            >
+
+                                <RotateCcw className="mr-2 h-4 w-4" />
+
+                                Reset Pose
+
+                            </button>
+
+                        </div>
+
+                        {jointList.map((joint) => (
+
+                            <div key={joint.id} className="p-2 bg-gray-900/50 rounded">
+
+                                <p 
+
+                                    className="text-md font-semibold mb-2 cursor-pointer hover:text-blue-400"
+
+                                    onClick={() => selectItem(joint.id, 'joint')}
+
+                                    title="Click to inspect this joint"
+
+                                >
+
+                                    {joint.name}
+
+                                </p>
+
+                                <div className="space-y-2">
+
+                                    {joint.type === 'rotational' && joint.dof.roll && (
+
+                                        <div><label className="text-xs flex justify-between"><span>Roll</span> <span>{joint.currentValues.roll.toFixed(2)}</span></label><input type="range" min={joint.limits.roll.lower} max={joint.limits.roll.upper} step={0.01} value={joint.currentValues.roll} onChange={e => updateJoint(joint.id, 'currentValues.roll', parseFloat(e.target.value))} className="w-full"/></div>
+
+                                    )}
+
+                                    {joint.type === 'rotational' && joint.dof.pitch && (
+
+                                        <div><label className="text-xs flex justify-between"><span>Pitch</span> <span>{joint.currentValues.pitch.toFixed(2)}</span></label><input type="range" min={joint.limits.pitch.lower} max={joint.limits.pitch.upper} step={0.01} value={joint.currentValues.pitch} onChange={e => updateJoint(joint.id, 'currentValues.pitch', parseFloat(e.target.value))} className="w-full"/></div>
+
+                                    )}
+
+                                    {joint.type === 'rotational' && joint.dof.yaw && (
+
+                                        <div><label className="text-xs flex justify-between"><span>Yaw</span> <span>{joint.currentValues.yaw.toFixed(2)}</span></label><input type="range" min={joint.limits.yaw.lower} max={joint.limits.yaw.upper} step={0.01} value={joint.currentValues.yaw} onChange={e => updateJoint(joint.id, 'currentValues.yaw', parseFloat(e.target.value))} className="w-full"/></div>
+
+                                    )}
+
+                                    {joint.type === 'prismatic' && (
+
+                                         <div><label className="text-xs flex justify-between"><span>Displacement</span> <span>{joint.currentValues.displacement.toFixed(2)}</span></label><input type="range" min={joint.limits.displacement.lower} max={joint.limits.displacement.upper} step={0.01} value={joint.currentValues.displacement} onChange={e => updateJoint(joint.id, 'currentValues.displacement', parseFloat(e.target.value))} className="w-full"/></div>
+
+                                    )}
+
+                                </div>
+
+                            </div>
+
+                        ))}
+
+                    </div>
+
+                );
+
+            };
 
 
 const Sidebar = () => {
