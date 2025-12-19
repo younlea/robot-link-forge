@@ -1,3 +1,6 @@
+
+
+
 // src/frontend/src/components/RobotVisualizer.tsx
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
@@ -6,6 +9,7 @@ import { Box, Cylinder, Sphere, TransformControls, Html } from '@react-three/dre
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Move, RotateCw } from 'lucide-react';
+import { STLMesh } from './STLMesh'; // Import the new component
 
 const HIGHLIGHT_COLOR = 'hotpink';
 
@@ -89,13 +93,29 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
   if (!link) return null;
 
   const renderVisual = () => {
-    const { type, dimensions, color } = link.visual;
+    const { type, dimensions, color, meshUrl, meshScale, meshOrigin } = link.visual;
     if (type === 'none') return null;
 
     const isSelected = selectedItem.id === linkId;
     const materialColor = isSelected ? HIGHLIGHT_COLOR : color;
     
     const clickHandler = (e: any) => { e.stopPropagation(); selectItem(link.id, 'link'); };
+
+    // Handle mesh type first
+    if (type === 'mesh') {
+        if (!meshUrl) return null; // Don't render if no URL
+        return (
+            // Wrap STLMesh in a group to handle the click, as STLMesh uses Suspense
+            <group onClick={clickHandler}>
+                <STLMesh
+                    url={meshUrl}
+                    scale={meshScale}
+                    origin={meshOrigin}
+                    color={materialColor}
+                />
+            </group>
+        );
+    }
 
     const props = {
         onClick: clickHandler,

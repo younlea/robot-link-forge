@@ -2,9 +2,16 @@
 import type { CameraControls } from '@react-three/drei';
 
 export type Visual = {
-  type: 'box' | 'cylinder' | 'sphere' | 'none';
+  type: 'box' | 'cylinder' | 'sphere' | 'mesh' | 'none';
   dimensions: [number, number, number];
   color: string;
+  // For meshes
+  meshUrl?: string | null;
+  meshScale?: [number, number, number];
+  meshOrigin?: {
+    xyz: [number, number, number];
+    rpy: [number, number, number];
+  };
 };
 
 export interface RobotLink {
@@ -79,6 +86,18 @@ export interface RobotState {
 export interface RobotActions {
   addJoint: (parentLinkId: string) => void;
   addChainedJoint: (parentJointId: string) => void;
+  uploadAndSetMesh: (itemId: string, itemType: 'link' | 'joint', file: File) => Promise<void>;
+  updateMeshTransform: (
+    itemId: string,
+    itemType: 'link' | 'joint',
+    transform: {
+      scale?: [number, number, number];
+      origin?: {
+        xyz?: [number, number, number];
+        rpy?: [number, number, number];
+      };
+    }
+  ) => void;
 
   // Generic update actions
   updateJoint: (id: string, path: string, value: any) => void;

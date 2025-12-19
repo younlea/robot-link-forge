@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRobotStore } from '../store';
 import { RobotLink, RobotJoint, JointType } from '../types';
-import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen } from 'lucide-react';
+import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, UploadCloud } from 'lucide-react';
 
 // --- Reusable Input Components (with fixes) ---
 const NumberInput = ({ label, value, onChange, step = 0.01 }: { label: string, value: number, onChange: (val: number) => void, step?: number }) => {
@@ -64,24 +64,62 @@ const Checkbox = ({ label, checked, onChange }: { label: string, checked: boolea
 
 // --- Inspector for Links ---
 const LinkInspector = ({ link }: { link: RobotLink }) => {
-    const { updateLink, addJoint } = useRobotStore();
+    const { updateLink, addJoint, uploadAndSetMesh } = useRobotStore();
+    const stlInputRef = useRef<HTMLInputElement>(null);
+
+    const handleStlUploadClick = () => stlInputRef.current?.click();
+    
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            uploadAndSetMesh(link.id, 'link', file);
+        }
+        if(e.target) e.target.value = ''; // Reset input
+    };
+
     return (
         <div className="space-y-4">
             <div className="flex items-center"> <ToyBrick className="mr-2 flex-shrink-0" />
                 <input type="text" value={link.name} onChange={(e) => updateLink(link.id, 'name', e.target.value)}
                     className="text-lg font-bold bg-transparent focus:bg-gray-800 rounded p-1 -m-1 w-full"/>
             </div>
-            <div>
-                <label className="text-xs text-gray-400">Visual Type</label>
-                <select value={link.visual.type} onChange={(e) => updateLink(link.id, 'visual.type', e.target.value)}
-                    className="w-full bg-gray-700 rounded p-1 mt-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
-                    <option value="box">Box</option> <option value="cylinder">Cylinder</option>
-                    <option value="sphere">Sphere</option> <option value="none">None (Virtual)</option>
-                </select>
+
+            {/* Visuals Section */}
+            <div className="p-2 bg-gray-900/50 rounded space-y-3">
+                <p className="text-sm font-semibold">Visuals</p>
+                <div>
+                    <label className="text-xs text-gray-400">Primitive Type</label>
+                    <select value={link.visual.type} onChange={(e) => updateLink(link.id, 'visual.type', e.target.value)}
+                        className="w-full bg-gray-700 rounded p-1 mt-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        <option value="box">Box</option> 
+                        <option value="cylinder">Cylinder</option>
+                        <option value="sphere">Sphere</option>
+                        <option value="mesh">Mesh</option>
+                        <option value="none">None (Virtual)</option>
+                    </select>
+                </div>
+
+                {link.visual.type !== 'none' && link.visual.type !== 'mesh' && (
+                  <Vector3Input label="Dimensions" value={link.visual.dimensions} onChange={(p, v) => updateLink(link.id, `visual.${p}`, v)} path="dimensions" />
+                )}
+
+                {/* --- STL/Mesh Controls --- */}
+                <input type="file" ref={stlInputRef} onChange={handleFileChange} className="hidden" accept=".stl" />
+                <button onClick={handleStlUploadClick} className="flex items-center justify-center w-full bg-purple-600 hover:bg-purple-700 p-2 rounded text-sm">
+                    <UploadCloud className="mr-2 h-4 w-4" /> Upload STL
+                </button>
+
+                {link.visual.type === 'mesh' && (
+                    <div className="space-y-3 pt-2">
+                         <h4 className="text-md font-semibold text-gray-300 border-t border-gray-700 pt-3">Mesh Properties</h4>
+                         <p className="text-xs text-gray-400 truncate">URL: {link.visual.meshUrl || 'N/A'}</p>
+                         <Vector3Input label="Mesh Scale" value={link.visual.meshScale || [1,1,1]} onChange={(p, v) => updateLink(link.id, `visual.meshScale${p.substring(p.indexOf('['))}`, v)} path="meshScale" />
+                         <Vector3Input label="Mesh Origin XYZ" value={link.visual.meshOrigin?.xyz || [0,0,0]} onChange={(p, v) => updateLink(link.id, `visual.meshOrigin.xyz${p.substring(p.indexOf('['))}`, v)} path="meshOrigin.xyz" />
+                         <Vector3Input label="Mesh Origin RPY" value={link.visual.meshOrigin?.rpy || [0,0,0]} onChange={(p, v) => updateLink(link.id, `visual.meshOrigin.rpy${p.substring(p.indexOf('['))}`, v)} path="meshOrigin.rpy" />
+                    </div>
+                )}
             </div>
-            {link.visual.type !== 'none' && (
-              <Vector3Input label="Dimensions" value={link.visual.dimensions} onChange={(p, v) => updateLink(link.id, `visual.${p}`, v)} path="dimensions" />
-            )}
+
             <button onClick={() => addJoint(link.id)} className="flex items-center justify-center w-full bg-blue-600 hover:bg-blue-700 p-2 rounded text-sm">
                 <PlusSquare className="mr-2 h-4 w-4" /> Add Child Joint
             </button>
@@ -91,7 +129,20 @@ const LinkInspector = ({ link }: { link: RobotLink }) => {
 
 // --- Inspector for Joints (with final workflow) ---
 const JointInspector = ({ joint }: { joint: RobotJoint }) => {
-    const { updateJoint, addChainedJoint } = useRobotStore();
+    const { updateJoint, addChainedJoint, uploadAndSetMesh } = useRobotStore();
+    const stlInputRef = useRef<HTMLInputElement>(null);
+
+    const handleStlUploadClick = () => stlInputRef.current?.click();
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            // Apply mesh to the joint's CHILD link
+            uploadAndSetMesh(joint.id, 'joint', file);
+        }
+        if(e.target) e.target.value = ''; // Reset input
+    };
+
     return (
         <div className="space-y-4">
             <div className="flex items-center"> <GitCommit className="mr-2 flex-shrink-0" />
@@ -125,6 +176,23 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                     <Vector3Input label="Axis" value={joint.axis} onChange={(p, v) => updateJoint(joint.id, `axis${p.substring(p.indexOf('['))}`, v)} path="axis" />
                 </div>
             )}
+            
+            {/* Action Buttons */}
+            <div className="space-y-2 pt-2 border-t border-gray-700">
+                 {joint.childLinkId && (
+                    <>
+                        <input type="file" ref={stlInputRef} onChange={handleFileChange} className="hidden" accept=".stl" />
+                        <button onClick={handleStlUploadClick} title="Applies a mesh to the child link of this joint" className="flex items-center justify-center w-full bg-purple-600 hover:bg-purple-700 p-2 rounded text-sm">
+                            <UploadCloud className="mr-2 h-4 w-4" /> Upload STL to Child Link
+                        </button>
+                    </>
+                )}
+                {!joint.childLinkId && (
+                     <button onClick={() => addChainedJoint(joint.id)} className="flex items-center justify-center w-full bg-green-600 hover:bg-green-700 p-2 rounded text-sm">
+                        <LinkIcon className="mr-2 h-4 w-4" /> Add Chained Joint
+                    </button>
+                )}
+            </div>
 
             {joint.type !== 'fixed' && (
                 <div className="p-2 bg-gray-900/50 rounded space-y-2">
@@ -142,12 +210,6 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                          <div><label className="text-xs">Displacement</label><input type="range" min={-1} max={1} step={0.01} value={joint.currentValues.displacement} onChange={e => updateJoint(joint.id, 'currentValues.displacement', parseFloat(e.target.value))} className="w-full"/></div>
                     )}
                 </div>
-            )}
-            
-            {!joint.childLinkId && (
-                 <button onClick={() => addChainedJoint(joint.id)} className="flex items-center justify-center w-full bg-green-600 hover:bg-green-700 p-2 rounded text-sm">
-                    <LinkIcon className="mr-2 h-4 w-4" /> Add Chained Joint
-                </button>
             )}
         </div>
     );
@@ -243,7 +305,7 @@ const Sidebar = () => {
                         ref={fileInputRef}
                         onChange={handleFileChange}
                         className="hidden"
-                        accept=".json,application/json"
+                        accept=".zip,application/zip"
                     />
                 </div>
             </div>

@@ -1,8 +1,8 @@
-// src/frontend/src/store.ts
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import { RobotState, RobotActions, RobotLink, RobotJoint, JointType } from './types';
 import { set } from 'lodash';
+import JSZip from 'jszip'; // Needed for advanced save/load
 
 // Helper function to update nested properties immutably.
 const updateDeep = (obj: any, path: string, value: any) => {
@@ -51,17 +51,105 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
   ...createInitialState(),
   cameraControls: null,
 
+  uploadAndSetMesh: async (itemId, itemType, file) => {
+    const { joints, links } = getState();
+    let targetLinkId: string | null = null;
+
+    if (itemType === 'link') {
+        targetLinkId = itemId;
+    } else if (itemType === 'joint') {
+        const joint = joints[itemId];
+        if (joint && joint.childLinkId) {
+            targetLinkId = joint.childLinkId;
+        } else {
+            console.error("Cannot add mesh: Selected joint has no child link.");
+            return;
+        }
+    }
+
+    if (!targetLinkId || !links[targetLinkId]) {
+        console.error("Cannot add mesh: Target link not found.");
+        return;
+    }
+
+    const finalTargetLinkId = targetLinkId;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+        const response = await fetch('http://localhost:8000/api/upload-stl', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            throw new Error(`Upload failed with status: ${response.status}`);
+        }
+
+        const result = await response.json();
+        const meshUrl = `http://localhost:8000${result.url}`;
+        
+        setState(state => {
+            const linkToUpdate = state.links[finalTargetLinkId];
+            if (!linkToUpdate) return {};
+
+            const updatedLink = updateDeep(linkToUpdate, 'visual', {
+                ...linkToUpdate.visual,
+                type: 'mesh',
+                meshUrl: meshUrl,
+                meshScale: [1, 1, 1],
+                meshOrigin: { xyz: [0, 0, 0], rpy: [0, 0, 0] }
+            });
+
+            return { links: { ...state.links, [finalTargetLinkId]: updatedLink } };
+        });
+
+    } catch (error) {
+        console.error("Failed to upload and set mesh:", error);
+        alert(`Failed to upload mesh. Make sure the backend server is running. Error: ${error.message}`);
+    }
+  },
+
+  updateMeshTransform: (itemId, itemType, transform) => {
+    setState(state => {
+        let targetLinkId: string | null = null;
+
+        if (itemType === 'link') {
+            targetLinkId = itemId;
+        } else if (itemType === 'joint') {
+            const joint = state.joints[itemId];
+            if (joint && joint.childLinkId) {
+                targetLinkId = joint.childLinkId;
+            }
+        }
+        
+        if (!targetLinkId || !state.links[targetLinkId]) return {};
+        
+        const linkToUpdate = state.links[targetLinkId];
+        let updatedLink = linkToUpdate;
+
+        if (transform.scale) {
+            updatedLink = updateDeep(updatedLink, 'visual.meshScale', transform.scale);
+        }
+        if (transform.origin?.xyz) {
+            updatedLink = updateDeep(updatedLink, 'visual.meshOrigin.xyz', transform.origin.xyz);
+        }
+        if (transform.origin?.rpy) {
+            updatedLink = updateDeep(updatedLink, 'visual.meshOrigin.rpy', transform.origin.rpy);
+        }
+
+        return { links: { ...state.links, [targetLinkId]: updatedLink } };
+    });
+  },
+
   setCameraControls: (controls) => setState({ cameraControls: controls }),
 
   zoomIn: () => {
-    // Dolly forward to zoom in. The value is a distance in world units.
-    // A negative value moves the camera closer to the target.
     getState().cameraControls?.dolly(-0.5, true);
   },
 
   zoomOut: () => {
-    // Dolly backward to zoom out.
-    // A positive value moves the camera away from the target.
     getState().cameraControls?.dolly(0.5, true);
   },
 
@@ -91,14 +179,12 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
     });
   },
 
-  // Creates ONLY a joint, attached to a link. Used to start a chain.
   addJoint: (parentLinkId) => {
     setState((state) => {
       const parentLink = state.links[parentLinkId];
       if (!parentLink) return {};
       const newJoint = createDefaultJoint(parentLinkId);
       
-      // Position new joint at parent's origin. User will move it.
       newJoint.origin = { xyz: [0, 0, 0], rpy: [0, 0, 0] };
 
       return {
@@ -109,21 +195,15 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
     });
   },
 
-  // Creates a visible link AND a new joint at its end. The core "chaining" action.
   addChainedJoint: (parentJointId) => {
     setState((state) => {
         const parentJoint = state.joints[parentJointId];
         if (!parentJoint || parentJoint.childLinkId) return {};
 
-        // 1. Create the intermediate link (now visible by default)
         const intermediateLink = createDefaultLink();
-
-        // 2. Create the new joint that will be at the end of the new link
         const newJoint = createDefaultJoint(intermediateLink.id);
-        // Position new joint at the end of the intermediate link's geometry
         newJoint.origin = { xyz: [0, 0, intermediateLink.visual.dimensions[2]], rpy: [0, 0, 0] };
         
-        // 3. Wire everything up
         intermediateLink.childJoints.push(newJoint.id);
         const updatedParentJoint = { ...parentJoint, childLinkId: intermediateLink.id };
 
@@ -137,83 +217,122 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
   // --- Save/Load Functionality ---
   saveRobot: async () => {
-    const { links, joints, baseLinkId } = getState();
-    const robotData = {
-      links,
-      joints,
-      baseLinkId,
-    };
-    const jsonString = JSON.stringify(robotData, null, 2);
-    const blob = new Blob([jsonString], { type: 'application/json' });
+    try {
+        const { links, joints, baseLinkId } = getState();
+        const zip = new JSZip();
 
-    // Modern approach: File System Access API
-    if ('showSaveFilePicker' in window) {
-      try {
-        const handle = await window.showSaveFilePicker({
-          suggestedName: 'robot-model.json',
-          types: [{
-            description: 'JSON Files',
-            accept: { 'application/json': ['.json'] },
-          }],
-        });
-        const writable = await handle.createWritable();
-        await writable.write(blob);
-        await writable.close();
-        return; // Success
-      } catch (err) {
-        // Handle cancellation or errors
-        if (err instanceof DOMException && err.name === 'AbortError') {
-          console.log('Save dialog was cancelled.');
-        } else {
-          console.error('Error saving file:', err);
+        // Create a deep copy to modify URLs without affecting current state
+        const linksToSave = JSON.parse(JSON.stringify(links));
+        
+        const meshFolder = zip.folder('meshes');
+        if (!meshFolder) throw new Error("Failed to create 'meshes' folder in zip.");
+
+        const meshUrlMap = new Map<string, string>();
+
+        for (const link of Object.values(linksToSave as Record<string, RobotLink>)) {
+            if (link.visual.type === 'mesh' && link.visual.meshUrl && link.visual.meshUrl.startsWith('http')) {
+                // Check if we've already processed this URL
+                if (meshUrlMap.has(link.visual.meshUrl)) {
+                    link.visual.meshUrl = meshUrlMap.get(link.visual.meshUrl);
+                    continue;
+                }
+
+                const response = await fetch(link.visual.meshUrl);
+                if (!response.ok) {
+                    console.warn(`Could not fetch mesh for ${link.name}: ${link.visual.meshUrl}`);
+                    continue;
+                }
+                const blob = await response.blob();
+                const newMeshName = `${uuidv4()}.stl`;
+                const relativePath = `meshes/${newMeshName}`;
+                
+                meshFolder.file(newMeshName, blob);
+
+                // Update the URL in our data-to-be-saved
+                link.visual.meshUrl = relativePath;
+                meshUrlMap.set(link.visual.meshUrl, relativePath); // Store original for mapping
+            }
         }
-        return; // Exit on error or cancellation
-      }
-    }
 
-    // Fallback approach for older browsers
-    const fileName = prompt("Enter a filename for your robot model:", "robot-model.json");
-    if (fileName) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = fileName.endsWith('.json') ? fileName : `${fileName}.json`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+        const robotData = { links: linksToSave, joints, baseLinkId };
+        zip.file('robot-scene.json', JSON.stringify(robotData, null, 2));
+        
+        const zipBlob = await zip.generateAsync({ type: 'blob' });
+
+        if ('showSaveFilePicker' in window) {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: 'robot-model.zip',
+                types: [{ description: 'RobotLinkForge Zip Archive', accept: { 'application/zip': ['.zip'] }}],
+            });
+            const writable = await handle.createWritable();
+            await writable.write(zipBlob);
+            await writable.close();
+        } else {
+            // Fallback for older browsers
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(zipBlob);
+            a.download = 'robot-model.zip';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+        }
+
+    } catch (err) {
+        console.error('Error saving robot project:', err);
+        alert(`Failed to save project: ${err.message}`);
     }
   },
 
-  loadRobot: (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const jsonString = event.target?.result;
-        if (typeof jsonString !== 'string') {
-          throw new Error('File could not be read as text.');
+  loadRobot: async (file: File) => {
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+        alert("Invalid file type. Please upload a '.zip' file created by RobotLinkForge.");
+        return;
+    }
+    try {
+        const zip = await JSZip.loadAsync(file);
+        const sceneFile = zip.file('robot-scene.json');
+        
+        if (!sceneFile) {
+            throw new Error("'robot-scene.json' not found in the zip archive.");
         }
+
+        const jsonString = await sceneFile.async('string');
         const robotData = JSON.parse(jsonString);
-        // Basic validation
-        if (robotData.links && robotData.joints && robotData.baseLinkId) {
-          setState({
+
+        if (!robotData.links || !robotData.joints || !robotData.baseLinkId) {
+            throw new Error('Invalid robot data format in robot-scene.json.');
+        }
+
+        const meshFolder = zip.folder('meshes');
+        
+        // Create local URLs for all meshes in the zip
+        if (meshFolder) {
+             for (const link of Object.values(robotData.links as Record<string, RobotLink>)) {
+                if (link.visual.type === 'mesh' && link.visual.meshUrl) {
+                    const meshFile = meshFolder.file(link.visual.meshUrl.replace('meshes/', ''));
+                    if (meshFile) {
+                        const blob = await meshFile.async('blob');
+                        // Replace relative path with a local, temporary URL
+                        link.visual.meshUrl = URL.createObjectURL(blob);
+                    } else {
+                        console.warn(`Mesh file not found in zip: ${link.visual.meshUrl}`);
+                        link.visual.meshUrl = null; // Mark as missing
+                    }
+                }
+            }
+        }
+
+        setState({
             links: robotData.links,
             joints: robotData.joints,
             baseLinkId: robotData.baseLinkId,
-            selectedItem: { id: null, type: null }, // Deselect after loading
-          });
-        } else {
-          throw new Error('Invalid robot data format.');
-        }
-      } catch (error) {
+            selectedItem: { id: null, type: null },
+        });
+
+    } catch (error) {
         console.error("Failed to load and parse robot data:", error);
-        alert("Failed to load robot file. Please check the console for details.");
-      }
-    };
-    reader.onerror = (error) => {
-        console.error("Error reading file:", error);
-        alert("Error reading file.");
+        alert(`Failed to load robot project. Please check the console for details. Error: ${error.message}`);
     }
-    reader.readAsText(file);
   },
 }));
