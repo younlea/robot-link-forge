@@ -100,6 +100,7 @@ export interface RobotActions {
     }
   ) => void;
   fitMeshToLink: (linkId: string) => void;
+  resetJointsToZero: () => void;
 
   // Generic update actions
   updateJoint: (id: string, path: string, value: any) => void;

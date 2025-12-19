@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRobotStore } from '../store';
 import { RobotLink, RobotJoint, JointType } from '../types';
-import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, UploadCloud } from 'lucide-react';
+import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, UploadCloud, RotateCcw } from 'lucide-react';
 
 // --- Reusable Input Components (with fixes) ---
 const NumberInput = ({ label, value, onChange, step = 0.01 }: { label: string, value: number, onChange: (val: number) => void, step?: number }) => {
@@ -232,7 +232,7 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
 
 // --- Global Joint Controller (Default View) ---
 const GlobalJointController = () => {
-    const { joints, updateJoint, selectItem } = useRobotStore();
+    const { joints, updateJoint, selectItem, resetJointsToZero } = useRobotStore();
     const jointList = Object.values(joints).filter(j => j.type !== 'fixed');
 
     if (jointList.length === 0) {
@@ -241,7 +241,17 @@ const GlobalJointController = () => {
 
     return (
         <div className="space-y-4">
-            <h3 className="text-lg font-semibold text-gray-300">Robot Pose Controller</h3>
+            <div className="flex justify-between items-center">
+                <h3 className="text-lg font-semibold text-gray-300">Robot Pose Controller</h3>
+                <button 
+                    onClick={resetJointsToZero} 
+                    title="Reset all joint values to zero"
+                    className="flex items-center text-sm bg-gray-700 hover:bg-gray-600 px-2 py-1 rounded"
+                >
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Reset Pose
+                </button>
+            </div>
             {jointList.map((joint) => (
                 <div key={joint.id} className="p-2 bg-gray-900/50 rounded">
                     <p 

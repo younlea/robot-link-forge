@@ -201,6 +201,25 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
   selectItem: (id, type) => setState({ selectedItem: { id, type } }),
   setCameraMode: (mode) => setState({ cameraMode: mode }),
 
+  resetJointsToZero: () => {
+    setState(state => {
+        const newJoints = { ...state.joints };
+        for (const jointId in newJoints) {
+            const joint = newJoints[jointId];
+            // Only reset movable joints
+            if (joint.type !== 'fixed') {
+                const newValues = {
+                    roll: 0,
+                    pitch: 0,
+                    yaw: 0,
+                    displacement: 0,
+                };
+                newJoints[jointId] = updateDeep(joint, 'currentValues', newValues);
+            }
+        }
+        return { joints: newJoints };
+    });
+  },
 
   updateJoint: (id, path, value) => {
     setState((state) => {
