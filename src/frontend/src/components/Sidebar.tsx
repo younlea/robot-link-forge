@@ -189,6 +189,22 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                     <Vector3Input label="Axis" value={joint.axis} onChange={(p, v) => updateJoint(joint.id, `axis${p.substring(p.indexOf('['))}`, v)} path="axis" />
                 </div>
             )}
+
+            {joint.type !== 'fixed' && (
+                <div className="p-2 bg-gray-900/50 rounded">
+                    <p className="text-sm font-semibold mb-2">Limits</p>
+                    <NumberInput 
+                        label="Lower" 
+                        value={joint.limit?.lower ?? -Math.PI} 
+                        onChange={v => updateJoint(joint.id, 'limit.lower', v)} 
+                    />
+                    <NumberInput 
+                        label="Upper" 
+                        value={joint.limit?.upper ?? Math.PI} 
+                        onChange={v => updateJoint(joint.id, 'limit.upper', v)}
+                    />
+                </div>
+            )}
             
             {/* Action Buttons */}
             <div className="space-y-2 pt-2 border-t border-gray-700">
@@ -211,16 +227,16 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                 <div className="p-2 bg-gray-900/50 rounded space-y-2">
                     <p className="text-sm font-semibold">Test Driver</p>
                     {joint.type === 'rotational' && joint.dof.roll && (
-                        <div><label className="text-xs">Roll</label><input type="range" min={-Math.PI} max={Math.PI} step={0.01} value={joint.currentValues.roll} onChange={e => updateJoint(joint.id, 'currentValues.roll', parseFloat(e.target.value))} className="w-full"/></div>
+                        <div><label className="text-xs">Roll</label><input type="range" min={joint.limit?.lower ?? -Math.PI} max={joint.limit?.upper ?? Math.PI} step={0.01} value={joint.currentValues.roll} onChange={e => updateJoint(joint.id, 'currentValues.roll', parseFloat(e.target.value))} className="w-full"/></div>
                     )}
                     {joint.type === 'rotational' && joint.dof.pitch && (
-                        <div><label className="text-xs">Pitch</label><input type="range" min={-Math.PI} max={Math.PI} step={0.01} value={joint.currentValues.pitch} onChange={e => updateJoint(joint.id, 'currentValues.pitch', parseFloat(e.target.value))} className="w-full"/></div>
+                        <div><label className="text-xs">Pitch</label><input type="range" min={joint.limit?.lower ?? -Math.PI} max={joint.limit?.upper ?? Math.PI} step={0.01} value={joint.currentValues.pitch} onChange={e => updateJoint(joint.id, 'currentValues.pitch', parseFloat(e.target.value))} className="w-full"/></div>
                     )}
                     {joint.type === 'rotational' && joint.dof.yaw && (
-                        <div><label className="text-xs">Yaw</label><input type="range" min={-Math.PI} max={Math.PI} step={0.01} value={joint.currentValues.yaw} onChange={e => updateJoint(joint.id, 'currentValues.yaw', parseFloat(e.target.value))} className="w-full"/></div>
+                        <div><label className="text-xs">Yaw</label><input type="range" min={joint.limit?.lower ?? -Math.PI} max={joint.limit?.upper ?? Math.PI} step={0.01} value={joint.currentValues.yaw} onChange={e => updateJoint(joint.id, 'currentValues.yaw', parseFloat(e.target.value))} className="w-full"/></div>
                     )}
                     {joint.type === 'prismatic' && (
-                         <div><label className="text-xs">Displacement</label><input type="range" min={-1} max={1} step={0.01} value={joint.currentValues.displacement} onChange={e => updateJoint(joint.id, 'currentValues.displacement', parseFloat(e.target.value))} className="w-full"/></div>
+                         <div><label className="text-xs">Displacement</label><input type="range" min={joint.limit?.lower ?? -1} max={joint.limit?.upper ?? 1} step={0.01} value={joint.currentValues.displacement} onChange={e => updateJoint(joint.id, 'currentValues.displacement', parseFloat(e.target.value))} className="w-full"/></div>
                     )}
                 </div>
             )}
@@ -263,16 +279,16 @@ const GlobalJointController = () => {
                     </p>
                     <div className="space-y-2">
                         {joint.type === 'rotational' && joint.dof.roll && (
-                            <div><label className="text-xs flex justify-between"><span>Roll</span> <span>{joint.currentValues.roll.toFixed(2)}</span></label><input type="range" min={-Math.PI} max={Math.PI} step={0.01} value={joint.currentValues.roll} onChange={e => updateJoint(joint.id, 'currentValues.roll', parseFloat(e.target.value))} className="w-full"/></div>
+                            <div><label className="text-xs flex justify-between"><span>Roll</span> <span>{joint.currentValues.roll.toFixed(2)}</span></label><input type="range" min={joint.limit?.lower ?? -Math.PI} max={joint.limit?.upper ?? Math.PI} step={0.01} value={joint.currentValues.roll} onChange={e => updateJoint(joint.id, 'currentValues.roll', parseFloat(e.target.value))} className="w-full"/></div>
                         )}
                         {joint.type === 'rotational' && joint.dof.pitch && (
-                            <div><label className="text-xs flex justify-between"><span>Pitch</span> <span>{joint.currentValues.pitch.toFixed(2)}</span></label><input type="range" min={-Math.PI} max={Math.PI} step={0.01} value={joint.currentValues.pitch} onChange={e => updateJoint(joint.id, 'currentValues.pitch', parseFloat(e.target.value))} className="w-full"/></div>
+                            <div><label className="text-xs flex justify-between"><span>Pitch</span> <span>{joint.currentValues.pitch.toFixed(2)}</span></label><input type="range" min={joint.limit?.lower ?? -Math.PI} max={joint.limit?.upper ?? Math.PI} step={0.01} value={joint.currentValues.pitch} onChange={e => updateJoint(joint.id, 'currentValues.pitch', parseFloat(e.target.value))} className="w-full"/></div>
                         )}
                         {joint.type === 'rotational' && joint.dof.yaw && (
-                            <div><label className="text-xs flex justify-between"><span>Yaw</span> <span>{joint.currentValues.yaw.toFixed(2)}</span></label><input type="range" min={-Math.PI} max={Math.PI} step={0.01} value={joint.currentValues.yaw} onChange={e => updateJoint(joint.id, 'currentValues.yaw', parseFloat(e.target.value))} className="w-full"/></div>
+                            <div><label className="text-xs flex justify-between"><span>Yaw</span> <span>{joint.currentValues.yaw.toFixed(2)}</span></label><input type="range" min={joint.limit?.lower ?? -Math.PI} max={joint.limit?.upper ?? Math.PI} step={0.01} value={joint.currentValues.yaw} onChange={e => updateJoint(joint.id, 'currentValues.yaw', parseFloat(e.target.value))} className="w-full"/></div>
                         )}
                         {joint.type === 'prismatic' && (
-                             <div><label className="text-xs flex justify-between"><span>Displacement</span> <span>{joint.currentValues.displacement.toFixed(2)}</span></label><input type="range" min={-1} max={1} step={0.01} value={joint.currentValues.displacement} onChange={e => updateJoint(joint.id, 'currentValues.displacement', parseFloat(e.target.value))} className="w-full"/></div>
+                             <div><label className="text-xs flex justify-between"><span>Displacement</span> <span>{joint.currentValues.displacement.toFixed(2)}</span></label><input type="range" min={joint.limit?.lower ?? -1} max={joint.limit?.upper ?? 1} step={0.01} value={joint.currentValues.displacement} onChange={e => updateJoint(joint.id, 'currentValues.displacement', parseFloat(e.target.value))} className="w-full"/></div>
                         )}
                     </div>
                 </div>
