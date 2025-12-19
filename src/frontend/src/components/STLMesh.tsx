@@ -1,11 +1,13 @@
 // src/frontend/src/components/STLMesh.tsx
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { useLoader } from '@react-three/fiber';
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader';
 import * as THREE from 'three';
 import { Euler } from 'three';
+import { useRobotStore } from '../store';
 
 interface STLMeshProps {
+  linkId: string; // Required to update the correct link
   url: string;
   scale?: [number, number, number];
   origin?: {
@@ -15,8 +17,23 @@ interface STLMeshProps {
   color?: string;
 }
 
-function LoadedMesh({ url, scale, origin, color }: STLMeshProps) {
+function LoadedMesh({ url, scale, origin, color, linkId }: STLMeshProps) {
+  const { updateLink } = useRobotStore();
   const geom = useLoader(STLLoader, url);
+
+  useEffect(() => {
+    if (geom) {
+      // This effect runs when the geometry is loaded.
+      // We compute the bounding box and store its size in our global state.
+      // This is crucial for the "Fit to Link" functionality.
+      geom.computeBoundingBox();
+      const box = geom.boundingBox;
+      if (box) {
+        const size = box.getSize(new THREE.Vector3());
+        updateLink(linkId, 'visual.meshBoundingBox', [size.x, size.y, size.z]);
+      }
+    }
+  }, [geom, linkId, updateLink]); // Effect depends on the loaded geometry
 
   // The STLLoader returns a BufferGeometry.
   // We need to create a mesh from it.

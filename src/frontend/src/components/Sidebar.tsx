@@ -64,7 +64,7 @@ const Checkbox = ({ label, checked, onChange }: { label: string, checked: boolea
 
 // --- Inspector for Links ---
 const LinkInspector = ({ link }: { link: RobotLink }) => {
-    const { updateLink, addJoint, uploadAndSetMesh } = useRobotStore();
+    const { updateLink, addJoint, uploadAndSetMesh, fitMeshToLink } = useRobotStore();
     const stlInputRef = useRef<HTMLInputElement>(null);
 
     const handleStlUploadClick = () => stlInputRef.current?.click();
@@ -99,6 +99,16 @@ const LinkInspector = ({ link }: { link: RobotLink }) => {
                     </select>
                 </div>
 
+                <div className="flex items-center justify-between">
+                    <label className="text-xs text-gray-400">Color</label>
+                    <input 
+                        type="color" 
+                        value={link.visual.color} 
+                        onChange={(e) => updateLink(link.id, 'visual.color', e.target.value)}
+                        className="w-24 h-8 bg-gray-900 rounded p-0 border-2 border-gray-700 cursor-pointer"
+                    />
+                </div>
+
                 {link.visual.type !== 'none' && link.visual.type !== 'mesh' && (
                   <Vector3Input label="Dimensions" value={link.visual.dimensions} onChange={(p, v) => updateLink(link.id, `visual.${p}`, v)} path="dimensions" />
                 )}
@@ -116,6 +126,9 @@ const LinkInspector = ({ link }: { link: RobotLink }) => {
                          <Vector3Input label="Mesh Scale" value={link.visual.meshScale || [1,1,1]} onChange={(p, v) => updateLink(link.id, `visual.meshScale${p.substring(p.indexOf('['))}`, v)} path="meshScale" />
                          <Vector3Input label="Mesh Origin XYZ" value={link.visual.meshOrigin?.xyz || [0,0,0]} onChange={(p, v) => updateLink(link.id, `visual.meshOrigin.xyz${p.substring(p.indexOf('['))}`, v)} path="meshOrigin.xyz" />
                          <Vector3Input label="Mesh Origin RPY" value={link.visual.meshOrigin?.rpy || [0,0,0]} onChange={(p, v) => updateLink(link.id, `visual.meshOrigin.rpy${p.substring(p.indexOf('['))}`, v)} path="meshOrigin.rpy" />
+                         <button onClick={() => fitMeshToLink(link.id)} title="Auto-scales the mesh to match the link's length (defined by its child joint). Assumes the mesh's main axis is Y." className="flex items-center justify-center w-full bg-teal-600 hover:bg-teal-700 p-2 rounded text-sm">
+                            <LinkIcon className="mr-2 h-4 w-4" /> Fit to Link Length
+                        </button>
                     </div>
                 )}
             </div>

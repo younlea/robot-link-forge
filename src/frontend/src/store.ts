@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
+import * as THREE from 'three';
 import { RobotState, RobotActions, RobotLink, RobotJoint, JointType } from './types';
 import { set } from 'lodash';
 import JSZip from 'jszip'; // Needed for advanced save/load
@@ -99,7 +100,8 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                 type: 'mesh',
                 meshUrl: meshUrl,
                 meshScale: [1, 1, 1],
-                meshOrigin: { xyz: [0, 0, 0], rpy: [0, 0, 0] }
+                meshOrigin: { xyz: [0, 0, 0], rpy: [0, 0, 0] },
+                meshBoundingBox: undefined, // Reset bounding box on new mesh upload
             });
 
             return { links: { ...state.links, [finalTargetLinkId]: updatedLink } };
@@ -109,6 +111,48 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         console.error("Failed to upload and set mesh:", error);
         alert(`Failed to upload mesh. Make sure the backend server is running. Error: ${error.message}`);
     }
+  },
+  
+  fitMeshToLink: (linkId) => {
+    setState(state => {
+        const link = state.links[linkId];
+        if (!link || link.visual.type !== 'mesh' || !link.visual.meshBoundingBox) {
+            console.warn("Fit to link requires a mesh with a calculated bounding box.");
+            alert("Cannot fit to length: Bounding box not calculated. Ensure the mesh is loaded correctly.");
+            return {};
+        }
+
+        if (link.childJoints.length === 0) {
+            alert("Cannot fit to length: The selected link has no child joint to define a length.");
+            return {};
+        }
+
+        const childJoint = state.joints[link.childJoints[0]];
+        if (!childJoint) return {};
+
+        // Calculate link length based on child joint position
+        const childPos = new THREE.Vector3(...childJoint.origin.xyz);
+        const linkLength = childPos.length();
+
+        if (linkLength < 0.0001) {
+            alert("Cannot fit to length: Link length is effectively zero.");
+            return {};
+        }
+
+        // Assume the primary axis of the STL is Y, which is a common convention for links.
+        const stlLength = link.visual.meshBoundingBox[1];
+        if (!stlLength || stlLength < 0.0001) {
+            alert("Cannot fit to length: Invalid STL bounding box dimension. The height (Y-axis) of the mesh is zero.");
+            return {};
+        }
+
+        const scaleFactor = linkLength / stlLength;
+        const newScale: [number, number, number] = [scaleFactor, scaleFactor, scaleFactor];
+
+        const updatedLink = updateDeep(link, 'visual.meshScale', newScale);
+        
+        return { links: { ...state.links, [linkId]: updatedLink } };
+    });
   },
 
   updateMeshTransform: (itemId, itemType, transform) => {
@@ -144,6 +188,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
   },
 
   setCameraControls: (controls) => setState({ cameraControls: controls }),
+
 
   zoomIn: () => {
     getState().cameraControls?.dolly(-0.5, true);

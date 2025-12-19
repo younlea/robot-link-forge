@@ -108,6 +108,7 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
             // Wrap STLMesh in a group to handle the click, as STLMesh uses Suspense
             <group onClick={clickHandler}>
                 <STLMesh
+                    linkId={linkId}
                     url={meshUrl}
                     scale={meshScale}
                     origin={meshOrigin}

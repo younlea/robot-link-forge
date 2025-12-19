@@ -8,6 +8,7 @@ export type Visual = {
   // For meshes
   meshUrl?: string | null;
   meshScale?: [number, number, number];
+  meshBoundingBox?: [number, number, number]; // Stores the computed size of the mesh
   meshOrigin?: {
     xyz: [number, number, number];
     rpy: [number, number, number];
@@ -98,6 +99,7 @@ export interface RobotActions {
       };
     }
   ) => void;
+  fitMeshToLink: (linkId: string) => void;
 
   // Generic update actions
   updateJoint: (id: string, path: string, value: any) => void;
