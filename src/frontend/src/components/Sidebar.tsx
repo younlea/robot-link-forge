@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRobotStore } from '../store';
 import { RobotLink, RobotJoint, JointType } from '../types';
-import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, UploadCloud, RotateCcw } from 'lucide-react';
+import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, Upload, RotateCcw } from 'lucide-react';
 
 // --- Reusable Input Components (with fixes) ---
 const NumberInput = ({ label, value, onChange, step = 0.01 }: { label: string, value: number, onChange: (val: number) => void, step?: number }) => {
@@ -116,7 +116,7 @@ const LinkInspector = ({ link }: { link: RobotLink }) => {
                 {/* --- STL/Mesh Controls --- */}
                 <input type="file" ref={stlInputRef} onChange={handleFileChange} className="hidden" accept=".stl" />
                 <button onClick={handleStlUploadClick} className="flex items-center justify-center w-full bg-purple-600 hover:bg-purple-700 p-2 rounded text-sm">
-                    <UploadCloud className="mr-2 h-4 w-4" /> Upload STL
+                    <Upload className="mr-2 h-4 w-4" /> Upload STL
                 </button>
 
                 {link.visual.type === 'mesh' && (
@@ -212,7 +212,7 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                     <>
                         <input type="file" ref={stlInputRef} onChange={handleFileChange} className="hidden" accept=".stl" />
                         <button onClick={handleStlUploadClick} title="Applies a mesh to the child link of this joint" className="flex items-center justify-center w-full bg-purple-600 hover:bg-purple-700 p-2 rounded text-sm">
-                            <UploadCloud className="mr-2 h-4 w-4" /> Upload STL to Child Link
+                            <Upload className="mr-2 h-4 w-4" /> Upload STL to Child Link
                         </button>
                     </>
                 )}
@@ -299,11 +299,14 @@ const GlobalJointController = () => {
 
 
 const Sidebar = () => {
-    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot } = useRobotStore();
+    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot, exportURDF } = useRobotStore();
     const selectedLink = selectedItem.type === 'link' ? links[selectedItem.id!] : null;
     const selectedJoint = selectedItem.type === 'joint' ? joints[selectedItem.id!] : null;
     
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [isExportMenuOpen, setExportMenuOpen] = useState(false);
+    const exportMenuRef = useRef<HTMLDivElement>(null);
+
 
     const handleLoadClick = () => {
         fileInputRef.current?.click();
@@ -319,6 +322,27 @@ const Sidebar = () => {
             event.target.value = '';
         }
     };
+
+    const handleExport = (format: 'urdf') => {
+        console.log(`Exporting to ${format}`);
+        if (format === 'urdf') {
+            exportURDF();
+        }
+        setExportMenuOpen(false);
+    };
+
+    // Close menu when clicking outside
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
+                setExportMenuOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [exportMenuRef]);
 
 
     return (
@@ -346,6 +370,20 @@ const Sidebar = () => {
                         className="hidden"
                         accept=".zip,application/zip,.json,application/json"
                     />
+                    <div className="relative" ref={exportMenuRef}>
+                        <button 
+                            onClick={() => setExportMenuOpen(!isExportMenuOpen)}
+                            className="flex-1 flex items-center justify-center bg-green-600 hover:bg-green-700 p-2 rounded text-sm"
+                        >
+                           <Upload className="mr-2 h-4 w-4" /> Export
+                        </button>
+                        {isExportMenuOpen && (
+                            <div className="absolute right-0 mt-2 w-48 bg-gray-700 rounded-md shadow-lg z-10">
+                                <a href="#" onClick={() => handleExport('urdf')} className="block px-4 py-2 text-sm text-white hover:bg-gray-600">Export as URDF</a>
+                                {/* Add more export options here in the future */}
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
 
