@@ -439,3 +439,109 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
     alert("Invalid file type. Please upload a '.zip' or '.json' file created by RobotLinkForge.");
   },
+
+  exportURDF: async () => {
+    try {
+        const { links, joints, baseLinkId } = getState();
+
+        // 1. Create a deep copy of the state to avoid mutations
+        const robotData = JSON.parse(JSON.stringify({ links, joints, baseLinkId }));
+
+        // 2. Fetch all necessary mesh files and convert them to a format the backend can handle (e.g., base64)
+        const meshDataPromises = Object.values(robotData.links as Record<string, RobotLink>).map(async (link) => {
+            if (link.visual.type === 'mesh' && link.visual.meshUrl && link.visual.meshUrl.startsWith('http')) {
+                try {
+                    const response = await fetch(link.visual.meshUrl);
+                    if (!response.ok) throw new Error(`Failed to fetch ${link.visual.meshUrl}`);
+                    const blob = await response.blob();
+                    
+                    // We need to get the original filename. Let's assume the URL's last part is the name.
+                    const urlParts = link.visual.meshUrl.split('/');
+                    const filename = urlParts[urlParts.length - 1];
+
+                    return {
+                        linkId: link.id,
+                        filename: filename, // e.g., 'nozzle.stl'
+                        blob: blob,
+                    };
+                } catch (e) {
+                    console.error(`Error fetching mesh for ${link.name}:`, e);
+                    return null; // Ignore failed fetches
+                }
+            }
+             else if (link.visual.type === 'mesh' && link.visual.meshUrl && link.visual.meshUrl.startsWith('blob:')) {
+                try {
+                    const response = await fetch(link.visual.meshUrl);
+                    if (!response.ok) throw new Error(`Failed to fetch ${link.visual.meshUrl}`);
+                    const blob = await response.blob();
+                    const filename = `${link.id}.stl`; // Create a unique name
+                    return {
+                        linkId: link.id,
+                        filename: filename,
+                        blob: blob
+                    };
+                } catch (e) {
+                    console.error(`Error fetching mesh for ${link.name}:`, e);
+                    return null;
+                }
+            }
+            return null;
+        });
+
+        const meshDatas = (await Promise.all(meshDataPromises)).filter(m => m !== null);
+        
+        // Use FormData to send both JSON and files
+        const formData = new FormData();
+        formData.append('robot_data', JSON.stringify(robotData));
+        
+        // Append each mesh blob
+        for (const meshData of meshDatas) {
+             if (meshData) {
+                // The backend will receive the file with the name `mesh_<linkId>`.
+                formData.append(`mesh_${meshData.linkId}`, meshData.blob, meshData.filename);
+            }
+        }
+
+        // 3. Send to the backend
+        const response = await fetch('http://localhost:8000/api/export-urdf', {
+            method: 'POST',
+            body: formData, // FormData sets the correct 'multipart/form-data' header
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Backend export failed: ${response.status} ${errorText}`);
+        }
+
+        // 4. Receive the zip file and trigger download
+        const zipBlob = await response.blob();
+        const robotName = robotData.links[robotData.baseLinkId]?.name.replace(/[^a-zA-Z0-9]/g, '_') || 'my_robot';
+
+        if ('showSaveFilePicker' in window) {
+             const handle = await window.showSaveFilePicker({
+                suggestedName: `${robotName}_ros_package.zip`,
+                types: [{ description: 'ROS Package (Zip)', accept: { 'application/zip': ['.zip'] }}],
+            });
+            const writable = await handle.createWritable();
+            await writable.write(zipBlob);
+            await writable.close();
+        } else {
+            const url = window.URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `${robotName}_ros_package.zip`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+        
+        alert('URDF package exported successfully!');
+
+    } catch (err) {
+        console.error('Error exporting URDF:', err);
+        alert(`Failed to export URDF package. Check the console for details. Error: ${err.message}`);
+    }
+  },
+}));
