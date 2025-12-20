@@ -121,4 +121,7 @@ export interface RobotActions {
   setCameraControls: (controls: CameraControls | null) => void;
   zoomIn: () => void;
   zoomOut: () => void;
+
+  // Export
+  exportURDF: (robotName: string) => Promise<void>;
 }

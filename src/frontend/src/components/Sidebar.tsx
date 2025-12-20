@@ -547,9 +547,15 @@ const Sidebar = () => {
     };
 
     const handleExport = (format: 'urdf') => {
-        console.log(`Exporting to ${format}`);
-        if (format === 'urdf') {
-            exportURDF();
+        const { baseLinkId, links } = useRobotStore.getState();
+        const defaultName = links[baseLinkId]?.name || 'my_robot';
+        const robotName = window.prompt("Enter a name for your robot package:", defaultName);
+
+        if (robotName) {
+            console.log(`Exporting to ${format} with name ${robotName}`);
+            if (format === 'urdf') {
+                exportURDF(robotName);
+            }
         }
         setExportMenuOpen(false);
     };
