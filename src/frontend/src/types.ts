@@ -124,4 +124,5 @@ export interface RobotActions {
 
   // Export
   exportURDF: (robotName: string) => Promise<void>;
+  exportURDF_ROS2: (robotName: string) => Promise<void>;
 }

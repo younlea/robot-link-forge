@@ -522,14 +522,18 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
 
 
 const Sidebar = () => {
-    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot, exportURDF } = useRobotStore();
+    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot, exportURDF, exportURDF_ROS2 } = useRobotStore();
     const selectedLink = selectedItem.type === 'link' ? links[selectedItem.id!] : null;
     const selectedJoint = selectedItem.type === 'joint' ? joints[selectedItem.id!] : null;
     
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isExportMenuOpen, setExportMenuOpen] = useState(false);
     const exportMenuRef = useRef<HTMLDivElement>(null);
-
+    
+    // State for the new export modal
+    const [showExportModal, setShowExportModal] = useState(false);
+    const [exportFormat, setExportFormat] = useState<'urdf' | 'urdf_ros2' | null>(null);
+    const [robotName, setRobotName] = useState('');
 
     const handleLoadClick = () => {
         fileInputRef.current?.click();
@@ -540,27 +544,35 @@ const Sidebar = () => {
         if (file) {
             loadRobot(file);
         }
-        // Reset file input to allow loading the same file again
-        if(event.target) {
-            event.target.value = '';
-        }
+        if(event.target) event.target.value = '';
     };
 
-    const handleExport = (format: 'urdf') => {
+    const openExportModal = (format: 'urdf' | 'urdf_ros2') => {
         const { baseLinkId, links } = useRobotStore.getState();
         const defaultName = links[baseLinkId]?.name || 'my_robot';
-        const robotName = window.prompt("Enter a name for your robot package:", defaultName);
-
-        if (robotName) {
-            console.log(`Exporting to ${format} with name ${robotName}`);
-            if (format === 'urdf') {
-                exportURDF(robotName);
-            }
-        }
+        setRobotName(defaultName);
+        setExportFormat(format);
+        setShowExportModal(true);
         setExportMenuOpen(false);
     };
 
-    // Close menu when clicking outside
+    const handleConfirmExport = () => {
+        if (!robotName || !exportFormat) return;
+
+        console.log(`Exporting to ${exportFormat} with name ${robotName}`);
+        if (exportFormat === 'urdf') {
+            exportURDF(robotName);
+        } else if (exportFormat === 'urdf_ros2') {
+            exportURDF_ROS2(robotName);
+        }
+        
+        // Close modal
+        setShowExportModal(false);
+        setExportFormat(null);
+        setRobotName('');
+    };
+
+    // Close dropdown menu when clicking outside
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (exportMenuRef.current && !exportMenuRef.current.contains(event.target as Node)) {
@@ -575,62 +587,95 @@ const Sidebar = () => {
 
 
     return (
-        <div className="absolute top-0 right-0 h-screen w-80 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 border-l border-gray-700 overflow-y-auto">
-            {/* File Operations */}
-            <div className="pb-4 mb-4 border-b border-gray-700">
-                <h2 className="text-xl font-bold">Robot Link Forge</h2>
-                <div className="flex space-x-2 mt-2">
-                    <button 
-                        onClick={() => saveRobot()}
-                        className="flex-1 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 p-2 rounded text-sm"
-                    >
-                       <Save className="mr-2 h-4 w-4" /> Save
-                    </button>
-                    <button 
-                        onClick={handleLoadClick}
-                        className="flex-1 flex items-center justify-center bg-gray-600 hover:bg-gray-700 p-2 rounded text-sm"
-                    >
-                       <FolderOpen className="mr-2 h-4 w-4" /> Load
-                    </button>
-                     <input
-                        type="file"
-                        ref={fileInputRef}
-                        onChange={handleFileChange}
-                        className="hidden"
-                        accept=".zip,application/zip,.json,application/json"
-                    />
-                    <div className="relative" ref={exportMenuRef}>
-                        <button 
-                            onClick={() => setExportMenuOpen(!isExportMenuOpen)}
-                            className="flex-1 flex items-center justify-center bg-green-600 hover:bg-green-700 p-2 rounded text-sm"
-                        >
-                           <Upload className="mr-2 h-4 w-4" /> Export
-                        </button>
-                        {isExportMenuOpen && (
-                            <div className="absolute right-0 mt-2 w-48 bg-gray-700 rounded-md shadow-lg z-10">
-                                <a href="#" onClick={() => handleExport('urdf')} className="block px-4 py-2 text-sm text-white hover:bg-gray-600">Export as URDF</a>
-                                {/* Add more export options here in the future */}
-                            </div>
-                        )}
+        <>
+            {/* Export Modal */}
+            {showExportModal && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
+                    <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-96">
+                        <h3 className="text-lg font-bold mb-4">Export Robot Package</h3>
+                        <p className="text-sm text-gray-400 mb-2">Enter a name for the robot package. This will be used for the folder and file names.</p>
+                        <input 
+                            type="text"
+                            value={robotName}
+                            onChange={(e) => setRobotName(e.target.value)}
+                            onFocus={e => e.target.select()}
+                            className="w-full bg-gray-900 rounded p-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
+                        <div className="flex justify-end space-x-2 mt-6">
+                            <button 
+                                onClick={() => setShowExportModal(false)}
+                                className="bg-gray-600 hover:bg-gray-700 p-2 px-4 rounded text-sm"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConfirmExport}
+                                className="bg-green-600 hover:bg-green-700 p-2 px-4 rounded text-sm"
+                            >
+                                Export
+                            </button>
+                        </div>
                     </div>
                 </div>
-            </div>
+            )}
 
-            {/* Inspector / Global Controls */}
-            <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold">{selectedItem.id ? 'Inspector' : 'Global Controls'}</h2>
-                {selectedItem.id && (
-                    <button onClick={() => selectItem(null, null)} title="Deselect and show Global Controls"
-                        className="flex items-center text-sm bg-gray-700 hover:bg-gray-600 p-2 rounded">
-                        <Move3d className="h-4 w-4" />
-                    </button>
-                )}
-            </div>
+            <div className="absolute top-0 right-0 h-screen w-80 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 border-l border-gray-700 overflow-y-auto">
+                {/* File Operations */}
+                <div className="pb-4 mb-4 border-b border-gray-700">
+                    <h2 className="text-xl font-bold">Robot Link Forge</h2>
+                    <div className="flex space-x-2 mt-2">
+                        <button 
+                            onClick={() => saveRobot()}
+                            className="flex-1 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 p-2 rounded text-sm"
+                        >
+                           <Save className="mr-2 h-4 w-4" /> Save
+                        </button>
+                        <button 
+                            onClick={handleLoadClick}
+                            className="flex-1 flex items-center justify-center bg-gray-600 hover:bg-gray-700 p-2 rounded text-sm"
+                        >
+                           <FolderOpen className="mr-2 h-4 w-4" /> Load
+                        </button>
+                         <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={handleFileChange}
+                            className="hidden"
+                            accept=".zip,application/zip,.json,application/json"
+                        />
+                        <div className="relative" ref={exportMenuRef}>
+                            <button 
+                                onClick={() => setExportMenuOpen(!isExportMenuOpen)}
+                                className="flex-1 flex items-center justify-center bg-green-600 hover:bg-green-700 p-2 rounded text-sm"
+                            >
+                               <Upload className="mr-2 h-4 w-4" /> Export
+                            </button>
+                            {isExportMenuOpen && (
+                                <div className="absolute right-0 mt-2 w-48 bg-gray-700 rounded-md shadow-lg z-10">
+                                    <a href="#" onClick={(e) => { e.preventDefault(); openExportModal('urdf'); }} className="block px-4 py-2 text-sm text-white hover:bg-gray-600">Export as URDF (ROS1)</a>
+                                    <a href="#" onClick={(e) => { e.preventDefault(); openExportModal('urdf_ros2'); }} className="block px-4 py-2 text-sm text-white hover:bg-gray-600">Export as URDF (ROS2)</a>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
 
-            {!selectedItem.id && <GlobalJointController />}
-            {selectedLink && <LinkInspector link={selectedLink} />}
-            {selectedJoint && <JointInspector joint={selectedJoint} />}
-        </div>
+                {/* Inspector / Global Controls */}
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold">{selectedItem.id ? 'Inspector' : 'Global Controls'}</h2>
+                    {selectedItem.id && (
+                        <button onClick={() => selectItem(null, null)} title="Deselect and show Global Controls"
+                            className="flex items-center text-sm bg-gray-700 hover:bg-gray-600 p-2 rounded">
+                            <Move3d className="h-4 w-4" />
+                        </button>
+                    )}
+                </div>
+
+                {!selectedItem.id && <GlobalJointController />}
+                {selectedLink && <LinkInspector link={selectedLink} />}
+                {selectedJoint && <JointInspector joint={selectedJoint} />}
+            </div>
+        </>
     );
 };
 

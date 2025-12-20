@@ -246,7 +246,7 @@ async def export_urdf_package(
         f.write(urdf_content)
 
     # Create other package files
-    package_xml = f"""<package format="2">\n<name>{sanitized_robot_name}</name>\n<version>0.1.0</version>\n<description>A description of {sanitized_robot_name}</description>\n<maintainer email="user@example.com">Your Name</maintainer>\n<license>MIT</license>\n<buildtool_depend>catkin</buildtool_depend>\n<depend>roslaunch</depend>\n<depend>robot_state_publisher</depend>\n<depend>rviz</depend>\n<depend>joint_state_publisher_gui</depend>\n</package>\n"""
+    package_xml = f"""<package format=\"2\">\n<name>{sanitized_robot_name}</name>\n<version>0.1.0</version>\n<description>A description of {sanitized_robot_name}</description>\n<maintainer email=\"user@example.com\">Your Name</maintainer>\n<license>MIT</license>\n<buildtool_depend>catkin</buildtool_depend>\n<depend>roslaunch</depend>\n<depend>robot_state_publisher</depend>\n<depend>rviz</depend>\n<depend>joint_state_publisher_gui</depend>\n</package>\n"""
     with open(os.path.join(package_dir, "package.xml"), "w") as f:
         f.write(package_xml)
 
@@ -254,7 +254,7 @@ async def export_urdf_package(
     with open(os.path.join(package_dir, "CMakeLists.txt"), "w") as f:
         f.write(cmakelists_txt)
 
-    display_launch = f"""<launch>\n<arg name="model" default="$(find {sanitized_robot_name})/urdf/{sanitized_robot_name}.urdf"/>\n<arg name="gui" default="true" />\n<param name="robot_description" textfile="$(arg model)" />\n<node name="joint_state_publisher_gui" pkg="joint_state_publisher_gui" type="joint_state_publisher_gui" />\n<node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />\n<node name="rviz" pkg="rviz" type="rviz" args="-d $(find {sanitized_robot_name})/launch/display.rviz" required="true" />\n</launch>\n"""
+    display_launch = f"""<launch>\n<arg name=\"model\" default=\"$(find {sanitized_robot_name})/urdf/{sanitized_robot_name}.urdf\"/>\n<arg name=\"gui\" default=\"true\" />\n<param name=\"robot_description\" textfile=\"$(arg model)\" />\n<node name=\"joint_state_publisher_gui\" pkg=\"joint_state_publisher_gui\" type=\"joint_state_publisher_gui\" />\n<node name=\"robot_state_publisher\" pkg=\"robot_state_publisher\" type=\"robot_state_publisher\" />\n<node name=\"rviz\" pkg=\"rviz\" type=\"rviz\" args=\"-d $(find {sanitized_robot_name})/launch/display.rviz\" required=\"true\" />\n</launch>\n"""
     with open(os.path.join(launch_dir, "display.launch"), "w") as f:
         f.write(display_launch)
     
@@ -366,10 +366,10 @@ Visualization Manager:
 
     # Create the zip archive
     archive_path = shutil.make_archive(
-        base_name=os.path.join(tmpdir, sanitized_robot_name), # e.g., /tmp/xyz/my_robot
+        base_name=os.path.join(tmpdir, sanitized_robot_name),
         format='zip',
-        root_dir=tmpdir,           # The archive will be rooted at /tmp/xyz
-        base_dir=sanitized_robot_name # The folder to zip is `my_robot`
+        root_dir=tmpdir,
+        base_dir=sanitized_robot_name
     )
     
     # Add a background task to clean up the temporary directory after the response is sent
@@ -382,6 +382,242 @@ Visualization Manager:
         filename=f"{sanitized_robot_name}_ros_package.zip"
     )
 
+
+@app.post("/api/export-urdf-ros2")
+async def export_urdf_package_ros2(
+    background_tasks: BackgroundTasks,
+    robot_data: str = Form(...), 
+    robot_name: str = Form(...), 
+    files: Optional[List[UploadFile]] = File(None)
+):
+    try:
+        data_dict = json.loads(robot_data)
+        robot = RobotData.parse_obj(data_dict)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
+
+    sanitized_robot_name = to_snake_case(robot_name)
+    if not sanitized_robot_name:
+        sanitized_robot_name = "my_robot"
+    
+    tmpdir = tempfile.mkdtemp()
+    
+    package_dir = os.path.join(tmpdir, sanitized_robot_name)
+    urdf_dir = os.path.join(package_dir, "urdf")
+    mesh_dir = os.path.join(package_dir, "meshes")
+    launch_dir = os.path.join(package_dir, "launch")
+
+    os.makedirs(urdf_dir, exist_ok=True)
+    os.makedirs(mesh_dir, exist_ok=True)
+    os.makedirs(launch_dir, exist_ok=True)
+
+    # Process and save mesh files
+    mesh_files_map = {}
+    if files:
+        for file in files:
+            form_field_name = file.name
+            link_id = form_field_name.replace('mesh_', '')
+
+            if link_id in robot.links:
+                safe_filename = to_snake_case(robot.links[link_id].name) + ".stl"
+                file_path = os.path.join(mesh_dir, safe_filename)
+                
+                with open(file_path, "wb") as f:
+                    shutil.copyfileobj(file.file, f)
+                
+                mesh_files_map[link_id] = safe_filename
+
+    # Generate and save URDF file
+    urdf_content = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map)
+    with open(os.path.join(urdf_dir, f"{sanitized_robot_name}.urdf"), "w") as f:
+        f.write(urdf_content)
+
+    # Create ROS2 specific files
+    package_xml = f"""<?xml version="1.0"?>\n<package format=\"3\">\n  <name>{sanitized_robot_name}</name>\n  <version>0.1.0</version>\n  <description>A description of {sanitized_robot_name}</description>\n  <maintainer email=\"user@example.com\">Your Name</maintainer>\n  <license>MIT</license>\n\n  <buildtool_depend>ament_cmake</buildtool_depend>\n\n  <exec_depend>joint_state_publisher_gui</exec_depend>\n  <exec_depend>robot_state_publisher</exec_depend>\n  <exec_depend>rviz2</exec_depend>\n  <exec_depend>xacro</exec_depend>\n\n  <test_depend>ament_lint_auto</test_depend>\n  <test_depend>ament_lint_common</test_depend>\n\n  <export>\n    <build_type>ament_cmake</build_type>\n  </export>\n</package>\n"""
+    with open(os.path.join(package_dir, "package.xml"), "w") as f:
+        f.write(package_xml)
+
+    cmakelists_txt = f"""cmake_minimum_required(VERSION 3.8)\nproject({sanitized_robot_name})\n\nif(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)\nendif()\n\nfind_package(ament_cmake REQUIRED)
+find_package(robot_state_publisher REQUIRED)
+find_package(joint_state_publisher_gui REQUIRED)
+find_package(rviz2 REQUIRED)\n\ninstall(
+    DIRECTORY urdf launch meshes
+    DESTINATION share/${{PROJECT_NAME}})
+
+ament_package()\n"""
+    with open(os.path.join(package_dir, "CMakeLists.txt"), "w") as f:
+        f.write(cmakelists_txt)
+
+    display_launch_py = f"""import os
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
+def generate_launch_description():
+
+    use_sim_time = LaunchConfiguration('use_sim_time', default='false')
+
+    urdf_file_name = '{sanitized_robot_name}.urdf'
+    urdf = os.path.join(
+        get_package_share_directory('{sanitized_robot_name}'),
+        'urdf',
+        urdf_file_name)
+    with open(urdf, 'r') as infp:
+        robot_desc = infp.read()
+
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='false',
+            description='Use simulation (Gazebo) clock if true'),
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
+            output='screen',
+            parameters=[{{\'use_sim_time\': use_sim_time, \'robot_description\': robot_desc}}],
+            arguments=[urdf]),
+        Node(
+            package='joint_state_publisher_gui',
+            executable='joint_state_publisher_gui',
+            name='joint_state_publisher_gui',
+            output='screen'),
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            output='screen',
+            arguments=['-d', os.path.join(get_package_share_directory('{sanitized_robot_name}'), 'launch', 'display.rviz')])
+    ])
+"""
+    with open(os.path.join(launch_dir, "display.launch.py"), "w") as f:
+        f.write(display_launch_py)
+
+    rviz_config = """Panels:
+- Class: rviz/Displays
+  Help Height: 78
+  Name: Displays
+  Property Tree Widget:
+    Expanded:
+      - /Global Options1
+      - /Status1
+      - /RobotModel1
+    Splitter Ratio: 0.5
+  Tree Height: 600
+- Class: rviz/Selection
+  Name: Selection
+- Class: rviz/Tool Properties
+  Expanded:
+    - /2D Nav Goal1
+    - /2D Pose Estimate1
+    - /Publish Point1
+  Name: Tool Properties
+  Splitter Ratio: 0.588679
+- Class: rviz/Views
+  Expanded:
+    - /Current View1
+  Name: Views
+  Splitter Ratio: 0.5
+- Class: rviz/Time
+  Name: Time
+  SyncMode: 0
+  SyncSource: ""
+Visualization Manager:
+  Class: ""
+  Displays:
+    - Alpha: 0.5
+      Cell Size: 1
+      Class: rviz/Grid
+      Color: 160; 160; 164
+      Enabled: true
+      Line Style:
+        Line Width: 0.03
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 10
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Class: rviz/RobotModel
+      Description File: ""
+      Description Source: Topic
+      Description Topic: /robot_description
+      Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+      Name: RobotModel
+      Robot Description: "robot_description"
+      Shadow Technique: 0
+      Update Interval: 0
+      Value: true
+      Visual Enabled: true
+  Enabled: true
+  Global Options:
+    Background Color: 48; 48; 48
+    Fixed Frame: base_link
+    Frame Rate: 30
+  Name: root
+  Tools:
+    - Class: rviz/Interact
+      Hide Inactive Objects: true
+    - Class: rviz/MoveCamera
+    - Class: rviz/Select
+  Value: true
+  Views:
+    Current:
+      Class: rviz/Orbit
+      Distance: 2.5
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.06
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
+      Focal Point:
+        X: 0
+        Y: 0.5
+        Z: 0.5
+      Name: Current View
+      Near Clip Distance: 0.01
+      Pitch: 0.4
+      Target Frame: <Fixed Frame>
+      Value: Orbit (rviz)
+      Yaw: 1.57
+"""
+    # Use the same rviz config as ROS1 for now
+    with open(os.path.join(launch_dir, "display.rviz"), "w") as f:
+        f.write(rviz_config)
+
+    guide_src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'URDF_export_ros2.md'))
+    if os.path.exists(guide_src_path):
+        shutil.copy(guide_src_path, os.path.join(package_dir, 'URDF_export_guide_ros2.md'))
+
+    # Create the zip archive
+    archive_path = shutil.make_archive(
+        base_name=os.path.join(tmpdir, sanitized_robot_name),
+        format='zip',
+        root_dir=tmpdir,
+        base_dir=sanitized_robot_name
+    )
+    
+    background_tasks.add_task(shutil.rmtree, tmpdir)
+    
+    return FileResponse(
+        path=archive_path, 
+        media_type='application/zip', 
+        filename=f"{sanitized_robot_name}_ros2_package.zip"
+    )
 
 @app.get("/")
 def read_root():

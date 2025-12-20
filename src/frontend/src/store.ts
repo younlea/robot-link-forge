@@ -527,4 +527,86 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         alert(`Failed to export URDF package. Check the console for details. Error: ${err.message}`);
     }
   },
+
+  exportURDF_ROS2: async (robotName: string) => {
+    try {
+        const { links, joints, baseLinkId } = getState();
+
+        const robotData = JSON.parse(JSON.stringify({ links, joints, baseLinkId }));
+
+        const meshDataPromises = Object.values(robotData.links as Record<string, RobotLink>).map(async (link) => {
+            if (link.visual.type === 'mesh' && link.visual.meshUrl && (link.visual.meshUrl.startsWith('http') || link.visual.meshUrl.startsWith('blob:'))) {
+                try {
+                    const response = await fetch(link.visual.meshUrl);
+                    if (!response.ok) throw new Error(`Failed to fetch ${link.visual.meshUrl}`);
+                    const blob = await response.blob();
+                    
+                    const urlParts = link.visual.meshUrl.split('/');
+                    const filename = urlParts[urlParts.length - 1] || `${link.id}.stl`;
+
+                    return {
+                        linkId: link.id,
+                        filename: filename,
+                        blob: blob,
+                    };
+                } catch (e) {
+                    console.error(`Error fetching mesh for ${link.name}:`, e);
+                    return null;
+                }
+            }
+            return null;
+        });
+
+        const meshDatas = (await Promise.all(meshDataPromises)).filter(m => m !== null);
+        
+        const formData = new FormData();
+        formData.append('robot_data', JSON.stringify(robotData));
+        formData.append('robot_name', robotName);
+        
+        for (const meshData of meshDatas) {
+             if (meshData) {
+                formData.append(`files`, meshData.blob, `mesh_${meshData.linkId}`);
+            }
+        }
+
+        const response = await fetch('http://localhost:8000/api/export-urdf-ros2', {
+            method: 'POST',
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Backend export failed: ${response.status} ${errorText}`);
+        }
+
+        const zipBlob = await response.blob();
+        const safeRobotName = robotName.replace(/[^a-zA-Z0-9]/g, '_');
+
+        if ('showSaveFilePicker' in window) {
+             const handle = await window.showSaveFilePicker({
+                suggestedName: `${safeRobotName}_ros2_package.zip`,
+                types: [{ description: 'ROS2 Package (Zip)', accept: { 'application/zip': ['.zip'] }}],
+            });
+            const writable = await handle.createWritable();
+            await writable.write(zipBlob);
+            await writable.close();
+        } else {
+            const url = window.URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `${safeRobotName}_ros2_package.zip`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+        
+        alert('URDF ROS2 package exported successfully!');
+
+    } catch (err) {
+        console.error('Error exporting URDF for ROS2:', err);
+        alert(`Failed to export URDF ROS2 package. Check the console for details. Error: ${err.message}`);
+    }
+  },
 }));
