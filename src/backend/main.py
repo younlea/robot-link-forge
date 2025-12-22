@@ -83,8 +83,15 @@ def to_snake_case(name: str) -> str:
 
 def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str]) -> str:
     """Generates the URDF XML content as a string."""
+
+    # Generate unique, valid names for all links first to ensure consistency.
+    unique_link_names = {
+        link_id: f"{to_snake_case(link.name)}_{link.id[:6]}"
+        for link_id, link in robot_data.links.items()
+    }
     
-    links_xml = f'  <link name="{to_snake_case(robot_data.links[robot_data.baseLinkId].name)}"/>\n'
+    base_link_name = unique_link_names[robot_data.baseLinkId]
+    links_xml = f'  <link name="{base_link_name}"/>\n'
     joints_xml = ""
 
     processed_links = {robot_data.baseLinkId}
@@ -93,9 +100,9 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
     q = [robot_data.baseLinkId]
     while q:
         parent_link_id = q.pop(0)
-        parent_link = robot_data.links[parent_link_id]
+        parent_link_name = unique_link_names[parent_link_id]
 
-        for joint_id in parent_link.childJoints:
+        for joint_id in robot_data.links[parent_link_id].childJoints:
             joint = robot_data.joints.get(joint_id)
             if not joint or not joint.childLinkId:
                 continue
@@ -105,49 +112,59 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
                 continue
             
             child_link = robot_data.links[child_link_id]
+            child_link_name = unique_link_names[child_link_id]
             processed_links.add(child_link_id)
             q.append(child_link_id)
 
-            # --- Link XML ---
-            links_xml += f'  <link name="{to_snake_case(child_link.name)}">\n'
-            links_xml += '    <visual>\n'
-            links_xml += f'      <origin xyz="0 0 0" rpy="0 0 0" />\n'
-            links_xml += '      <geometry>\n'
+            # --- Visual and Collision XML for the current link ---
+            visual_xml = '    <visual>\n'
             
+            origin_xyz_str = "0 0 0"
+            origin_rpy_str = "0 0 0"
+
             vis = child_link.visual
             if vis.type == 'mesh' and child_link_id in mesh_files:
-                mesh_origin_xyz = " ".join(map(str, vis.meshOrigin['xyz'])) if vis.meshOrigin and 'xyz' in vis.meshOrigin else "0 0 0"
-                mesh_origin_rpy = " ".join(map(str, vis.meshOrigin['rpy'])) if vis.meshOrigin and 'rpy' in vis.meshOrigin else "0 0 0"
+                if vis.meshOrigin:
+                    origin_xyz_str = " ".join(map(str, vis.meshOrigin.get('xyz', [0,0,0])))
+                    origin_rpy_str = " ".join(map(str, vis.meshOrigin.get('rpy', [0,0,0])))
                 mesh_scale = " ".join(map(str, vis.meshScale)) if vis.meshScale else "1 1 1"
-                
-                links_xml = links_xml.replace('<origin xyz="0 0 0" rpy="0 0 0" />', f'<origin xyz="{mesh_origin_xyz}" rpy="{mesh_origin_rpy}" />')
-                links_xml += f'        <mesh filename="package://{robot_name}/meshes/{mesh_files[child_link_id]}" scale="{mesh_scale}"/>\n'
-
+                geometry_xml = f'        <mesh filename="package://{robot_name}/meshes/{mesh_files[child_link_id]}" scale="{mesh_scale}"/>\n'
             elif vis.type == 'box' and vis.dimensions:
-                links_xml += f'        <box size="{" ".join(map(str, vis.dimensions))}" />\n'
+                geometry_xml = f'        <box size="{" ".join(map(str, vis.dimensions))}" />\n'
             elif vis.type == 'cylinder' and vis.dimensions:
-                links_xml += f'        <cylinder radius="{vis.dimensions[0]}" length="{vis.dimensions[2]}" />\n'
+                geometry_xml = f'        <cylinder radius="{vis.dimensions[0]}" length="{vis.dimensions[2]}" />\n'
             elif vis.type == 'sphere' and vis.dimensions:
-                links_xml += f'        <sphere radius="{vis.dimensions[0]}" />\n'
+                geometry_xml = f'        <sphere radius="{vis.dimensions[0]}" />\n'
             else:
-                 links_xml += '        <box size="0.01 0.01 0.01" />\n'
+                geometry_xml = '        <box size="0.01 0.01 0.01" />\n'
 
-            links_xml += '      </geometry>\n'
+            visual_xml += f'      <origin xyz="{origin_xyz_str}" rpy="{origin_rpy_str}" />\n'
+            visual_xml += '      <geometry>\n'
+            visual_xml += geometry_xml
+            visual_xml += '      </geometry>\n'
+
             if vis.color:
                 r, g, b = int(vis.color[1:3], 16)/255, int(vis.color[3:5], 16)/255, int(vis.color[5:7], 16)/255
-                links_xml += f'      <material name="{to_snake_case(child_link.name)}_color">\n'
-                links_xml += f'        <color rgba="{r:.3f} {g:.3f} {b:.3f} 1.0" />\n'
-                links_xml += '      </material>\n'
-            links_xml += '    </visual>\n'
-            links_xml += links_xml.replace('<visual>', '<collision>').replace('</visual>', '</collision>')
+                visual_xml += f'      <material name="{child_link_name}_color">\n'
+                visual_xml += f'        <color rgba="{r:.3f} {g:.3f} {b:.3f} 1.0" />\n'
+                visual_xml += '      </material>\n'
+            
+            visual_xml += '    </visual>\n'
+            
+            collision_xml = visual_xml.replace('<visual>', '<collision>', 1).replace('</visual>', '</collision>', 1)
+
+            # --- Link XML ---
+            links_xml += f'  <link name="{child_link_name}">\n'
+            links_xml += visual_xml
+            links_xml += collision_xml
             links_xml += '  </link>\n\n'
 
-
             # --- Joint XML ---
+            joint_name = f"{to_snake_case(joint.name)}_{joint.id[:6]}"
             joint_type = "revolute" if joint.type == 'rotational' else joint.type
-            joints_xml += f'  <joint name="{to_snake_case(joint.name)}" type="{joint_type}">\n'
-            joints_xml += f'    <parent link="{to_snake_case(parent_link.name)}"/>\n'
-            joints_xml += f'    <child link="{to_snake_case(child_link.name)}"/>\n'
+            joints_xml += f'  <joint name="{joint_name}" type="{joint_type}">\n'
+            joints_xml += f'    <parent link="{parent_link_name}"/>\n'
+            joints_xml += f'    <child link="{child_link_name}"/>\n'
             joints_xml += f'    <origin xyz="{" ".join(map(str, joint.origin.xyz))}" rpy="{" ".join(map(str, joint.origin.rpy))}"/>\n'
             
             if joint.type == 'rotational':
@@ -292,7 +309,7 @@ Visualization Manager:
   Displays:
     - Alpha: 0.5
       Cell Size: 1
-      Class: rviz/Grid
+      Class: rviz_default_plugins/Grid
       Color: 160; 160; 164
       Enabled: true
       Line Style:
@@ -308,7 +325,7 @@ Visualization Manager:
       Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
       Value: true
-    - Class: rviz/RobotModel
+    - Class: rviz_default_plugins/RobotModel
       Description File: ""
       Description Source: Topic
       Description Topic: /robot_description
@@ -332,14 +349,14 @@ Visualization Manager:
     Frame Rate: 30
   Name: root
   Tools:
-    - Class: rviz/Interact
+    - Class: rviz_default_plugins/Interact
       Hide Inactive Objects: true
-    - Class: rviz/MoveCamera
-    - Class: rviz/Select
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
   Value: true
   Views:
     Current:
-      Class: rviz/Orbit
+      Class: rviz_default_plugins/Orbit
       Distance: 2.5
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
@@ -386,8 +403,8 @@ Visualization Manager:
 @app.post("/api/export-urdf-ros2")
 async def export_urdf_package_ros2(
     background_tasks: BackgroundTasks,
-    robot_data: str = Form(...), 
-    robot_name: str = Form(...), 
+    robot_data: str = Form(...),
+    robot_name: str = Form(...),
     files: Optional[List[UploadFile]] = File(None)
 ):
     try:
@@ -406,11 +423,12 @@ async def export_urdf_package_ros2(
     urdf_dir = os.path.join(package_dir, "urdf")
     mesh_dir = os.path.join(package_dir, "meshes")
     launch_dir = os.path.join(package_dir, "launch")
+    rviz_dir = os.path.join(package_dir, "rviz")
 
     os.makedirs(urdf_dir, exist_ok=True)
     os.makedirs(mesh_dir, exist_ok=True)
     os.makedirs(launch_dir, exist_ok=True)
-
+    os.makedirs(rviz_dir, exist_ok=True)
     # Process and save mesh files
     mesh_files_map = {}
     if files:
@@ -433,19 +451,25 @@ async def export_urdf_package_ros2(
         f.write(urdf_content)
 
     # Create ROS2 specific files
-    package_xml = f"""<?xml version="1.0"?>\n<package format=\"3\">\n  <name>{sanitized_robot_name}</name>\n  <version>0.1.0</version>\n  <description>A description of {sanitized_robot_name}</description>\n  <maintainer email=\"user@example.com\">Your Name</maintainer>\n  <license>MIT</license>\n\n  <buildtool_depend>ament_cmake</buildtool_depend>\n\n  <exec_depend>joint_state_publisher_gui</exec_depend>\n  <exec_depend>robot_state_publisher</exec_depend>\n  <exec_depend>rviz2</exec_depend>\n  <exec_depend>xacro</exec_depend>\n\n  <test_depend>ament_lint_auto</test_depend>\n  <test_depend>ament_lint_common</test_depend>\n\n  <export>\n    <build_type>ament_cmake</build_type>\n  </export>\n</package>\n"""
+    package_xml = f"""<?xml version="1.0"?>\n<package format=\"3\">\n  <name>{sanitized_robot_name}</name>\n  <version>0.1.0</version>\n  <description>A description of {sanitized_robot_name}</description>\n  <maintainer email=\"user@example.com\">Your Name</maintainer>\n  <license>MIT</license>\n\n  <buildtool_depend>ament_cmake</buildtool_depend>\n\n  <exec_depend>joint_state_publisher</exec_depend>\n  <exec_depend>joint_state_publisher_gui</exec_depend>\n  <exec_depend>robot_state_publisher</exec_depend>\n  <exec_depend>rviz2</exec_depend>\n  <exec_depend>xacro</exec_depend>\n\n  <test_depend>ament_lint_auto</test_depend>\n  <test_depend>ament_lint_common</test_depend>\n\n  <export>\n    <build_type>ament_cmake</build_type>\n  </export>\n</package>\n"""
     with open(os.path.join(package_dir, "package.xml"), "w") as f:
         f.write(package_xml)
 
-    cmakelists_txt = f"""cmake_minimum_required(VERSION 3.8)\nproject({sanitized_robot_name})\n\nif(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  add_compile_options(-Wall -Wextra -Wpedantic)\nendif()\n\nfind_package(ament_cmake REQUIRED)
-find_package(robot_state_publisher REQUIRED)
-find_package(joint_state_publisher_gui REQUIRED)
-find_package(rviz2 REQUIRED)\n\ninstall(
-    DIRECTORY urdf launch meshes
+    cmakelists_txt = f"""cmake_minimum_required(VERSION 3.8)
+project({sanitized_robot_name})
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+find_package(ament_cmake REQUIRED)
+
+install(
+    DIRECTORY urdf launch meshes rviz
     DESTINATION share/${{PROJECT_NAME}})
 
-ament_package()\n"""
+ament_package()
+"""
     with open(os.path.join(package_dir, "CMakeLists.txt"), "w") as f:
         f.write(cmakelists_txt)
 
@@ -455,10 +479,12 @@ from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+from launch.conditions import IfCondition, UnlessCondition
 
 def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
+    use_gui = LaunchConfiguration('use_gui', default='true')
 
     urdf_file_name = '{sanitized_robot_name}.urdf'
     urdf = os.path.join(
@@ -467,35 +493,50 @@ def generate_launch_description():
         urdf_file_name)
     with open(urdf, 'r') as infp:
         robot_desc = infp.read()
+    
+    rviz_config_file = os.path.join(
+        get_package_share_directory('{sanitized_robot_name}'),
+        'rviz',
+        'display.rviz'
+    )
 
     return LaunchDescription([
         DeclareLaunchArgument(
             'use_sim_time',
             default_value='false',
             description='Use simulation (Gazebo) clock if true'),
+        DeclareLaunchArgument(
+            'use_gui',
+            default_value='true',
+            description='Whether to use the joint state publisher GUI'),
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
             name='robot_state_publisher',
             output='screen',
-            parameters=[{{\'use_sim_time\': use_sim_time, \'robot_description\': robot_desc}}],
-            arguments=[urdf]),
+            parameters=[{{'use_sim_time': use_sim_time, 'robot_description': robot_desc}}]),
+        Node(
+            package='joint_state_publisher',
+            executable='joint_state_publisher',
+            name='joint_state_publisher',
+            output='screen',
+            condition=UnlessCondition(use_gui)),
         Node(
             package='joint_state_publisher_gui',
             executable='joint_state_publisher_gui',
             name='joint_state_publisher_gui',
-            output='screen'),
+            output='screen',
+            condition=IfCondition(use_gui)),
         Node(
             package='rviz2',
             executable='rviz2',
             name='rviz2',
             output='screen',
-            arguments=['-d', os.path.join(get_package_share_directory('{sanitized_robot_name}'), 'launch', 'display.rviz')])
+            arguments=['-d', rviz_config_file])
     ])
 """
     with open(os.path.join(launch_dir, "display.launch.py"), "w") as f:
         f.write(display_launch_py)
-
     rviz_config = """Panels:
 - Class: rviz/Displays
   Help Height: 78
@@ -530,7 +571,7 @@ Visualization Manager:
   Displays:
     - Alpha: 0.5
       Cell Size: 1
-      Class: rviz/Grid
+      Class: rviz_default_plugins/Grid
       Color: 160; 160; 164
       Enabled: true
       Line Style:
@@ -546,7 +587,7 @@ Visualization Manager:
       Plane Cell Count: 10
       Reference Frame: <Fixed Frame>
       Value: true
-    - Class: rviz/RobotModel
+    - Class: rviz_default_plugins/RobotModel
       Description File: ""
       Description Source: Topic
       Description Topic: /robot_description
@@ -570,14 +611,14 @@ Visualization Manager:
     Frame Rate: 30
   Name: root
   Tools:
-    - Class: rviz/Interact
+    - Class: rviz_default_plugins/Interact
       Hide Inactive Objects: true
-    - Class: rviz/MoveCamera
-    - Class: rviz/Select
+    - Class: rviz_default_plugins/MoveCamera
+    - Class: rviz_default_plugins/Select
   Value: true
   Views:
     Current:
-      Class: rviz/Orbit
+      Class: rviz_default_plugins/Orbit
       Distance: 2.5
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.06
@@ -595,8 +636,7 @@ Visualization Manager:
       Value: Orbit (rviz)
       Yaw: 1.57
 """
-    # Use the same rviz config as ROS1 for now
-    with open(os.path.join(launch_dir, "display.rviz"), "w") as f:
+    with open(os.path.join(rviz_dir, "display.rviz"), "w") as f:
         f.write(rviz_config)
 
     guide_src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'URDF_export_ros2.md'))
