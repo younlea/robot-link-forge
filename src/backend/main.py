@@ -760,6 +760,36 @@ Visualization Manager:
     if os.path.exists(guide_src_path):
         shutil.copy(guide_src_path, os.path.join(package_dir, 'URDF_export_guide_ros2.md'))
 
+    # Create build_and_launch.sh script
+    build_script = f"""#!/bin/bash
+# Convenience script to build and launch the package
+# Usage: Run this script from your ROS2 workspace root after placing the package in src/
+
+echo "Building package {sanitized_robot_name}..."
+colcon build --packages-select {sanitized_robot_name} --symlink-install
+
+if [ $? -eq 0 ]; then
+    echo "Build successful. Sourcing setup..."
+    if [ -f "install/setup.bash" ]; then
+        source install/setup.bash
+    else
+        echo "Warning: install/setup.bash not found. Sourcing might fail."
+    fi
+    
+    echo "Launching {sanitized_robot_name}..."
+    ros2 launch {sanitized_robot_name} display.launch.py
+else
+    echo "Build failed!"
+    exit 1
+fi
+"""
+    script_path = os.path.join(package_dir, "build_and_launch.sh")
+    with open(script_path, "w") as f:
+        f.write(build_script)
+    
+    # Make executable
+    os.chmod(script_path, 0o755)
+
     # Create the zip archive
     archive_path = shutil.make_archive(
         base_name=os.path.join(tmpdir, sanitized_robot_name),
