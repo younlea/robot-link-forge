@@ -20,6 +20,8 @@ const createInitialState = (): RobotState => {
         baseLinkId: baseLinkId,
         selectedItem: { id: baseLinkId, type: 'link' },
         cameraMode: 'rotate', // Default camera mode
+        cameraControls: null,
+        serverProjects: [],
     };
 };
 
@@ -52,6 +54,54 @@ const createDefaultLink = (): RobotLink => ({
     },
     childJoints: [],
 });
+
+// Helper for Zip Generation
+const createRobotZip = async (state: RobotState) => {
+    const { links, joints, baseLinkId } = state;
+    const zip = new JSZip();
+
+    // Create a deep copy to modify URLs without affecting current state
+    const linksToSave = JSON.parse(JSON.stringify(links));
+
+    const meshFolder = zip.folder('meshes');
+    if (!meshFolder) throw new Error("Failed to create 'meshes' folder in zip.");
+
+    const meshUrlMap = new Map<string, string>();
+
+    for (const link of Object.values(linksToSave as Record<string, RobotLink>)) {
+        if (link.visual.type === 'mesh' && link.visual.meshUrl && (link.visual.meshUrl.startsWith('http') || link.visual.meshUrl.startsWith('blob:'))) {
+            // Check if we've already processed this URL
+            if (meshUrlMap.has(link.visual.meshUrl)) {
+                link.visual.meshUrl = meshUrlMap.get(link.visual.meshUrl);
+                continue;
+            }
+
+            try {
+                const response = await fetch(link.visual.meshUrl);
+                if (!response.ok) {
+                    console.warn(`Could not fetch mesh for ${link.name}: ${link.visual.meshUrl}`);
+                    continue;
+                }
+                const blob = await response.blob();
+                const newMeshName = `${uuidv4()}.stl`;
+                const relativePath = `meshes/${newMeshName}`;
+
+                meshFolder.file(newMeshName, blob);
+
+                // Update the URL in our data-to-be-saved
+                link.visual.meshUrl = relativePath;
+                meshUrlMap.set(link.visual.meshUrl, relativePath); // Store original for mapping
+            } catch (e) {
+                console.warn(`Error fetching mesh during save: ${e}`);
+            }
+        }
+    }
+
+    const robotData = { links: linksToSave, joints, baseLinkId };
+    zip.file('robot-scene.json', JSON.stringify(robotData, null, 2));
+
+    return await zip.generateAsync({ type: 'blob' });
+};
 
 export const useRobotStore = create<RobotState & RobotActions>((setState, getState) => ({
     ...createInitialState(),
@@ -285,48 +335,10 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
     },
 
     // --- Save/Load Functionality ---
+    // --- Save/Load Functionality ---
     saveRobot: async () => {
         try {
-            const { links, joints, baseLinkId } = getState();
-            const zip = new JSZip();
-
-            // Create a deep copy to modify URLs without affecting current state
-            const linksToSave = JSON.parse(JSON.stringify(links));
-
-            const meshFolder = zip.folder('meshes');
-            if (!meshFolder) throw new Error("Failed to create 'meshes' folder in zip.");
-
-            const meshUrlMap = new Map<string, string>();
-
-            for (const link of Object.values(linksToSave as Record<string, RobotLink>)) {
-                if (link.visual.type === 'mesh' && link.visual.meshUrl && (link.visual.meshUrl.startsWith('http') || link.visual.meshUrl.startsWith('blob:'))) {
-                    // Check if we've already processed this URL
-                    if (meshUrlMap.has(link.visual.meshUrl)) {
-                        link.visual.meshUrl = meshUrlMap.get(link.visual.meshUrl);
-                        continue;
-                    }
-
-                    const response = await fetch(link.visual.meshUrl);
-                    if (!response.ok) {
-                        console.warn(`Could not fetch mesh for ${link.name}: ${link.visual.meshUrl}`);
-                        continue;
-                    }
-                    const blob = await response.blob();
-                    const newMeshName = `${uuidv4()}.stl`;
-                    const relativePath = `meshes/${newMeshName}`;
-
-                    meshFolder.file(newMeshName, blob);
-
-                    // Update the URL in our data-to-be-saved
-                    link.visual.meshUrl = relativePath;
-                    meshUrlMap.set(link.visual.meshUrl, relativePath); // Store original for mapping
-                }
-            }
-
-            const robotData = { links: linksToSave, joints, baseLinkId };
-            zip.file('robot-scene.json', JSON.stringify(robotData, null, 2));
-
-            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const zipBlob = await createRobotZip(getState());
 
             if ('showSaveFilePicker' in window) {
                 const handle = await window.showSaveFilePicker({
@@ -347,9 +359,65 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                 URL.revokeObjectURL(a.href);
             }
 
-        } catch (err) {
+        } catch (err: any) {
             console.error('Error saving robot project:', err);
             alert(`Failed to save project: ${err.message}`);
+        }
+    },
+
+    saveProjectToServer: async (name: string) => {
+        try {
+            const zipBlob = await createRobotZip(getState());
+            const formData = new FormData();
+            formData.append('file', zipBlob, `${name}.zip`);
+            formData.append('project_name', name);
+
+            const response = await fetch('http://localhost:8000/api/projects', {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                throw new Error(`Server returned ${response.status}`);
+            }
+
+            const result = await response.json();
+            console.log('Project saved to server:', result);
+            alert('Project saved to server successfully!');
+            // Refresh list
+            getState().getProjectList();
+
+        } catch (err: any) {
+            console.error('Error saving robot project to server:', err);
+            alert(`Failed to save project to server: ${err.message}`);
+        }
+    },
+
+    getProjectList: async () => {
+        try {
+            const response = await fetch('http://localhost:8000/api/projects');
+            if (response.ok) {
+                const data = await response.json();
+                setState({ serverProjects: data.projects || [] });
+            }
+        } catch (error) {
+            console.error("Failed to fetch project list:", error);
+        }
+    },
+
+    loadProjectFromServer: async (filename: string) => {
+        try {
+            const response = await fetch(`http://localhost:8000/api/projects/${filename}`);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch project: ${response.status}`);
+            }
+            const blob = await response.blob();
+            // Reuse existing load logic, but need to wrap blob in File
+            const file = new File([blob], filename, { type: 'application/zip' });
+            await getState().loadRobot(file);
+        } catch (error: any) {
+            console.error("Failed to load project from server:", error);
+            alert(`Failed to load project from server: ${error.message}`);
         }
     },
 

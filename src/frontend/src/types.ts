@@ -89,6 +89,7 @@ export interface RobotState {
   selectedItem: SelectedItem;
   cameraMode: 'rotate' | 'pan';
   cameraControls: CameraControls | null;
+  serverProjects: string[];
 }
 
 export interface RobotActions {
@@ -127,8 +128,14 @@ export interface RobotActions {
   exportURDF_ROS2: (robotName: string) => Promise<void>;
 
   // App State Management
-  saveRobot: () => Promise<void>;
-  loadRobot: (file: File) => Promise<void>;
+  saveRobot: () => Promise<void>; // Local Download
+  loadRobot: (file: File) => Promise<void>; // Local Upload
+
+  // Server-side Persistence
+  getProjectList: () => Promise<void>;
+  saveProjectToServer: (name: string) => Promise<void>;
+  loadProjectFromServer: (filename: string) => Promise<void>;
+
   deleteItem: (id: string, type: 'link' | 'joint') => void;
   resetProject: () => void;
 }

@@ -596,7 +596,7 @@ const GlobalJointController = () => {
 
 
 const Sidebar = () => {
-    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot, exportURDF, exportURDF_ROS2, resetProject } = useRobotStore();
+    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot, exportURDF, exportURDF_ROS2, resetProject, saveProjectToServer, getProjectList, serverProjects, loadProjectFromServer } = useRobotStore();
     const selectedLink = selectedItem.type === 'link' ? links[selectedItem.id!] : null;
     const selectedJoint = selectedItem.type === 'joint' ? joints[selectedItem.id!] : null;
 
@@ -608,6 +608,11 @@ const Sidebar = () => {
     const [showExportModal, setShowExportModal] = useState(false);
     const [exportFormat, setExportFormat] = useState<'urdf' | 'urdf_ros2' | null>(null);
     const [robotName, setRobotName] = useState('');
+
+    // State for Save/Load Modals
+    const [showSaveModal, setShowSaveModal] = useState(false);
+    const [showLoadModal, setShowLoadModal] = useState(false);
+    const [saveProjectName, setSaveProjectName] = useState('');
 
     const handleLoadClick = () => {
         fileInputRef.current?.click();
@@ -644,6 +649,20 @@ const Sidebar = () => {
         setShowExportModal(false);
         setExportFormat(null);
         setRobotName('');
+    };
+
+    const handleSaveToServer = async () => {
+        if (!saveProjectName) return;
+        await saveProjectToServer(saveProjectName);
+        setShowSaveModal(false);
+        setSaveProjectName('');
+    };
+
+    const handleLoadFromServer = async (filename: string) => {
+        if (confirm(`Load project "${filename}"? Unsaved changes will be lost.`)) {
+            await loadProjectFromServer(filename);
+            setShowLoadModal(false);
+        }
     };
 
     // Close dropdown menu when clicking outside
@@ -693,20 +712,102 @@ const Sidebar = () => {
                 </div>
             )}
 
+            {/* Save Project Modal */}
+            {showSaveModal && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
+                    <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-96">
+                        <h3 className="text-lg font-bold mb-4">Save Project</h3>
+
+                        {/* Server Save */}
+                        <div className="mb-6">
+                            <label className="block text-sm text-gray-400 mb-1">Project Name (Server)</label>
+                            <div className="flex space-x-2">
+                                <input
+                                    type="text"
+                                    value={saveProjectName}
+                                    onChange={(e) => setSaveProjectName(e.target.value)}
+                                    placeholder="MyRobot"
+                                    className="flex-1 bg-gray-900 rounded p-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                                <button onClick={handleSaveToServer} className="bg-indigo-600 hover:bg-indigo-700 p-2 rounded text-sm whitespace-nowrap">
+                                    Save to Server
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="border-t border-gray-700 my-4"></div>
+
+                        {/* Local Save */}
+                        <div className="mb-2">
+                            <p className="text-sm text-gray-400 mb-2">Or save to your computer:</p>
+                            <button onClick={() => { saveRobot(); setShowSaveModal(false); }} className="w-full bg-gray-700 hover:bg-gray-600 p-2 rounded text-sm flex items-center justify-center">
+                                <Save className="mr-2 h-4 w-4" /> Download Local Zip
+                            </button>
+                        </div>
+
+                        <div className="flex justify-end mt-4">
+                            <button onClick={() => setShowSaveModal(false)} className="text-sm text-gray-400 hover:text-white">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Load Project Modal */}
+            {showLoadModal && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
+                    <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-96 flex flex-col max-h-[80vh]">
+                        <h3 className="text-lg font-bold mb-4">Load Project</h3>
+
+                        {/* Server List */}
+                        <div className="flex-1 overflow-y-auto min-h-[150px] mb-4 bg-gray-900/50 rounded p-2">
+                            <h4 className="text-xs font-semibold text-gray-400 mb-2 uppercase">Server Projects</h4>
+                            {serverProjects.length === 0 ? (
+                                <p className="text-gray-500 text-sm italic">No projects found on server.</p>
+                            ) : (
+                                <ul className="space-y-1">
+                                    {serverProjects.map(proj => (
+                                        <li key={proj} className="flex justify-between items-center bg-gray-800 hover:bg-gray-700 p-2 rounded cursor-pointer group">
+                                            <span className="text-sm truncate mr-2">{proj}</span>
+                                            <button onClick={() => handleLoadFromServer(proj)} className="text-xs bg-indigo-600 hover:bg-indigo-500 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
+                                                Load
+                                            </button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+
+                        <div className="border-t border-gray-700 my-4"></div>
+
+                        {/* Local Load */}
+                        <div>
+                            <p className="text-sm text-gray-400 mb-2">Or load from your computer:</p>
+                            <button onClick={() => { handleLoadClick(); setShowLoadModal(false); }} className="w-full bg-gray-700 hover:bg-gray-600 p-2 rounded text-sm flex items-center justify-center">
+                                <FolderOpen className="mr-2 h-4 w-4" /> Browse Local File...
+                            </button>
+                        </div>
+
+                        <div className="flex justify-end mt-4">
+                            <button onClick={() => setShowLoadModal(false)} className="text-sm text-gray-400 hover:text-white">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="absolute top-0 right-0 h-screen w-80 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 border-l border-gray-700 overflow-y-auto">
                 {/* File Operations */}
                 <div className="pb-4 mb-4 border-b border-gray-700">
                     <h2 className="text-xl font-bold">Robot Link Forge</h2>
                     <div className="flex space-x-2 mt-2">
                         <button
-                            onClick={() => saveRobot()}
+                            onClick={() => { setSaveProjectName('MyRobot'); setShowSaveModal(true); }}
                             className="flex-1 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 p-2 rounded text-sm"
                         >
                             <Save className="mr-2 h-4 w-4" /> Save
                         </button>
 
                         <button
-                            onClick={handleLoadClick}
+                            onClick={() => { getProjectList(); setShowLoadModal(true); }}
                             className="flex-1 flex items-center justify-center bg-gray-600 hover:bg-gray-700 p-2 rounded text-sm"
                         >
                             <FolderOpen className="mr-2 h-4 w-4" /> Load

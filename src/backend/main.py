@@ -26,6 +26,11 @@ app.add_middleware(
 # --- Static File Serving for Meshes ---
 MESH_DIR = "static/meshes"
 os.makedirs(MESH_DIR, exist_ok=True)
+
+# --- Project Storage ---
+PROJECTS_DIR = "saved_projects"
+os.makedirs(PROJECTS_DIR, exist_ok=True)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # --- Pydantic Models for Robot Data ---
@@ -344,6 +349,43 @@ async def upload_stl_file(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=f"Could not save file: {e}")
 
     return {"url": f"/{file_path}"}
+
+
+# --- Project Save/Load Endpoints ---
+
+@app.post("/api/projects")
+async def save_project(file: UploadFile = File(...), project_name: str = Form(...)):
+    # Sanitize project name
+    safe_name = "".join(c for c in project_name if c.isalnum() or c in (' ', '_', '-')).strip()
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid project name")
+    
+    filename = f"{safe_name}.zip"
+    file_location = os.path.join(PROJECTS_DIR, filename)
+    
+    try:
+        with open(file_location, "wb+") as file_object:
+            file_object.write(await file.read())
+        return {"message": "Project saved successfully", "filename": filename}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save project: {str(e)}")
+
+@app.get("/api/projects")
+async def list_projects():
+    try:
+        if not os.path.exists(PROJECTS_DIR):
+            return {"projects": []}
+        files = [f for f in os.listdir(PROJECTS_DIR) if f.endswith('.zip')]
+        return {"projects": sorted(files)}
+    except Exception as e:
+        return {"projects": [], "error": str(e)}
+
+@app.get("/api/projects/{filename}")
+async def load_project(filename: str):
+    file_path = os.path.join(PROJECTS_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Project not found")
+    return FileResponse(file_path, media_type='application/zip', filename=filename)
 
 
 @app.post("/api/export-urdf")
