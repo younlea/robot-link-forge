@@ -81,8 +81,65 @@ def to_snake_case(name: str) -> str:
     return s if s else "link"
 
 
-def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str]) -> str:
-    """Generates the URDF XML content as a string."""
+
+def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str]) -> str:
+    """Generates the XML content for a single link (visual, collision, etc.)."""
+    
+    link: RobotLink = robot_data.links[link_id]
+    
+    # --- Visual and Collision XML ---
+    visual_xml = '    <visual>\n'
+    
+    origin_xyz_str = "0 0 0"
+    origin_rpy_str = "0 0 0"
+
+    vis = link.visual
+    geometry_xml = ""
+    
+    if vis.type == 'mesh' and link_id in mesh_files:
+        if vis.meshOrigin:
+            origin_xyz_str = " ".join(map(str, vis.meshOrigin.get('xyz', [0,0,0])))
+            origin_rpy_str = " ".join(map(str, vis.meshOrigin.get('rpy', [0,0,0])))
+        mesh_scale = " ".join(map(str, vis.meshScale)) if vis.meshScale else "1 1 1"
+        geometry_xml = f'        <mesh filename="package://{robot_name}/meshes/{mesh_files[link_id]}" scale="{mesh_scale}"/>\n'
+    elif vis.type == 'box' and vis.dimensions:
+        geometry_xml = f'        <box size="{" ".join(map(str, vis.dimensions))}" />\n'
+    elif vis.type == 'cylinder' and vis.dimensions:
+        geometry_xml = f'        <cylinder radius="{vis.dimensions[0]}" length="{vis.dimensions[2]}" />\n'
+    elif vis.type == 'sphere' and vis.dimensions:
+        geometry_xml = f'        <sphere radius="{vis.dimensions[0]}" />\n'
+    else:
+        # Fallback or default
+        geometry_xml = '        <box size="0.01 0.01 0.01" />\n'
+
+    visual_xml += f'      <origin xyz="{origin_xyz_str}" rpy="{origin_rpy_str}" />\n'
+    visual_xml += '      <geometry>\n'
+    visual_xml += geometry_xml
+    visual_xml += '      </geometry>\n'
+
+    if vis.color:
+        try:
+            r, g, b = int(vis.color[1:3], 16)/255, int(vis.color[3:5], 16)/255, int(vis.color[5:7], 16)/255
+            visual_xml += f'      <material name="{link_name}_color">\n'
+            visual_xml += f'        <color rgba="{r:.3f} {g:.3f} {b:.3f} 1.0" />\n'
+            visual_xml += '      </material>\n'
+        except Exception:
+            pass # Handle invalid color hex gracefully
+    
+    visual_xml += '    </visual>\n'
+    
+    collision_xml = visual_xml.replace('<visual>', '<collision>', 1).replace('</visual>', '</collision>', 1)
+
+    # --- Link XML ---
+    link_xml = f'  <link name="{link_name}">\n'
+    link_xml += visual_xml
+    link_xml += collision_xml
+    link_xml += '  </link>\n\n'
+    
+    return link_xml
+
+def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str]) -> Tuple[str, str]:
+    """Generates the URDF XML content and returns (urdf_string, base_link_name)."""
 
     # Generate unique, valid names for all links first to ensure consistency.
     unique_link_names = {
@@ -91,10 +148,15 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
     }
     
     base_link_name = unique_link_names[robot_data.baseLinkId]
-    links_xml = f'  <link name="{base_link_name}"/>\n'
+    
+    # Generate XML for the base link
+    links_xml = _generate_link_xml(robot_data.baseLinkId, base_link_name, robot_data, robot_name, mesh_files)
+    
     joints_xml = ""
 
     processed_links = {robot_data.baseLinkId}
+    processed_joints = set()
+    generated_joint_names = set()
     
     # Traverse from base link
     q = [robot_data.baseLinkId]
@@ -102,65 +164,39 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
         parent_link_id = q.pop(0)
         parent_link_name = unique_link_names[parent_link_id]
 
-        for joint_id in robot_data.links[parent_link_id].childJoints:
+        # Ensure childJoints is iterable
+        child_joints = robot_data.links[parent_link_id].childJoints or []
+        
+        for joint_id in child_joints:
+            if joint_id in processed_joints:
+                continue
+            
             joint = robot_data.joints.get(joint_id)
             if not joint or not joint.childLinkId:
                 continue
 
+            processed_joints.add(joint_id)
+            
             child_link_id = joint.childLinkId
             if child_link_id in processed_links:
                 continue
             
-            child_link = robot_data.links[child_link_id]
             child_link_name = unique_link_names[child_link_id]
             processed_links.add(child_link_id)
             q.append(child_link_id)
 
-            # --- Visual and Collision XML for the current link ---
-            visual_xml = '    <visual>\n'
-            
-            origin_xyz_str = "0 0 0"
-            origin_rpy_str = "0 0 0"
-
-            vis = child_link.visual
-            if vis.type == 'mesh' and child_link_id in mesh_files:
-                if vis.meshOrigin:
-                    origin_xyz_str = " ".join(map(str, vis.meshOrigin.get('xyz', [0,0,0])))
-                    origin_rpy_str = " ".join(map(str, vis.meshOrigin.get('rpy', [0,0,0])))
-                mesh_scale = " ".join(map(str, vis.meshScale)) if vis.meshScale else "1 1 1"
-                geometry_xml = f'        <mesh filename="package://{robot_name}/meshes/{mesh_files[child_link_id]}" scale="{mesh_scale}"/>\n'
-            elif vis.type == 'box' and vis.dimensions:
-                geometry_xml = f'        <box size="{" ".join(map(str, vis.dimensions))}" />\n'
-            elif vis.type == 'cylinder' and vis.dimensions:
-                geometry_xml = f'        <cylinder radius="{vis.dimensions[0]}" length="{vis.dimensions[2]}" />\n'
-            elif vis.type == 'sphere' and vis.dimensions:
-                geometry_xml = f'        <sphere radius="{vis.dimensions[0]}" />\n'
-            else:
-                geometry_xml = '        <box size="0.01 0.01 0.01" />\n'
-
-            visual_xml += f'      <origin xyz="{origin_xyz_str}" rpy="{origin_rpy_str}" />\n'
-            visual_xml += '      <geometry>\n'
-            visual_xml += geometry_xml
-            visual_xml += '      </geometry>\n'
-
-            if vis.color:
-                r, g, b = int(vis.color[1:3], 16)/255, int(vis.color[3:5], 16)/255, int(vis.color[5:7], 16)/255
-                visual_xml += f'      <material name="{child_link_name}_color">\n'
-                visual_xml += f'        <color rgba="{r:.3f} {g:.3f} {b:.3f} 1.0" />\n'
-                visual_xml += '      </material>\n'
-            
-            visual_xml += '    </visual>\n'
-            
-            collision_xml = visual_xml.replace('<visual>', '<collision>', 1).replace('</visual>', '</collision>', 1)
-
-            # --- Link XML ---
-            links_xml += f'  <link name="{child_link_name}">\n'
-            links_xml += visual_xml
-            links_xml += collision_xml
-            links_xml += '  </link>\n\n'
+            # --- Link XML for Child ---
+            links_xml += _generate_link_xml(child_link_id, child_link_name, robot_data, robot_name, mesh_files)
 
             # --- Joint XML ---
-            joint_name = f"{to_snake_case(joint.name)}_{joint.id[:6]}"
+            base_joint_name = f"{to_snake_case(joint.name)}_{joint.id[:6]}"
+            joint_name = base_joint_name
+            counter = 1
+            while joint_name in generated_joint_names:
+                joint_name = f"{base_joint_name}_{counter}"
+                counter += 1
+            generated_joint_names.add(joint_name)
+
             joint_type = "revolute" if joint.type == 'rotational' else joint.type
             joints_xml += f'  <joint name="{joint_name}" type="{joint_type}">\n'
             joints_xml += f'    <parent link="{parent_link_name}"/>\n'
@@ -192,7 +228,7 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
 
             joints_xml += '  </joint>\n\n'
 
-    return f'<robot name="{robot_name}">\n{links_xml}{joints_xml}</robot>'
+    return f'<robot name="{robot_name}">\n{links_xml}{joints_xml}</robot>', base_link_name
 
 
 # --- API Endpoints ---
@@ -258,7 +294,7 @@ async def export_urdf_package(
                 mesh_files_map[link_id] = safe_filename
 
     # Generate and save URDF file
-    urdf_content = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map)
+    urdf_content, base_link_name = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map)
     with open(os.path.join(urdf_dir, f"{sanitized_robot_name}.urdf"), "w") as f:
         f.write(urdf_content)
 
@@ -275,7 +311,7 @@ async def export_urdf_package(
     with open(os.path.join(launch_dir, "display.launch"), "w") as f:
         f.write(display_launch)
     
-    rviz_config = """Panels:
+    rviz_config = f"""Panels:
 - Class: rviz/Displays
   Help Height: 78
   Name: Displays
@@ -345,7 +381,8 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: base_link
+    Fixed Frame: {base_link_name}
+
     Frame Rate: 30
   Name: root
   Tools:
@@ -446,7 +483,7 @@ async def export_urdf_package_ros2(
                 mesh_files_map[link_id] = safe_filename
 
     # Generate and save URDF file
-    urdf_content = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map)
+    urdf_content, base_link_name = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map)
     with open(os.path.join(urdf_dir, f"{sanitized_robot_name}.urdf"), "w") as f:
         f.write(urdf_content)
 
@@ -537,8 +574,8 @@ def generate_launch_description():
 """
     with open(os.path.join(launch_dir, "display.launch.py"), "w") as f:
         f.write(display_launch_py)
-    rviz_config = """Panels:
-- Class: rviz/Displays
+    rviz_config = f"""Panels:
+- Class: rviz_common/Displays
   Help Height: 78
   Name: Displays
   Property Tree Widget:
@@ -548,21 +585,21 @@ def generate_launch_description():
       - /RobotModel1
     Splitter Ratio: 0.5
   Tree Height: 600
-- Class: rviz/Selection
+- Class: rviz_common/Selection
   Name: Selection
-- Class: rviz/Tool Properties
+- Class: rviz_common/Tool Properties
   Expanded:
     - /2D Nav Goal1
     - /2D Pose Estimate1
     - /Publish Point1
   Name: Tool Properties
   Splitter Ratio: 0.588679
-- Class: rviz/Views
+- Class: rviz_common/Views
   Expanded:
     - /Current View1
   Name: Views
   Splitter Ratio: 0.5
-- Class: rviz/Time
+- Class: rviz_common/Time
   Name: Time
   SyncMode: 0
   SyncSource: ""
@@ -607,7 +644,8 @@ Visualization Manager:
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
-    Fixed Frame: base_link
+    Fixed Frame: {base_link_name}
+
     Frame Rate: 30
   Name: root
   Tools:

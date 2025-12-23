@@ -134,6 +134,38 @@ const Checkbox = ({ label, checked, onChange }: { label: string, checked: boolea
     </label>
 )
 
+// --- TextInput for IME Support ---
+const TextInput = ({ value, onChange, className }: { value: string, onChange: (val: string) => void, className?: string }) => {
+    const [localValue, setLocalValue] = useState(value);
+
+    useEffect(() => {
+        setLocalValue(value);
+    }, [value]);
+
+    const handleBlur = () => {
+        if (localValue !== value) {
+            onChange(localValue);
+        }
+    };
+    
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            e.currentTarget.blur();
+        }
+    };
+
+    return (
+        <input 
+            type="text"
+            value={localValue}
+            onChange={(e) => setLocalValue(e.target.value)}
+            onBlur={handleBlur}
+            onKeyDown={handleKeyDown}
+            className={className}
+        />
+    );
+};
+
 // --- Inspector for Links ---
 const LinkInspector = ({ link }: { link: RobotLink }) => {
     const { updateLink, addJoint, uploadAndSetMesh, fitMeshToLink } = useRobotStore();
@@ -152,7 +184,7 @@ const LinkInspector = ({ link }: { link: RobotLink }) => {
     return (
         <div className="space-y-4">
             <div className="flex items-center"> <ToyBrick className="mr-2 flex-shrink-0" />
-                <input type="text" value={link.name} onChange={(e) => updateLink(link.id, 'name', e.target.value)}
+                <TextInput value={link.name} onChange={(val) => updateLink(link.id, 'name', val)}
                     className="text-lg font-bold bg-transparent focus:bg-gray-800 rounded p-1 -m-1 w-full"/>
             </div>
 
@@ -231,7 +263,7 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
     return (
         <div className="space-y-4">
             <div className="flex items-center"> <GitCommit className="mr-2 flex-shrink-0" />
-                 <input type="text" value={joint.name} onChange={(e) => updateJoint(joint.id, 'name', e.target.value)}
+                 <TextInput value={joint.name} onChange={(val) => updateJoint(joint.id, 'name', val)}
                     className="text-lg font-bold bg-transparent focus:bg-gray-800 rounded p-1 -m-1 w-full"/>
             </div>
             
