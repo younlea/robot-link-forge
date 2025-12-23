@@ -360,7 +360,7 @@ async def export_urdf_package(
     mesh_files_map = {}
     if files:
         for file in files:
-            form_field_name = file.name
+            form_field_name = file.filename
             link_id = form_field_name.replace('mesh_', '')
 
             if link_id in robot.links:
@@ -549,7 +549,7 @@ async def export_urdf_package_ros2(
     mesh_files_map = {}
     if files:
         for file in files:
-            form_field_name = file.name
+            form_field_name = file.filename
             link_id = form_field_name.replace('mesh_', '')
 
             if link_id in robot.links:
