@@ -10,6 +10,7 @@ import shutil
 import json
 import tempfile
 import re
+import math
 
 app = FastAPI()
 
@@ -80,6 +81,40 @@ def to_snake_case(name: str) -> str:
     s = re.sub(r'^_|_$', '', s) # Remove leading/trailing _
     return s if s else "link"
 
+def calculate_cylinder_transform(start_point: List[float], end_point: List[float]) -> Tuple[float, List[float], List[float]]:
+    """
+    Calculates the length, midpoint (origin), and rotation (rpy) to align a cylinder 
+    from start_point to end_point.
+    Returns: (length, origin_xyz, origin_rpy)
+    """
+    dx = end_point[0] - start_point[0]
+    dy = end_point[1] - start_point[1]
+    dz = end_point[2] - start_point[2]
+    
+    length = math.sqrt(dx*dx + dy*dy + dz*dz)
+    
+    # Midpoint
+    mx = (start_point[0] + end_point[0]) / 2.0
+    my = (start_point[1] + end_point[1]) / 2.0
+    mz = (start_point[2] + end_point[2]) / 2.0
+    
+    # Rotation (Align Z-axis to vector D)
+    # Pitch (Y) and Yaw (Z). Roll (X) is 0.
+    
+    # Yaw: atan2(dy, dx)
+    yaw = math.atan2(dy, dx)
+    
+    # Horizontal projection length
+    horizontal_dist = math.sqrt(dx*dx + dy*dy)
+    
+    # Pitch: angle between Z and vector.
+    # Positive pitch around Y moves Z toward X.
+    # If dx=1, dz=0 (Forward X), we want pitch +90.
+    # pitch = atan2(horizontal_dist, dz) gives 90 for (1,0) and 0 for (0,1). Correct.
+    pitch = math.atan2(horizontal_dist, dz)
+    
+    return length, [mx, my, mz], [0.0, pitch, yaw]
+
 
 
 def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str]) -> str:
@@ -94,23 +129,67 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
     origin_rpy_str = "0 0 0"
 
     vis = link.visual
-    geometry_xml = ""
     
-    if vis.type == 'mesh' and link_id in mesh_files:
-        if vis.meshOrigin:
-            origin_xyz_str = " ".join(map(str, vis.meshOrigin.get('xyz', [0,0,0])))
-            origin_rpy_str = " ".join(map(str, vis.meshOrigin.get('rpy', [0,0,0])))
-        mesh_scale = " ".join(map(str, vis.meshScale)) if vis.meshScale else "1 1 1"
-        geometry_xml = f'        <mesh filename="package://{robot_name}/meshes/{mesh_files[link_id]}" scale="{mesh_scale}"/>\n'
-    elif vis.type == 'box' and vis.dimensions:
-        geometry_xml = f'        <box size="{" ".join(map(str, vis.dimensions))}" />\n'
-    elif vis.type == 'cylinder' and vis.dimensions:
-        geometry_xml = f'        <cylinder radius="{vis.dimensions[0]}" length="{vis.dimensions[2]}" />\n'
-    elif vis.type == 'sphere' and vis.dimensions:
-        geometry_xml = f'        <sphere radius="{vis.dimensions[0]}" />\n'
-    else:
-        # Fallback or default
-        geometry_xml = '        <box size="0.01 0.01 0.01" />\n'
+    # Apply origin if present (regardless of type)
+    if vis.meshOrigin:
+        origin_xyz_str = " ".join(map(str, vis.meshOrigin.get('xyz', [0,0,0])))
+        origin_rpy_str = " ".join(map(str, vis.meshOrigin.get('rpy', [0,0,0])))
+
+    geometry_xml = ""
+    override_origin_xyz = None
+    override_origin_rpy = None
+
+    # Check for Dynamic Cylinder Case (Connecting Link)
+    if vis.type == 'cylinder' and link.childJoints and len(link.childJoints) == 1:
+        child_joint_id = link.childJoints[0]
+        child_joint = robot_data.joints.get(child_joint_id)
+        
+        # Only apply dynamic transform if valid connection exists
+        if child_joint and child_joint.origin:
+            length, mid_xyz, mid_rpy = calculate_cylinder_transform(
+                [0,0,0], # Start at parent link origin (0,0,0)
+                child_joint.origin.xyz
+            )
+            
+            # If length is tiny, might want to fallback, but trust it if > 0.001
+            if length > 0.001:
+                # Override the Radius from dimensions (index 0)
+                radius = vis.dimensions[0] if (vis.dimensions and len(vis.dimensions) > 0) else 0.05
+                # Override calculated length
+                geometry_xml = f'        <cylinder radius="{radius}" length="{length}" />\n'
+                
+                # Override Origin
+                override_origin_xyz = " ".join(map(str, mid_xyz))
+                override_origin_rpy = " ".join(map(str, mid_rpy))
+
+    if not geometry_xml:
+        if vis.type == 'mesh' and link_id in mesh_files:
+            mesh_scale = " ".join(map(str, vis.meshScale)) if vis.meshScale else "1 1 1"
+            geometry_xml = f'        <mesh filename="package://{robot_name}/meshes/{mesh_files[link_id]}" scale="{mesh_scale}"/>\n'
+        elif vis.type == 'box' and vis.dimensions:
+            geometry_xml = f'        <box size="{" ".join(map(str, vis.dimensions))}" />\n'
+        elif vis.type == 'cylinder' and vis.dimensions:
+            # FIX: Index 1 is length, not 2
+            length_val = vis.dimensions[1] if len(vis.dimensions) > 1 else 1.0
+            geometry_xml = f'        <cylinder radius="{vis.dimensions[0]}" length="{length_val}" />\n'
+        elif vis.type == 'sphere' and vis.dimensions:
+            geometry_xml = f'        <sphere radius="{vis.dimensions[0]}" />\n'
+        else:
+            # Fallback or default
+            geometry_xml = '        <box size="0.01 0.01 0.01" />\n'
+
+    # Determine Final Origin
+    origin_xyz_str = "0 0 0"
+    origin_rpy_str = "0 0 0"
+
+    # Priority 1: Dynamic Calculation (Override)
+    if override_origin_xyz:
+        origin_xyz_str = override_origin_xyz
+        origin_rpy_str = override_origin_rpy
+    # Priority 2: Manual meshOrigin from visual properties (only if not overridden)
+    elif vis.meshOrigin:
+        origin_xyz_str = " ".join(map(str, vis.meshOrigin.get('xyz', [0,0,0])))
+        origin_rpy_str = " ".join(map(str, vis.meshOrigin.get('rpy', [0,0,0])))
 
     visual_xml += f'      <origin xyz="{origin_xyz_str}" rpy="{origin_rpy_str}" />\n'
     visual_xml += '      <geometry>\n'
