@@ -273,9 +273,6 @@ const LinkInspector = ({ link }: { link: RobotLink }) => {
             <button onClick={() => addJoint(link.id)} className="flex items-center justify-center w-full bg-blue-600 hover:bg-blue-700 p-2 rounded text-sm">
                 <PlusSquare className="mr-2 h-4 w-4" /> Add Child Joint
             </button>
-            <button onClick={() => addJoint(link.id)} className="flex items-center justify-center w-full bg-blue-600 hover:bg-blue-700 p-2 rounded text-sm">
-                <PlusSquare className="mr-2 h-4 w-4" /> Add Child Joint
-            </button>
 
             <button onClick={() => { if (confirm('Delete this link and all its children?')) deleteItem(link.id, 'link'); }} className="flex items-center justify-center w-full bg-red-900/50 hover:bg-red-700 p-2 rounded text-sm text-red-200 border border-red-800">
                 <Trash2 className="mr-2 h-4 w-4" /> Delete Link
@@ -707,13 +704,7 @@ const Sidebar = () => {
                         >
                             <Save className="mr-2 h-4 w-4" /> Save
                         </button>
-                        <button
-                            onClick={resetProject}
-                            className="flex-none flex items-center justify-center bg-red-800 hover:bg-red-700 p-2 rounded text-sm"
-                            title="New Project (Reset)"
-                        >
-                            <FilePlus className="h-4 w-4" />
-                        </button>
+
                         <button
                             onClick={handleLoadClick}
                             className="flex-1 flex items-center justify-center bg-gray-600 hover:bg-gray-700 p-2 rounded text-sm"
@@ -741,6 +732,13 @@ const Sidebar = () => {
                                 </div>
                             )}
                         </div>
+                        <button
+                            onClick={resetProject}
+                            className="flex-none flex items-center justify-center bg-red-800 hover:bg-red-700 p-2 rounded text-sm"
+                            title="New Project (Reset)"
+                        >
+                            <FilePlus className="h-4 w-4" />
+                        </button>
                     </div>
                 </div>
 
