@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRobotStore } from '../store';
 import { RobotLink, RobotJoint, JointType } from '../types';
-import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, Upload, RotateCcw } from 'lucide-react';
+import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, Upload, RotateCcw, Trash2, FilePlus } from 'lucide-react';
 
 // --- Reusable Input Components (with fixes) ---
 const NumberInput = ({ label, value, onChange, step = 0.01 }: { label: string, value: number, onChange: (val: number) => void, step?: number }) => {
@@ -201,7 +201,7 @@ const TextInput = ({ value, onChange, className }: { value: string, onChange: (v
 
 // --- Inspector for Links ---
 const LinkInspector = ({ link }: { link: RobotLink }) => {
-    const { updateLink, addJoint, uploadAndSetMesh, fitMeshToLink } = useRobotStore();
+    const { updateLink, addJoint, uploadAndSetMesh, fitMeshToLink, deleteItem } = useRobotStore();
     const stlInputRef = useRef<HTMLInputElement>(null);
 
     const handleStlUploadClick = () => stlInputRef.current?.click();
@@ -273,13 +273,20 @@ const LinkInspector = ({ link }: { link: RobotLink }) => {
             <button onClick={() => addJoint(link.id)} className="flex items-center justify-center w-full bg-blue-600 hover:bg-blue-700 p-2 rounded text-sm">
                 <PlusSquare className="mr-2 h-4 w-4" /> Add Child Joint
             </button>
+            <button onClick={() => addJoint(link.id)} className="flex items-center justify-center w-full bg-blue-600 hover:bg-blue-700 p-2 rounded text-sm">
+                <PlusSquare className="mr-2 h-4 w-4" /> Add Child Joint
+            </button>
+
+            <button onClick={() => { if (confirm('Delete this link and all its children?')) deleteItem(link.id, 'link'); }} className="flex items-center justify-center w-full bg-red-900/50 hover:bg-red-700 p-2 rounded text-sm text-red-200 border border-red-800">
+                <Trash2 className="mr-2 h-4 w-4" /> Delete Link
+            </button>
         </div>
     );
 };
 
 // --- Inspector for Joints (with final workflow) ---
 const JointInspector = ({ joint }: { joint: RobotJoint }) => {
-    const { updateJoint, addChainedJoint, uploadAndSetMesh } = useRobotStore();
+    const { updateJoint, addChainedJoint, uploadAndSetMesh, deleteItem } = useRobotStore();
     const stlInputRef = useRef<HTMLInputElement>(null);
 
     const handleStlUploadClick = () => stlInputRef.current?.click();
@@ -473,7 +480,12 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
 
             )}
 
-        </div>
+
+
+            <button onClick={() => { if (confirm('Delete this joint and its children?')) deleteItem(joint.id, 'joint'); }} className="flex items-center justify-center w-full bg-red-900/50 hover:bg-red-700 p-2 rounded text-sm text-red-200 border border-red-800 mt-4">
+                <Trash2 className="mr-2 h-4 w-4" /> Delete Joint
+            </button>
+        </div >
 
     );
 
@@ -587,7 +599,7 @@ const GlobalJointController = () => {
 
 
 const Sidebar = () => {
-    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot, exportURDF, exportURDF_ROS2 } = useRobotStore();
+    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot, exportURDF, exportURDF_ROS2, resetProject } = useRobotStore();
     const selectedLink = selectedItem.type === 'link' ? links[selectedItem.id!] : null;
     const selectedJoint = selectedItem.type === 'joint' ? joints[selectedItem.id!] : null;
 
@@ -694,6 +706,13 @@ const Sidebar = () => {
                             className="flex-1 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 p-2 rounded text-sm"
                         >
                             <Save className="mr-2 h-4 w-4" /> Save
+                        </button>
+                        <button
+                            onClick={resetProject}
+                            className="flex-none flex items-center justify-center bg-red-800 hover:bg-red-700 p-2 rounded text-sm"
+                            title="New Project (Reset)"
+                        >
+                            <FilePlus className="h-4 w-4" />
                         </button>
                         <button
                             onClick={handleLoadClick}

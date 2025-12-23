@@ -609,4 +609,119 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             alert(`Failed to export URDF ROS2 package. Check the console for details. Error: ${err.message}`);
         }
     },
+    deleteItem: (id, type) => {
+        setState(state => {
+            // Prevent deleting the base link
+            if (type === 'link' && id === state.baseLinkId) {
+                alert("Cannot delete the base link.");
+                return {};
+            }
+
+            const newLinks = { ...state.links };
+            const newJoints = { ...state.joints };
+
+            // Helper to recursively delete a joint and its children
+            const deleteJointRecursive = (jointId: string) => {
+                const joint = newJoints[jointId];
+                if (!joint) return;
+
+                // Delete the child link if it exists
+                if (joint.childLinkId) {
+                    deleteLinkRecursive(joint.childLinkId);
+                }
+
+                delete newJoints[jointId];
+            };
+
+            // Helper to recursively delete a link and its children
+            const deleteLinkRecursive = (linkId: string) => {
+                const link = newLinks[linkId];
+                if (!link) return;
+
+                // Delete all child joints
+                for (const childJointId of link.childJoints) {
+                    deleteJointRecursive(childJointId);
+                }
+
+                delete newLinks[linkId];
+            };
+
+            if (type === 'link') {
+                const linkToDelete = newLinks[id];
+                if (!linkToDelete) return {};
+
+                // Find parent joint (if any) to remove reference
+                // A link is a child of a joint. We need to find the joint that has this link as childLinkId.
+                const parentJointEntry = Object.entries(newJoints).find(([_, j]) => j.childLinkId === id);
+
+                if (parentJointEntry) {
+                    const [parentJointId, parentJoint] = parentJointEntry;
+                    // Deleting a link implies deleting the joint that connects to it, 
+                    // OR just unsetting the childLinkId?
+                    // Usually in a tree, if you delete a node, you delete the subtree.
+                    // If I delete a link, the joint pointing to it becomes a "dead end".
+                    // Let's delete the parent joint as well, because a joint without a child link is valid but 
+                    // typically if user deletes "Link B", they want the joint connecting "Link A -> Link B" to go too,
+                    // otherwise they'd just be left with a dangling joint.
+                    // However, the user might want to attach a different link.
+                    // Let's stick to the behavior: Delete Link -> Delete Parent Joint -> Remove Parent Joint from Parent Link.
+
+                    // WAIT: If I delete the parent joint, I must remove it from the GrandParent Link.
+                    const grandParentLinkId = parentJoint.parentLinkId;
+                    const grandParentLink = newLinks[grandParentLinkId];
+
+                    if (grandParentLink) {
+                        // Remove parentJointId from grandParentLink.childJoints
+                        newLinks[grandParentLinkId] = {
+                            ...grandParentLink,
+                            childJoints: grandParentLink.childJoints.filter(jid => jid !== parentJointId)
+                        };
+                    }
+
+                    // Now delete the parent joint (which will recurse down if we hadn't started at the link)
+                    // But since we are starting at the link, we can just call deleteJointRecursive on the parent joint,
+                    // which will come back to delete this link.
+                    // To avoid infinite loops or complexity, let's simpler:
+                    // 1. Detach from GrandParent.
+                    // 2. Delete Parent Joint.
+                    // 3. Delete Target Link (and subtree).
+
+                    delete newJoints[parentJointId];
+                }
+
+                deleteLinkRecursive(id);
+
+            } else if (type === 'joint') {
+                const jointToDelete = newJoints[id];
+                if (!jointToDelete) return {};
+
+                // Remove from Parent Link
+                const parentLink = newLinks[jointToDelete.parentLinkId];
+                if (parentLink) {
+                    newLinks[jointToDelete.parentLinkId] = {
+                        ...parentLink,
+                        childJoints: parentLink.childJoints.filter(jid => jid !== id)
+                    };
+                }
+
+                deleteJointRecursive(id);
+            }
+
+            return {
+                links: newLinks,
+                joints: newJoints,
+                selectedItem: { id: null, type: null } // Deselect
+            };
+        });
+    },
+
+    resetProject: () => {
+        if (confirm("Are you sure you want to create a new project? Unsaved changes will be lost.")) {
+            setState({
+                ...createInitialState(),
+                cameraControls: getState().cameraControls // Keep camera controls
+            });
+        }
+    },
+
 }));

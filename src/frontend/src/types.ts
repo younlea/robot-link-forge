@@ -52,10 +52,10 @@ export interface RobotJoint {
 
   // Motion properties
   type: JointType;
-  
+
   // For 'rotational'
   dof: RotationalDof;
-  
+
   // For 'prismatic'
   axis: [number, number, number];
 
@@ -112,7 +112,7 @@ export interface RobotActions {
   // Generic update actions
   updateJoint: (id: string, path: string, value: any) => void;
   updateLink: (id: string, path: string, value: any) => void;
-  
+
   // Selection
   selectItem: (id: string | null, type: 'link' | 'joint' | null) => void;
 
@@ -125,4 +125,10 @@ export interface RobotActions {
   // Export
   exportURDF: (robotName: string) => Promise<void>;
   exportURDF_ROS2: (robotName: string) => Promise<void>;
+
+  // App State Management
+  saveRobot: () => Promise<void>;
+  loadRobot: (file: File) => Promise<void>;
+  deleteItem: (id: string, type: 'link' | 'joint') => void;
+  resetProject: () => void;
 }
