@@ -144,8 +144,8 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
         child_joint_id = link.childJoints[0]
         child_joint = robot_data.joints.get(child_joint_id)
         
-        # Only apply dynamic transform if valid connection exists
-        if child_joint and child_joint.origin:
+        # Only apply dynamic transform if valid connection exists AND user hasn't manually set origin
+        if child_joint and child_joint.origin and not vis.meshOrigin:
             length, mid_xyz, mid_rpy = calculate_cylinder_transform(
                 [0,0,0], # Start at parent link origin (0,0,0)
                 child_joint.origin.xyz
@@ -283,21 +283,39 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
             joints_xml += f'    <origin xyz="{" ".join(map(str, joint.origin.xyz))}" rpy="{" ".join(map(str, joint.origin.rpy))}"/>\n'
             
             if joint.type == 'rotational':
-                active_dof = None
+                if joint.axis:
+                    axis_str = " ".join(map(str, joint.axis))
+                    active_dof = 'roll' # Defaulting limit check to roll if custom axis, or need logic
+                    # If using custom axis, we might need to know which limit to grab. 
+                    # Assuming 'roll' holds the limit for single-axis rotation in this simplified model 
+                    # OR we check which limit is non-zero/set. 
+                    # For now, let's stick to the boolean logic for LIMIT selection, but AXIS override.
+                    
+                    # Fallback logic for limits if custom axis is used:
+                    # We need to know which of roll/pitch/yaw user edited? 
+                    # In current frontend, 'rotational' implies one DOF.
+                    # As a heuristic, if axis is set, we still need a limit.
+                    # Let's check the booleans to pick the limit value, BUT use the custom axis vector.
+                    pass 
+                
+                # Determine limit source based on flags
+                limit = None
                 if joint.dof.roll:
-                    active_dof = 'roll'
-                    axis_str = "1 0 0"
+                    limit = joint.limits['roll']
+                    if not joint.axis: axis_str = "1 0 0"
                 elif joint.dof.pitch:
-                    active_dof = 'pitch'
-                    axis_str = "0 1 0"
+                    limit = joint.limits['pitch']
+                    if not joint.axis: axis_str = "0 1 0"
                 elif joint.dof.yaw:
-                    active_dof = 'yaw'
-                    axis_str = "0 0 1"
+                    limit = joint.limits['yaw']
+                    if not joint.axis: axis_str = "0 0 1"
 
-                if active_dof:
-                    joints_xml += f'    <axis xyz="{axis_str}"/>\n'
-                    limit = joint.limits[active_dof]
+                joints_xml += f'    <axis xyz="{axis_str}"/>\n'
+                if limit:
                     joints_xml += f'    <limit lower="{limit.lower}" upper="{limit.upper}" effort="10" velocity="1.0"/>\n'
+                else: 
+                     # Default safety fallback
+                     joints_xml += f'    <limit lower="-3.14" upper="3.14" effort="10" velocity="1.0"/>\n'
 
             elif joint.type == 'prismatic':
                 axis_str = " ".join(map(str, joint.axis)) if joint.axis else "1 0 0"
@@ -364,7 +382,8 @@ async def export_urdf_package(
             link_id = form_field_name.replace('mesh_', '')
 
             if link_id in robot.links:
-                safe_filename = to_snake_case(robot.links[link_id].name) + ".stl"
+                # FIX: Append link ID snippet to partial name to ensure uniqueness
+                safe_filename = f"{to_snake_case(robot.links[link_id].name)}_{link_id[:6]}.stl"
                 file_path = os.path.join(mesh_dir, safe_filename)
                 
                 with open(file_path, "wb") as f:
@@ -553,7 +572,8 @@ async def export_urdf_package_ros2(
             link_id = form_field_name.replace('mesh_', '')
 
             if link_id in robot.links:
-                safe_filename = to_snake_case(robot.links[link_id].name) + ".stl"
+                # FIX: Append link ID snippet to partial name to ensure uniqueness
+                safe_filename = f"{to_snake_case(robot.links[link_id].name)}_{link_id[:6]}.stl"
                 file_path = os.path.join(mesh_dir, safe_filename)
                 
                 with open(file_path, "wb") as f:
