@@ -750,6 +750,10 @@ fi
         media_type='application/zip', 
         filename=f"{sanitized_robot_name}_ros2_package.zip"
     )
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Export Failed: {str(e)}")
 
 @app.get("/")
 def read_root():
