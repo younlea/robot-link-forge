@@ -108,6 +108,9 @@ const createRobotZip = async (state: RobotState) => {
     return await zip.generateAsync({ type: 'blob' });
 };
 
+// Define API Base URL dynamically to support remote access
+const API_BASE_URL = `http://${window.location.hostname}:8000`;
+
 export const useRobotStore = create<RobotState & RobotActions>((setState, getState) => ({
     ...createInitialState(),
     cameraControls: null,
@@ -135,7 +138,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         formData.append('file', file);
 
         try {
-            const response = await fetch('http://localhost:8000/api/upload-stl', {
+            const response = await fetch(`${API_BASE_URL}/api/upload-stl`, {
                 method: 'POST',
                 body: formData,
             });
@@ -145,7 +148,10 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             }
 
             const result = await response.json();
-            const meshUrl = `http://localhost:8000${result.url}`;
+            // Ensure the returned URL is also relative or uses the dynamic host
+            // The backend returns e.g. /static/meshes/foo.stl or similar? 
+            // Currently backend returns {"url": "/path/to/file"} -> we prepend base url.
+            const meshUrl = `${API_BASE_URL}${result.url}`;
 
             setState(state => {
                 if (targetType === 'link') {
@@ -392,13 +398,23 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
     },
 
     saveProjectToServer: async (name: string) => {
+        const { serverProjects } = getState();
+        const expectedFilename = `${name}.zip`;
+
+        // Confirmation if exists
+        if (serverProjects.includes(expectedFilename)) {
+            if (!window.confirm(`A project named "${name}" already exists on the server. Do you want to overwrite it?`)) {
+                return;
+            }
+        }
+
         try {
             const zipBlob = await createRobotZip(getState());
             const formData = new FormData();
             formData.append('file', zipBlob, `${name}.zip`);
             formData.append('project_name', name);
 
-            const response = await fetch('http://localhost:8000/api/projects', {
+            const response = await fetch(`${API_BASE_URL}/api/projects`, {
                 method: 'POST',
                 body: formData,
             });
@@ -421,7 +437,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
     getProjectList: async () => {
         try {
-            const response = await fetch('http://localhost:8000/api/projects');
+            const response = await fetch(`${API_BASE_URL}/api/projects`);
             if (response.ok) {
                 const data = await response.json();
                 setState({ serverProjects: data.projects || [] });
@@ -433,7 +449,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
     loadProjectFromServer: async (filename: string) => {
         try {
-            const response = await fetch(`http://localhost:8000/api/projects/${filename}`);
+            const response = await fetch(`${API_BASE_URL}/api/projects/${filename}`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch project: ${response.status}`);
             }
@@ -589,7 +605,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             }
 
             // 3. Send to the backend
-            const response = await fetch('http://localhost:8000/api/export-urdf', {
+            const response = await fetch(`${API_BASE_URL}/api/export-urdf`, {
                 method: 'POST',
                 body: formData,
             });
@@ -672,7 +688,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                 }
             }
 
-            const response = await fetch('http://localhost:8000/api/export-urdf-ros2', {
+            const response = await fetch(`${API_BASE_URL}/api/export-urdf-ros2`, {
                 method: 'POST',
                 body: formData,
             });
