@@ -378,6 +378,21 @@ const RobotVisualizer: React.FC = () => {
           if (collisionMode === 'box') {
             const box1 = new THREE.Box3().setFromObject(mesh1);
             const box2 = new THREE.Box3().setFromObject(mesh2);
+
+            // Shrink boxes to be slightly smaller (e.g. 80% of original size)
+            // This prevents "grazing" or large AABB false positives
+            const shrinkBox = (box: THREE.Box3) => {
+              const center = new THREE.Vector3();
+              box.getCenter(center);
+              const size = new THREE.Vector3();
+              box.getSize(size);
+              size.multiplyScalar(0.8); // 80% size
+              box.setFromCenterAndSize(center, size);
+            };
+
+            shrinkBox(box1);
+            shrinkBox(box2);
+
             if (box1.intersectsBox(box2)) intersection = true;
           } else if (collisionMode === 'mesh') {
             // BVH Check
