@@ -802,20 +802,21 @@ const Sidebar = () => {
                                 <label className="flex items-center space-x-2 cursor-pointer bg-gray-900 p-2 rounded hover:bg-gray-700">
                                     <input
                                         type="radio"
-                                        name="collision"
+                                        name="collisionMode"
+                                        value="box"
                                         checked={collisionMode === 'box'}
                                         onChange={() => setCollisionMode('box')}
-                                        className="text-yellow-500 focus:ring-yellow-500"
+                                        className="form-radio text-blue-600"
                                     />
                                     <div>
-                                        <span className="text-sm font-semibold">Box (AABB)</span>
-                                        <span className="text-xs text-gray-500 block">Rough, fast checks</span>
+                                        <span className="text-sm font-semibold">Cylinder (Fast)</span>
+                                        <span className="text-xs text-gray-500 block">Approximation, stable</span>
                                     </div>
                                 </label>
                                 <label className="flex items-center space-x-2 cursor-pointer bg-gray-900 p-2 rounded hover:bg-gray-700">
                                     <input
                                         type="radio"
-                                        name="collision"
+                                        name="collisionMode"
                                         checked={collisionMode === 'mesh'}
                                         onChange={() => setCollisionMode('mesh')}
                                         className="text-green-500 focus:ring-green-500"
@@ -830,18 +831,18 @@ const Sidebar = () => {
                             {collisionMode === 'box' && (
                                 <div className="mt-4 p-2 bg-gray-900 rounded">
                                     <label className="block text-sm text-gray-400 mb-1">
-                                        Box Size Factor: {useRobotStore.getState().collisionBoxScale.toFixed(2)}x
+                                        Cylinder Size Factor: {useRobotStore.getState().collisionBoxScale.toFixed(2)}x
                                     </label>
                                     <input
                                         type="range"
-                                        min="0.5"
+                                        min="0.1"
                                         max="1.2"
                                         step="0.05"
                                         value={useRobotStore.getState().collisionBoxScale}
                                         onChange={(e) => setCollisionBoxScale(parseFloat(e.target.value))}
                                         className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                     />
-                                    <p className="text-xs text-gray-500 mt-1">Adjust if detection is too loose or strict.</p>
+                                    <p className="text-xs text-gray-500 mt-1">Adjust to fit link skin.</p>
                                 </div>
                             )}
                         </div>
