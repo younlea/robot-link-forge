@@ -22,6 +22,7 @@ const createInitialState = (): RobotState => {
         cameraMode: 'rotate', // Default camera mode
         cameraControls: null,
         serverProjects: [],
+        importUnit: 'm', // Default to Meters
     };
 };
 
@@ -163,6 +164,16 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             const meshUrl = `${API_BASE_URL}${result.url}`;
 
             setState(state => {
+                // Determine scale based on global setting
+                // If setting is 'm' -> 1.0 (already meters)
+                // If setting is 'cm' -> 0.01 (cm to m)
+                // If setting is 'mm' -> 0.001 (mm to m)
+                let scaleFactor = 1.0;
+                if (state.importUnit === 'cm') scaleFactor = 0.01;
+                if (state.importUnit === 'mm') scaleFactor = 0.001;
+
+                const initialScale: [number, number, number] = [scaleFactor, scaleFactor, scaleFactor];
+
                 if (targetType === 'link') {
                     const linkToUpdate = state.links[targetId];
                     if (!linkToUpdate) return {};
@@ -171,7 +182,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                         ...linkToUpdate.visual,
                         type: 'mesh',
                         meshUrl: meshUrl,
-                        meshScale: [1, 1, 1],
+                        meshScale: initialScale,
                         meshOrigin: { xyz: [0, 0, 0], rpy: [0, 0, 0] },
                         meshBoundingBox: undefined,
                         color: '#F0F0F0', // Default light gray for new meshes
@@ -186,7 +197,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                         ...jointToUpdate.visual,
                         type: 'mesh',
                         meshUrl: meshUrl,
-                        meshScale: [1, 1, 1],
+                        meshScale: initialScale,
                         meshOrigin: { xyz: [0, 0, 0], rpy: [0, 0, 0] },
                         color: '#F0F0F0', // Default light gray for new meshes
                         // Joints don't usually need bounding box for length fitting like links do, but we can store it if we want.
@@ -471,6 +482,8 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             alert(`Failed to load project from server: ${error.message}`);
         }
     },
+
+    setImportUnit: (unit) => setState({ importUnit: unit }),
 
     loadRobot: async (file: File) => {
         const processAndSetState = (robotData: any) => {

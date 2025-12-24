@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRobotStore } from '../store';
 import { RobotLink, RobotJoint, JointType } from '../types';
-import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, Upload, RotateCcw, Trash2, FilePlus, HelpCircle } from 'lucide-react';
+import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, Upload, RotateCcw, Trash2, FilePlus, HelpCircle, Settings } from 'lucide-react';
 import HelpModal from './HelpModal';
 
 // --- Reusable Input Components (with fixes) ---
@@ -634,7 +634,7 @@ const GlobalJointController = () => {
 
 
 const Sidebar = () => {
-    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot, exportURDF, exportURDF_ROS2, resetProject, saveProjectToServer, getProjectList, serverProjects, loadProjectFromServer } = useRobotStore();
+    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot, exportURDF, exportURDF_ROS2, resetProject, saveProjectToServer, getProjectList, serverProjects, loadProjectFromServer, importUnit, setImportUnit } = useRobotStore();
     const selectedLink = selectedItem.type === 'link' ? links[selectedItem.id!] : null;
     const selectedJoint = selectedItem.type === 'joint' ? joints[selectedItem.id!] : null;
 
@@ -651,6 +651,7 @@ const Sidebar = () => {
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [showLoadModal, setShowLoadModal] = useState(false);
     const [showHelpModal, setShowHelpModal] = useState(false);
+    const [showSettingsModal, setShowSettingsModal] = useState(false);
     const [saveProjectName, setSaveProjectName] = useState('');
 
     const handleLoadClick = () => {
@@ -722,6 +723,69 @@ const Sidebar = () => {
         <>
             {/* Help Modal */}
             {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
+
+            {/* Settings Modal */}
+            {showSettingsModal && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
+                    <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-80">
+                        <h3 className="text-lg font-bold mb-4 flex items-center"><Settings className="mr-2" size={20} /> Settings</h3>
+
+                        <div className="mb-6">
+                            <label className="block text-sm text-gray-400 mb-2">Default Import Unit</label>
+                            <p className="text-xs text-gray-500 mb-2">
+                                When uploading STL files, they will be automatically scaled based on this unit to match the robot's meter-based system.
+                            </p>
+                            <div className="space-y-2">
+                                <label className="flex items-center space-x-2 cursor-pointer bg-gray-900 p-2 rounded hover:bg-gray-700">
+                                    <input
+                                        type="radio"
+                                        name="unit"
+                                        checked={importUnit === 'm'}
+                                        onChange={() => setImportUnit('m')}
+                                        className="text-blue-500 focus:ring-blue-500"
+                                    />
+                                    <div>
+                                        <span className="text-sm font-semibold">Meters (m)</span>
+                                        <span className="text-xs text-gray-500 block">Scale: 1.0</span>
+                                    </div>
+                                </label>
+                                <label className="flex items-center space-x-2 cursor-pointer bg-gray-900 p-2 rounded hover:bg-gray-700">
+                                    <input
+                                        type="radio"
+                                        name="unit"
+                                        checked={importUnit === 'cm'}
+                                        onChange={() => setImportUnit('cm')}
+                                        className="text-blue-500 focus:ring-blue-500"
+                                    />
+                                    <div>
+                                        <span className="text-sm font-semibold">Centimeters (cm)</span>
+                                        <span className="text-xs text-gray-500 block">Scale: 0.01</span>
+                                    </div>
+                                </label>
+                                <label className="flex items-center space-x-2 cursor-pointer bg-gray-900 p-2 rounded hover:bg-gray-700">
+                                    <input
+                                        type="radio"
+                                        name="unit"
+                                        checked={importUnit === 'mm'}
+                                        onChange={() => setImportUnit('mm')}
+                                        className="text-blue-500 focus:ring-blue-500"
+                                    />
+                                    <div>
+                                        <span className="text-sm font-semibold">Millimeters (mm)</span>
+                                        <span className="text-xs text-gray-500 block">Scale: 0.001</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end">
+                            <button onClick={() => setShowSettingsModal(false)} className="bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded text-sm text-white">
+                                Done
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Export Modal */}
             {showExportModal && (
@@ -889,6 +953,14 @@ const Sidebar = () => {
                             title="User Guide / Help"
                         >
                             <HelpCircle className="h-4 w-4" />
+                        </button>
+
+                        <button
+                            onClick={() => setShowSettingsModal(true)}
+                            className="flex-none flex items-center justify-center bg-gray-600 hover:bg-gray-700 p-2 rounded text-sm"
+                            title="Global Settings"
+                        >
+                            <Settings className="h-4 w-4" />
                         </button>
                     </div>
                 </div>

@@ -93,6 +93,7 @@ export interface RobotState {
   cameraMode: 'rotate' | 'pan';
   cameraControls: CameraControls | null;
   serverProjects: string[];
+  importUnit: 'm' | 'cm' | 'mm';
 }
 
 export interface RobotActions {
@@ -141,4 +142,7 @@ export interface RobotActions {
 
   deleteItem: (id: string, type: 'link' | 'joint') => void;
   resetProject: () => void;
+
+  // Settings
+  setImportUnit: (unit: 'm' | 'cm' | 'mm') => void;
 }
