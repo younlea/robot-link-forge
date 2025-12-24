@@ -545,7 +545,8 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                 const meshFolder = zip.folder('meshes');
                 if (meshFolder) {
                     const resolveMeshUrl = async (item: any) => {
-                        if (item.visual.type === 'mesh' && item.visual.meshUrl) {
+                        // Defensive check: Ensure visual exists before checking properties
+                        if (item.visual && item.visual.type === 'mesh' && item.visual.meshUrl) {
                             const meshFile = meshFolder.file(item.visual.meshUrl.replace('meshes/', ''));
                             if (meshFile) {
                                 const blob = await meshFile.async('blob');
