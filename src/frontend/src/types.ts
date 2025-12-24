@@ -94,6 +94,7 @@ export interface RobotState {
   cameraControls: CameraControls | null;
   serverProjects: string[];
   importUnit: 'm' | 'cm' | 'mm';
+  collisionMode: 'box' | 'mesh' | 'off';
 }
 
 export interface RobotActions {
@@ -145,4 +146,5 @@ export interface RobotActions {
 
   // Settings
   setImportUnit: (unit: 'm' | 'cm' | 'mm') => void;
+  setCollisionMode: (mode: 'box' | 'mesh' | 'off') => void;
 }

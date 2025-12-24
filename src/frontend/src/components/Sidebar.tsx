@@ -634,7 +634,7 @@ const GlobalJointController = () => {
 
 
 const Sidebar = () => {
-    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot, exportURDF, exportURDF_ROS2, resetProject, saveProjectToServer, getProjectList, serverProjects, loadProjectFromServer, importUnit, setImportUnit } = useRobotStore();
+    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot, exportURDF, exportURDF_ROS2, resetProject, saveProjectToServer, getProjectList, serverProjects, loadProjectFromServer, importUnit, setImportUnit, collisionMode, setCollisionMode } = useRobotStore();
     const selectedLink = selectedItem.type === 'link' ? links[selectedItem.id!] : null;
     const selectedJoint = selectedItem.type === 'joint' ? joints[selectedItem.id!] : null;
 
@@ -773,6 +773,56 @@ const Sidebar = () => {
                                     <div>
                                         <span className="text-sm font-semibold">Millimeters (mm)</span>
                                         <span className="text-xs text-gray-500 block">Scale: 0.001</span>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="border-t border-gray-700 my-4"></div>
+
+                        <div className="mb-6">
+                            <label className="block text-sm text-gray-400 mb-2">Collision Detection</label>
+                            <p className="text-xs text-gray-500 mb-2">
+                                Choose the accuracy of collision checks. "Mesh" is slower but more precise.
+                            </p>
+                            <div className="space-y-2">
+                                <label className="flex items-center space-x-2 cursor-pointer bg-gray-900 p-2 rounded hover:bg-gray-700">
+                                    <input
+                                        type="radio"
+                                        name="collision"
+                                        checked={collisionMode === 'off'}
+                                        onChange={() => setCollisionMode('off')}
+                                        className="text-red-500 focus:ring-red-500"
+                                    />
+                                    <div>
+                                        <span className="text-sm font-semibold">Off</span>
+                                        <span className="text-xs text-gray-500 block">No checks (Fastest)</span>
+                                    </div>
+                                </label>
+                                <label className="flex items-center space-x-2 cursor-pointer bg-gray-900 p-2 rounded hover:bg-gray-700">
+                                    <input
+                                        type="radio"
+                                        name="collision"
+                                        checked={collisionMode === 'box'}
+                                        onChange={() => setCollisionMode('box')}
+                                        className="text-yellow-500 focus:ring-yellow-500"
+                                    />
+                                    <div>
+                                        <span className="text-sm font-semibold">Box (AABB)</span>
+                                        <span className="text-xs text-gray-500 block">Rough, fast checks</span>
+                                    </div>
+                                </label>
+                                <label className="flex items-center space-x-2 cursor-pointer bg-gray-900 p-2 rounded hover:bg-gray-700">
+                                    <input
+                                        type="radio"
+                                        name="collision"
+                                        checked={collisionMode === 'mesh'}
+                                        onChange={() => setCollisionMode('mesh')}
+                                        className="text-green-500 focus:ring-green-500"
+                                    />
+                                    <div>
+                                        <span className="text-sm font-semibold">Mesh (Precise)</span>
+                                        <span className="text-xs text-gray-500 block">Accurate but slower</span>
                                     </div>
                                 </label>
                             </div>

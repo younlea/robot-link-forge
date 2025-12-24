@@ -9,15 +9,22 @@ import { Box, Cylinder, Sphere, TransformControls, Html } from '@react-three/dre
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Move, RotateCw } from 'lucide-react';
-import { STLMesh } from './STLMesh'; // Import the new component
+import { STLMesh } from './STLMesh';
+import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+
+// Extend BufferGeometry to include BVH properties
+THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
+THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
+(THREE.Mesh.prototype as any).raycast = acceleratedRaycast;
 
 const HIGHLIGHT_COLOR = 'hotpink';
+const COLLISION_COLOR = '#FF0000'; // Red for collision
 
 type RefMap = Map<string, THREE.Object3D>;
 type RegisterRef = (id: string, ref: THREE.Object3D) => void;
 
 // --- JointWrapper ---
-const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({ jointId, registerRef }) => {
+const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef; isColliding: boolean }> = ({ jointId, registerRef, isColliding }) => {
   const joint = useRobotStore((state) => state.joints[jointId]);
   const { selectedItem, selectItem } = useRobotStore();
 
@@ -65,14 +72,14 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({
     if (!joint.visual || joint.visual.type === 'none') {
       return (
         <Sphere args={[0.02, 16, 16]} onClick={(e) => { e.stopPropagation(); selectItem(joint.id, 'joint'); }}>
-          <meshStandardMaterial color={selectedItem.id === jointId ? HIGHLIGHT_COLOR : 'yellow'} />
+          <meshStandardMaterial color={isColliding ? COLLISION_COLOR : (selectedItem.id === jointId ? HIGHLIGHT_COLOR : 'yellow')} />
         </Sphere>
       );
     }
 
     const { type, dimensions, color, meshUrl, meshScale, meshOrigin } = joint.visual;
     const isSelected = selectedItem.id === jointId;
-    const materialColor = isSelected ? HIGHLIGHT_COLOR : (color || '#888888');
+    const materialColor = isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : (color || '#888888'));
     const clickHandler = (e: any) => { e.stopPropagation(); selectItem(joint.id, 'joint'); };
 
     if (type === 'mesh') {
@@ -80,7 +87,7 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({
       return (
         <group onClick={clickHandler}>
           <STLMesh
-            linkId={jointId} // passing jointId as linkId for caching purposes is fine
+            linkId={jointId}
             url={meshUrl}
             scale={meshScale}
             origin={meshOrigin}
@@ -121,6 +128,20 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
   const link = useRobotStore((state) => state.links[linkId]);
   const getJoint = useRobotStore((state) => (id: string) => state.joints[id]);
   const { selectedItem, selectItem } = useRobotStore();
+
+  // We need to inject the collision state here. 
+  // However, RobotVisualizer manages the collision state. 
+  // We can't easily pass props down recursively without refactoring the whole recursion.
+  // A cleaner way for the recursive pattern is to use a Context or a separate tiny store (or select purely from store if we put collision in global store).
+  // But wait! We are inside RobotVisualizer, and RecursiveLink renders RecursiveLink...
+  // Actually, let's use a simplistic approach: subscribe to a 'collidingLinks' set passed via Context?
+  // OR, simpler: useRobotStore with a selector for "is this link colliding?"
+  // But we didn't put collidingLinks in the main store to avoid global re-renders on every drag frame.
+  // Let's modify RecursiveLink to take `collidingLinks` set as a prop? No, it's recursive.
+
+  // SOLUTION: We will lift the `collidingLinks` set to a React Context to avoid prop drilling through recursion.
+  const isColliding = useCollisionContext(linkId);
+
   const groupRef = useRef<THREE.Group>(null!);
 
   useEffect(() => {
@@ -138,15 +159,14 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
     if (type === 'none') return null;
 
     const isSelected = selectedItem.id === linkId;
-    const materialColor = isSelected ? HIGHLIGHT_COLOR : color;
+    const materialColor = isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : color);
 
     const clickHandler = (e: any) => { e.stopPropagation(); selectItem(link.id, 'link'); };
 
     // Handle mesh type first
     if (type === 'mesh') {
-      if (!meshUrl) return null; // Don't render if no URL
+      if (!meshUrl) return null;
       return (
-        // Wrap STLMesh in a group to handle the click, as STLMesh uses Suspense
         <group onClick={clickHandler}>
           <STLMesh
             linkId={linkId}
@@ -165,36 +185,28 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
 
     switch (type) {
       case 'box':
-        // Box is centered at origin by default, this is usually fine.
         return <Box {...props} args={dimensions as [number, number, number]} >
           <meshStandardMaterial color={materialColor} />
         </Box>;
 
       case 'cylinder': {
-        // This is a connecting link in a chain.
         if (link.childJoints.length === 1) {
           const childJoint = getJoint(link.childJoints[0]);
           if (childJoint) {
             const start = new THREE.Vector3(0, 0, 0);
             const end = new THREE.Vector3(...childJoint.origin.xyz);
+            if (end.lengthSq() < 0.0001) return null;
 
-            if (end.lengthSq() < 0.0001) return null; // Avoid zero-length cylinder
-
-            const JOINT_VISUAL_RADIUS = 0.02; // Matches the Sphere args in JointWrapper
-            const GAP_OFFSET = JOINT_VISUAL_RADIUS * 1.5; // Create a visible gap
-
+            const JOINT_VISUAL_RADIUS = 0.02;
+            const GAP_OFFSET = JOINT_VISUAL_RADIUS * 1.5;
             const originalLength = start.distanceTo(end);
-            const length = Math.max(0, originalLength - (GAP_OFFSET * 2)); // Don't allow negative length
-
-            // If the link is too short to be visible, don't render it.
+            const length = Math.max(0, originalLength - (GAP_OFFSET * 2));
             if (length <= 0) return null;
 
             const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-
             const orientation = new THREE.Quaternion();
-            const up = new THREE.Vector3(0, 1, 0); // Default Cylinder axis is Y
+            const up = new THREE.Vector3(0, 1, 0);
             const direction = new THREE.Vector3().subVectors(end, start).normalize();
-
             orientation.setFromUnitVectors(up, direction);
 
             const radius = dimensions[0] || 0.05;
@@ -209,19 +221,15 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
             );
           }
         }
-
-        // Fallback for terminal or branching links.
         const radius = dimensions[0] || 0.05;
         const length = dimensions[1] || 0.5;
         const cylinderProps: [number, number, number, number] = [radius, radius, length, 16];
-        // For a terminal cylinder, stand it on the XY plane (Y-up). Its base is at y=0.
         return <Cylinder {...props} args={cylinderProps} position={[0, length / 2, 0]} >
           <meshStandardMaterial color={materialColor} />
         </Cylinder>;
       }
 
       case 'sphere':
-        // Sphere is centered at origin.
         return <Sphere {...props} args={[(dimensions[0] || 0.1), 32, 32]} >
           <meshStandardMaterial color={materialColor} />
         </Sphere>;
@@ -234,21 +242,26 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
     <group ref={groupRef}>
       {renderVisual()}
       {link.childJoints.map((jointId) => (
-        <JointWrapper key={jointId} jointId={jointId} registerRef={registerRef} />
+        <JointWrapper key={jointId} jointId={jointId} registerRef={registerRef} isColliding={useCollisionContext(jointId)} />
       ))}
     </group>
   );
 };
 
+// --- Collision Context ---
+// Simple Context to pass down the colliding set without drillin props deep
+const CollisionContext = React.createContext<Set<string>>(new Set());
+const useCollisionContext = (id: string) => {
+  const set = React.useContext(CollisionContext);
+  return set.has(id);
+};
 
 // --- Main Visualizer with Gizmo Logic ---
 const RobotVisualizer: React.FC = () => {
-  const { baseLinkId, selectedItem, updateJoint, cameraMode, setCameraMode } = useRobotStore();
-  // We get the camera controls via the new manager, not useThree, to avoid conflicts
-  // const orbitControls = useThree(state => state.controls) as any; 
-  // const { scene } = useThree(); // Unused
+  const { baseLinkId, selectedItem, updateJoint, cameraMode, setCameraMode, collisionMode, joints } = useRobotStore();
   const transformControlsRef = useRef<any>(null!);
   const [objectRefs] = useState(() => new Map<string, THREE.Object3D>());
+  const [collidingLinks, setCollidingLinks] = useState<Set<string>>(new Set());
 
   // Helper: Clamp value within limits
   const clamp = (val: number, min?: number, max?: number) => {
@@ -263,26 +276,125 @@ const RobotVisualizer: React.FC = () => {
     else objectRefs.delete(id);
   };
 
-  // Helper to find parent joint for a link
   const getParentJointId = (linkId: string): string | null => {
-    const joints = useRobotStore.getState().joints;
+    // using local `joints` from store hook
     const entry = Object.values(joints).find(j => j.childLinkId === linkId);
     return entry ? entry.id : null;
   };
 
+  // --- Collision Logic ---
+  const checkCollisions = () => {
+    if (collisionMode === 'off') {
+      if (collidingLinks.size > 0) setCollidingLinks(new Set());
+      return false;
+    }
+
+    const collisionSet = new Set<string>();
+
+    // We need to check every visible object against every other visible object
+    // Filter objects that are "meshable" (have geometry)
+    // objectRefs contains Groups. We need to find the Mesh children within those groups.
+    const items = Array.from(objectRefs.entries());
+
+    // Pre-calculate adjacency (Ignored Pairs)
+    // Parent Link <-> Child Joint <-> Child Link
+    // We ignore (Parent Link, Child Joint) and (Parent Link, Child Link)?? 
+    // Usually physically connected parts should be ignored.
+    const ignoredPairs = new Set<string>();
+    Object.values(joints).forEach(joint => {
+      if (joint.parentLinkId) {
+        // Parent Link <-> Joint
+        ignoredPairs.add(`${joint.parentLinkId}+${joint.id}`);
+        ignoredPairs.add(`${joint.id}+${joint.parentLinkId}`);
+
+        if (joint.childLinkId) {
+          // Joint <-> Child Link
+          ignoredPairs.add(`${joint.id}+${joint.childLinkId}`);
+          ignoredPairs.add(`${joint.childLinkId}+${joint.id}`);
+
+          // Parent Link <-> Child Link (Directly connected via joint)
+          ignoredPairs.add(`${joint.parentLinkId}+${joint.childLinkId}`);
+          ignoredPairs.add(`${joint.childLinkId}+${joint.parentLinkId}`);
+        }
+      }
+    });
+
+    for (let i = 0; i < items.length; i++) {
+      for (let j = i + 1; j < items.length; j++) {
+        const [id1, group1] = items[i];
+        const [id2, group2] = items[j];
+
+        if (ignoredPairs.has(`${id1}+${id2}`)) continue;
+
+        // Traverse to find meshes
+        let mesh1: THREE.Mesh | undefined;
+        let mesh2: THREE.Mesh | undefined;
+        group1.traverse((child) => { if ((child as THREE.Mesh).isMesh) mesh1 = child as THREE.Mesh; });
+        group2.traverse((child) => { if ((child as THREE.Mesh).isMesh) mesh2 = child as THREE.Mesh; });
+
+        if (!mesh1 || !mesh2) continue;
+
+        let intersection = false;
+
+        // Ensure matrices are up to date
+        // Note: during drag, React frame might not have updated yet, but the ThreeJS scene graph IS updated by TransformControls.
+        // We must ensure WorldMatrices are current.
+        mesh1.updateMatrixWorld();
+        mesh2.updateMatrixWorld();
+
+        // Optimisation: Broadphase Bounding Sphere check first?
+        const sphere1 = mesh1.geometry.boundingSphere?.clone().applyMatrix4(mesh1.matrixWorld);
+        const sphere2 = mesh2.geometry.boundingSphere?.clone().applyMatrix4(mesh2.matrixWorld);
+        if (sphere1 && sphere2 && !sphere1.intersectsSphere(sphere2)) continue;
+
+        if (collisionMode === 'box') {
+          const box1 = new THREE.Box3().setFromObject(mesh1);
+          const box2 = new THREE.Box3().setFromObject(mesh2);
+          if (box1.intersectsBox(box2)) intersection = true;
+        } else if (collisionMode === 'mesh') {
+          // BVH Check
+          // Ensure geometry has bounds tree computed (lazy init)
+          if (!mesh1.geometry.boundsTree) mesh1.geometry.computeBoundsTree!();
+          if (!mesh2.geometry.boundsTree) mesh2.geometry.computeBoundsTree!();
+
+          // Use the built-in intersectsGeometry which transforms mesh2 into mesh1's space
+          if (mesh1.geometry.boundsTree && mesh2.geometry.boundsTree) {
+            // The type definitions might be tricky, checking docs pattern:
+            // bvh.intersectsGeometry(otherGeometry, otherMatrixFromLocalToWorld)
+            // But we need to account for both transforms. 
+            // Effectively: mesh1.geometry.boundsTree.intersectsGeometry(mesh2.geometry, mesh1.matrixWorld.invert() * mesh2.matrixWorld)
+
+            const matrix2to1 = new THREE.Matrix4().copy(mesh1.matrixWorld).invert().multiply(mesh2.matrixWorld);
+            if (mesh1.geometry.boundsTree.intersectsGeometry(mesh2.geometry, matrix2to1)) {
+              intersection = true;
+            }
+          }
+        }
+
+        if (intersection) {
+          collisionSet.add(id1);
+          collisionSet.add(id2);
+        }
+      }
+    }
+
+    // Update state only if changed
+    if (collisionSet.size !== collidingLinks.size || ![...collisionSet].every(x => collidingLinks.has(x))) {
+      setCollidingLinks(collisionSet);
+    }
+
+    return collisionSet.size > 0;
+  };
+
   useEffect(() => {
     const controls = transformControlsRef.current;
-
     let targetId = null;
     if (selectedItem.id) {
       if (selectedItem.type === 'joint') {
         targetId = selectedItem.id;
       } else if (selectedItem.type === 'link') {
-        // If checking link, find its parent joint
         const parentJointId = getParentJointId(selectedItem.id);
-        if (parentJointId) {
-          targetId = parentJointId;
-        }
+        if (parentJointId) targetId = parentJointId;
       }
     }
 
@@ -296,9 +408,6 @@ const RobotVisualizer: React.FC = () => {
       controls.visible = false;
     }
 
-    // This logic to disable camera controls during object dragging is now more complex
-    // because the controls are managed in CameraManager. We'll handle this with a new state.
-    // For now, we focus on the main task. A simple way is to check the `dragging` property.
     if (controls) {
       const callback = (event: any) => {
         const cameraControls = useRobotStore.getState().cameraControls;
@@ -309,65 +418,70 @@ const RobotVisualizer: React.FC = () => {
       controls.addEventListener('dragging-changed', callback);
       return () => controls.removeEventListener('dragging-changed', callback);
     }
-  }, [selectedItem, objectRefs]); // Removed scene dependency as it's no longer used for controls
+  }, [selectedItem, objectRefs]);
 
   const handleObjectChange = () => {
     const controls = transformControlsRef.current;
-
-    // Determine the actual Joint ID being modified
     let actualJointId: string | null = null;
-    if (selectedItem.type === 'joint') {
-      actualJointId = selectedItem.id;
-    } else if (selectedItem.type === 'link') {
-      actualJointId = getParentJointId(selectedItem.id || "");
-    }
+    if (selectedItem.type === 'joint') actualJointId = selectedItem.id;
+    else if (selectedItem.type === 'link') actualJointId = getParentJointId(selectedItem.id || "");
 
     if (!controls || !controls.object || !actualJointId) return;
 
-    // Fetch latest state to check limits and types
     const state = useRobotStore.getState();
     const joint = state.joints[actualJointId];
-    if (!joint) return;
+    if (!joint || joint.type === 'fixed') return;
 
-    if (joint.type === 'fixed') {
-      // Fixed joints cannot be moved
+    const { object } = controls;
+    let proposedValues = { ...joint.currentValues };
+
+    // 1. Calculate Proposed Values
+    if (joint.type === 'rotational') {
+      const euler = new THREE.Euler().setFromQuaternion(object.quaternion, 'ZYX');
+      if (joint.dof.yaw) proposedValues.yaw = clamp(euler.z, joint.limits.yaw.lower, joint.limits.yaw.upper);
+      if (joint.dof.pitch) proposedValues.pitch = clamp(euler.y, joint.limits.pitch.lower, joint.limits.pitch.upper);
+      if (joint.dof.roll) proposedValues.roll = clamp(euler.x, joint.limits.roll.lower, joint.limits.roll.upper);
+    } else if (joint.type === 'prismatic') {
+      const pos = object.position;
+      const axis = new THREE.Vector3(...joint.axis).normalize();
+      const displacement = pos.dot(axis);
+      const clampedDisp = clamp(displacement, joint.limits.displacement?.lower, joint.limits.displacement?.upper);
+      proposedValues = { ...joint.currentValues, displacement: clampedDisp };
+    }
+
+    // 2. We need to physically APPLY these values to the scene graph nodes *before* checking collision.
+    // The TransformControls has already moved the 'motionGroup' of the joint we are editing.
+    // However, the standard `useFrame` in JointWrapper will overwrite this on next frame.
+    // AND, importantly, the TransformControls only moves the specific node it is attached to.
+    // If we have a chain, the children move with it automatically because they are children in ThreeJS graph.
+    // So the visual state IS theoretically correct for testing right now.
+
+    // BUT we need to ensure local matrix updates have propagated if we rely on World Matrix.
+    // object.updateMatrixWorld(true); // force update down the tree?
+
+    // 3. Check Collision
+    // We run the check. If it returns true, we REVERT.
+    const hasCollision = checkCollisions();
+
+    if (hasCollision) {
+      // If collision:
+      // 1. Do NOT update store.
+      // 2. The visual object is currently in the "bad" place because of TransformControls.
+      // 3. We should force it back? 
+      // Note: TransformControls is tricky. If we just don't update store, the object might snap back on next render?
+      // Actually, if we don't update store, the `useFrame` hook will reset the position/rotation to the OLD store value!
+      // So simply doing nothing here is synonymous with "reverting".
+      // HOWEVER, we want to update the visualization of RED color. `checkCollisions` called `setCollidingLinks`.
+      // We probably want to allow the user to see they are colliding?
+      // The user asked to "stop" (not move through).
+      // So we strictly DO NOT update the store.
       return;
     }
 
-    const { object } = controls;
-
-    if (joint.type === 'rotational') {
-      // Read rotation from object
-      // NOTE: The object is the motionGroup. Its default order might be XYZ but we prefer ZYX for Roll-Pitch-Yaw
-      const euler = new THREE.Euler().setFromQuaternion(object.quaternion, 'ZYX');
-
-      // We only update the DOFs that are enabled
-      const newValues = { ...joint.currentValues };
-
-      if (joint.dof.yaw) newValues.yaw = clamp(euler.z, joint.limits.yaw.lower, joint.limits.yaw.upper);
-      if (joint.dof.pitch) newValues.pitch = clamp(euler.y, joint.limits.pitch.lower, joint.limits.pitch.upper);
-      if (joint.dof.roll) newValues.roll = clamp(euler.x, joint.limits.roll.lower, joint.limits.roll.upper);
-
-      // Update Store
-      updateJoint(actualJointId, 'currentValues', newValues);
-
-    } else if (joint.type === 'prismatic') {
-      // Read position
-      const pos = object.position;
-      const axis = new THREE.Vector3(...joint.axis).normalize();
-
-      // Project position onto the axis to find displacement (scalar)
-      // displacement = pos dot axis
-      const displacement = pos.dot(axis);
-
-      const clampedDisp = clamp(displacement, joint.limits.displacement?.lower, joint.limits.displacement?.upper);
-
-      const newValues = { ...joint.currentValues, displacement: clampedDisp };
-      updateJoint(actualJointId, 'currentValues', newValues);
-    }
+    // If no collision, we commit the values
+    updateJoint(actualJointId, 'currentValues', proposedValues);
   }
 
-  // Determine TransformControls Props based on Selection
   const getGizmoProps = () => {
     let targetJointId: string | null = null;
     if (selectedItem.type === 'joint') targetJointId = selectedItem.id;
@@ -388,14 +502,6 @@ const RobotVisualizer: React.FC = () => {
         space: 'local' as const
       };
     } else if (joint.type === 'prismatic') {
-      // For prismatic, we ideally want to show only the arrow along the axis.
-      // TransformControls doesn't support arbitrary axis arrows easily without rotation.
-      // BUT, we are in 'local' space of the joint.
-      // The JointWrapper sets the MOTION GROUP position/rotation relative to origin.
-      // The Prismatic logic: `motionGroup.position.copy(axis).multiplyScalar(disp)`.
-      // If axis is [0,0,1], we slide Z. If axis is [1,0,0], we slide X.
-      // So we can enable X/Y/Z based on the axis vector components? 
-      // Roughly: if abs(component) > 0.1, show it.
       const axis = joint.axis;
       return {
         mode: 'translate' as const,
@@ -413,7 +519,7 @@ const RobotVisualizer: React.FC = () => {
   const gizmoProps = getGizmoProps();
 
   return (
-    <>
+    <CollisionContext.Provider value={collidingLinks}>
       <Html position={[-4, 2, 0]} wrapperClass="w-32">
         <div className="bg-gray-800 bg-opacity-80 p-1 rounded-lg flex justify-around">
           <button onClick={() => setCameraMode("pan")} className={`p-2 rounded ${cameraMode === 'pan' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`} title="Camera Pan"> <Move size={16} /> </button>
@@ -433,7 +539,7 @@ const RobotVisualizer: React.FC = () => {
         space={gizmoProps.space}
         size={0.7}
       />
-    </>
+    </CollisionContext.Provider>
   );
 };
 

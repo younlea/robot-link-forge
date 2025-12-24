@@ -23,6 +23,7 @@ const createInitialState = (): RobotState => {
         cameraControls: null,
         serverProjects: [],
         importUnit: 'm', // Default to Meters
+        collisionMode: 'off', // Default collision off
     };
 };
 
@@ -484,6 +485,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
     },
 
     setImportUnit: (unit) => setState({ importUnit: unit }),
+    setCollisionMode: (mode) => setState({ collisionMode: mode }),
 
     loadRobot: async (file: File) => {
         const processAndSetState = (robotData: any) => {
