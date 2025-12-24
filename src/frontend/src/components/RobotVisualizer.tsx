@@ -15,7 +15,6 @@ const HIGHLIGHT_COLOR = 'hotpink';
 
 type RefMap = Map<string, THREE.Object3D>;
 type RegisterRef = (id: string, ref: THREE.Object3D) => void;
-type GizmoMode = "translate" | "rotate";
 
 // --- JointWrapper ---
 const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({ jointId, registerRef }) => {
@@ -251,8 +250,13 @@ const RobotVisualizer: React.FC = () => {
   const transformControlsRef = useRef<any>(null!);
   const [objectRefs] = useState(() => new Map<string, THREE.Object3D>());
 
-  // Gizmo Mode State
-  const [gizmoMode, setGizmoMode] = useState<GizmoMode>("translate");
+  // Helper: Clamp value within limits
+  const clamp = (val: number, min?: number, max?: number) => {
+    let v = val;
+    if (min !== undefined) v = Math.max(min, v);
+    if (max !== undefined) v = Math.min(max, v);
+    return v;
+  };
 
   const registerRef: RegisterRef = (id, ref) => {
     if (ref) objectRefs.set(id, ref);
@@ -323,44 +327,100 @@ const RobotVisualizer: React.FC = () => {
 
     if (!controls || !controls.object || !actualJointId) return;
 
-    const { object } = controls;
-    const newPos = object.position.toArray();
-    // Use ZYX order for consistency with common robotics conventions, but Three.js default is XYZ. 
-    // We should probably stick to what the store expects. The initial code used an Euler with 'ZYX' in JointWrapper.
-    // Let's grab the rotation as Euler 'ZYX' to be safe since we set it that way.
-    const euler = new THREE.Euler().setFromQuaternion(object.quaternion, 'ZYX');
-    const newRot = [euler.x, euler.y, euler.z];
+    // Fetch latest state to check limits and types
+    const state = useRobotStore.getState();
+    const joint = state.joints[actualJointId];
+    if (!joint) return;
 
-    updateJoint(actualJointId, 'origin.xyz', newPos);
-    updateJoint(actualJointId, 'origin.rpy', newRot);
+    if (joint.type === 'fixed') {
+      // Fixed joints cannot be moved
+      return;
+    }
+
+    const { object } = controls;
+
+    if (joint.type === 'rotational') {
+      // Read rotation from object
+      // NOTE: The object is the motionGroup. Its default order might be XYZ but we prefer ZYX for Roll-Pitch-Yaw
+      const euler = new THREE.Euler().setFromQuaternion(object.quaternion, 'ZYX');
+
+      // We only update the DOFs that are enabled
+      const newValues = { ...joint.currentValues };
+
+      if (joint.dof.yaw) newValues.yaw = clamp(euler.z, joint.limits.yaw.lower, joint.limits.yaw.upper);
+      if (joint.dof.pitch) newValues.pitch = clamp(euler.y, joint.limits.pitch.lower, joint.limits.pitch.upper);
+      if (joint.dof.roll) newValues.roll = clamp(euler.x, joint.limits.roll.lower, joint.limits.roll.upper);
+
+      // Update Store
+      updateJoint(actualJointId, 'currentValues', newValues);
+
+    } else if (joint.type === 'prismatic') {
+      // Read position
+      const pos = object.position;
+      const axis = new THREE.Vector3(...joint.axis).normalize();
+
+      // Project position onto the axis to find displacement (scalar)
+      // displacement = pos dot axis
+      const displacement = pos.dot(axis);
+
+      const clampedDisp = clamp(displacement, joint.limits.displacement?.lower, joint.limits.displacement?.upper);
+
+      const newValues = { ...joint.currentValues, displacement: clampedDisp };
+      updateJoint(actualJointId, 'currentValues', newValues);
+    }
   }
+
+  // Determine TransformControls Props based on Selection
+  const getGizmoProps = () => {
+    let targetJointId: string | null = null;
+    if (selectedItem.type === 'joint') targetJointId = selectedItem.id;
+    else if (selectedItem.type === 'link') targetJointId = getParentJointId(selectedItem.id || "");
+
+    if (!targetJointId) return { mode: 'translate' as const, visible: false };
+
+    const joint = useRobotStore.getState().joints[targetJointId];
+    if (!joint || joint.type === 'fixed') return { mode: 'translate' as const, visible: false };
+
+    if (joint.type === 'rotational') {
+      return {
+        mode: 'rotate' as const,
+        visible: true,
+        showX: joint.dof.roll,
+        showY: joint.dof.pitch,
+        showZ: joint.dof.yaw,
+        space: 'local' as const
+      };
+    } else if (joint.type === 'prismatic') {
+      // For prismatic, we ideally want to show only the arrow along the axis.
+      // TransformControls doesn't support arbitrary axis arrows easily without rotation.
+      // BUT, we are in 'local' space of the joint.
+      // The JointWrapper sets the MOTION GROUP position/rotation relative to origin.
+      // The Prismatic logic: `motionGroup.position.copy(axis).multiplyScalar(disp)`.
+      // If axis is [0,0,1], we slide Z. If axis is [1,0,0], we slide X.
+      // So we can enable X/Y/Z based on the axis vector components? 
+      // Roughly: if abs(component) > 0.1, show it.
+      const axis = joint.axis;
+      return {
+        mode: 'translate' as const,
+        visible: true,
+        showX: Math.abs(axis[0]) > 0.01,
+        showY: Math.abs(axis[1]) > 0.01,
+        showZ: Math.abs(axis[2]) > 0.01,
+        space: 'local' as const
+      };
+    }
+
+    return { mode: 'translate' as const, visible: false };
+  };
+
+  const gizmoProps = getGizmoProps();
 
   return (
     <>
       <Html position={[-4, 2, 0]} wrapperClass="w-32">
-        <div className="bg-gray-800 bg-opacity-80 p-1 rounded-lg flex flex-col gap-2">
-          <div className="flex justify-around border-b border-gray-600 pb-1 mb-1">
-            {/* Camera Modes */}
-            <button onClick={() => setCameraMode("pan")} className={`p-2 rounded ${cameraMode === 'pan' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`} title="Camera Pan"> <Move size={16} /> </button>
-            <button onClick={() => setCameraMode("rotate")} className={`p-2 rounded ${cameraMode === 'rotate' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`} title="Camera Rotate"> <RotateCw size={16} /> </button>
-          </div>
-          <div className="flex justify-around">
-            {/* Gizmo Modes - Only active if we have a valid selection */}
-            <button
-              onClick={() => setGizmoMode("translate")}
-              className={`p-2 rounded ${gizmoMode === 'translate' ? 'bg-green-600' : 'bg-gray-700'} hover:bg-green-500`}
-              title="Move Object"
-            >
-              <Move size={16} color={gizmoMode === 'translate' ? 'white' : '#aaa'} />
-            </button>
-            <button
-              onClick={() => setGizmoMode("rotate")}
-              className={`p-2 rounded ${gizmoMode === 'rotate' ? 'bg-green-600' : 'bg-gray-700'} hover:bg-green-500`}
-              title="Rotate Object"
-            >
-              <RotateCw size={16} color={gizmoMode === 'rotate' ? 'white' : '#aaa'} />
-            </button>
-          </div>
+        <div className="bg-gray-800 bg-opacity-80 p-1 rounded-lg flex justify-around">
+          <button onClick={() => setCameraMode("pan")} className={`p-2 rounded ${cameraMode === 'pan' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`} title="Camera Pan"> <Move size={16} /> </button>
+          <button onClick={() => setCameraMode("rotate")} className={`p-2 rounded ${cameraMode === 'rotate' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`} title="Camera Rotate"> <RotateCw size={16} /> </button>
         </div>
       </Html>
       {baseLinkId && <RecursiveLink linkId={baseLinkId} registerRef={registerRef} />}
@@ -368,7 +428,12 @@ const RobotVisualizer: React.FC = () => {
       <TransformControls
         ref={transformControlsRef}
         onObjectChange={handleObjectChange}
-        mode={gizmoMode}
+        mode={gizmoProps.mode}
+        visible={gizmoProps.visible && !!((selectedItem.id && selectedItem.type === 'joint') || (selectedItem.type === 'link' && getParentJointId(selectedItem.id || "")))}
+        showX={gizmoProps.showX}
+        showY={gizmoProps.showY}
+        showZ={gizmoProps.showZ}
+        space={gizmoProps.space}
         size={0.7}
       />
     </>
