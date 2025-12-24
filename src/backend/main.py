@@ -317,7 +317,6 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
             joints_xml += f'    <origin xyz="{" ".join(map(str, joint.origin.xyz))}" rpy="{" ".join(map(str, joint.origin.rpy))}"/>\n'
             
             if joint.type == 'rotational':
-            if joint.type == 'rotational':
                 if joint.axis:
                     axis_str = " ".join(map(str, joint.axis))
                 else: 
