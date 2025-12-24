@@ -246,7 +246,7 @@ const RobotVisualizer: React.FC = () => {
   const { baseLinkId, selectedItem, updateJoint, cameraMode, setCameraMode } = useRobotStore();
   // We get the camera controls via the new manager, not useThree, to avoid conflicts
   // const orbitControls = useThree(state => state.controls) as any; 
-  const { scene } = useThree();
+  // const { scene } = useThree(); // Unused
   const transformControlsRef = useRef<any>(null!);
   const [objectRefs] = useState(() => new Map<string, THREE.Object3D>());
 
@@ -300,19 +300,16 @@ const RobotVisualizer: React.FC = () => {
     // because the controls are managed in CameraManager. We'll handle this with a new state.
     // For now, we focus on the main task. A simple way is to check the `dragging` property.
     if (controls) {
-      // Guard against race condition: cameraControls might not be set yet.
-      const cameraControls = (scene.userData.cameraControls as any);
-      if (!cameraControls) {
-        return;
-      }
-
       const callback = (event: any) => {
-        if (cameraControls) cameraControls.enabled = !event.value
+        const cameraControls = useRobotStore.getState().cameraControls;
+        if (cameraControls) {
+          cameraControls.enabled = !event.value;
+        }
       };
       controls.addEventListener('dragging-changed', callback);
       return () => controls.removeEventListener('dragging-changed', callback);
     }
-  }, [selectedItem, objectRefs, scene]); // Added dependencies for reliability
+  }, [selectedItem, objectRefs]); // Removed scene dependency as it's no longer used for controls
 
   const handleObjectChange = () => {
     const controls = transformControlsRef.current;
