@@ -80,158 +80,39 @@ class RobotData(BaseModel):
 # --- Helper Functions ---
 def to_snake_case(name: str) -> str:
     """Converts a string to snake_case and ensures it's a valid identifier."""
+    # Ensure it's a string
+    name = str(name).strip()
+    # Explicitly replace spaces first to be sure
+    name = name.replace(' ', '_')
+    
     s = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     s = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s).lower()
     s = re.sub(r'\W+', '_', s) # Replace non-alphanumeric with _
+    s = re.sub(r'_+', '_', s) # Dedupe underscores
     s = re.sub(r'^_|_$', '', s) # Remove leading/trailing _
     return s if s else "link"
 
-def calculate_cylinder_transform(start_point: List[float], end_point: List[float]) -> Tuple[float, List[float], List[float]]:
-    """
-    Calculates the length, midpoint (origin), and rotation (rpy) to align a cylinder 
-    from start_point to end_point.
-    Returns: (length, origin_xyz, origin_rpy)
-    """
-    dx = end_point[0] - start_point[0]
-    dy = end_point[1] - start_point[1]
-    dz = end_point[2] - start_point[2]
-    
-    length = math.sqrt(dx*dx + dy*dy + dz*dz)
-    
-    # Midpoint
-    mx = (start_point[0] + end_point[0]) / 2.0
-    my = (start_point[1] + end_point[1]) / 2.0
-    mz = (start_point[2] + end_point[2]) / 2.0
-    
-    # Rotation (Align Z-axis to vector D)
-    # Pitch (Y) and Yaw (Z). Roll (X) is 0.
-    
-    # Yaw: atan2(dy, dx)
-    yaw = math.atan2(dy, dx)
-    
-    # Horizontal projection length
-    horizontal_dist = math.sqrt(dx*dx + dy*dy)
-    
-    # Pitch: angle between Z and vector.
-    # Positive pitch around Y moves Z toward X.
-    # If dx=1, dz=0 (Forward X), we want pitch +90.
-    # pitch = atan2(horizontal_dist, dz) gives 90 for (1,0) and 0 for (0,1). Correct.
-    pitch = math.atan2(horizontal_dist, dz)
-    
-    return length, [mx, my, mz], [0.0, pitch, yaw]
-
-
-
-def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str]) -> str:
-    """Generates the XML content for a single link (visual, collision, etc.)."""
-    
-    link: RobotLink = robot_data.links[link_id]
-    
-    # --- Visual and Collision XML ---
-    visual_xml = '    <visual>\n'
-    
-    origin_xyz_str = "0 0 0"
-    origin_rpy_str = "0 0 0"
-
-    vis = link.visual
-    
-    # Apply origin if present (regardless of type)
-    if vis.meshOrigin:
-        origin_xyz_str = " ".join(map(str, vis.meshOrigin.get('xyz', [0,0,0])))
-        origin_rpy_str = " ".join(map(str, vis.meshOrigin.get('rpy', [0,0,0])))
-
-    geometry_xml = ""
-    override_origin_xyz = None
-    override_origin_rpy = None
-
-    # Check for Dynamic Cylinder Case (Connecting Link)
-    if vis.type == 'cylinder' and link.childJoints and len(link.childJoints) == 1:
-        child_joint_id = link.childJoints[0]
-        child_joint = robot_data.joints.get(child_joint_id)
-        
-        # Only apply dynamic transform if valid connection exists AND user hasn't manually set origin
-        if child_joint and child_joint.origin and not vis.meshOrigin:
-            length, mid_xyz, mid_rpy = calculate_cylinder_transform(
-                [0,0,0], # Start at parent link origin (0,0,0)
-                child_joint.origin.xyz
-            )
-            
-            # If length is tiny, might want to fallback, but trust it if > 0.001
-            if length > 0.001:
-                # Override the Radius from dimensions (index 0)
-                radius = vis.dimensions[0] if (vis.dimensions and len(vis.dimensions) > 0) else 0.05
-                # Override calculated length
-                geometry_xml = f'        <cylinder radius="{radius}" length="{length}" />\n'
-                
-                # Override Origin
-                override_origin_xyz = " ".join(map(str, mid_xyz))
-                override_origin_rpy = " ".join(map(str, mid_rpy))
-
-    if not geometry_xml:
-        if vis.type == 'mesh' and link_id in mesh_files:
-            mesh_scale = " ".join(map(str, vis.meshScale)) if vis.meshScale else "1 1 1"
-            geometry_xml = f'        <mesh filename="package://{robot_name}/meshes/{mesh_files[link_id]}" scale="{mesh_scale}"/>\n'
-        elif vis.type == 'box' and vis.dimensions:
-            geometry_xml = f'        <box size="{" ".join(map(str, vis.dimensions))}" />\n'
-        elif vis.type == 'cylinder' and vis.dimensions:
-            # FIX: Index 1 is length, not 2
-            length_val = vis.dimensions[1] if len(vis.dimensions) > 1 else 1.0
-            geometry_xml = f'        <cylinder radius="{vis.dimensions[0]}" length="{length_val}" />\n'
-        elif vis.type == 'sphere' and vis.dimensions:
-            geometry_xml = f'        <sphere radius="{vis.dimensions[0]}" />\n'
-        else:
-            # Fallback or default
-            geometry_xml = '        <box size="0.01 0.01 0.01" />\n'
-
-    # Determine Final Origin
-    origin_xyz_str = "0 0 0"
-    origin_rpy_str = "0 0 0"
-
-    # Priority 1: Dynamic Calculation (Override)
-    if override_origin_xyz:
-        origin_xyz_str = override_origin_xyz
-        origin_rpy_str = override_origin_rpy
-    # Priority 2: Manual meshOrigin from visual properties (only if not overridden)
-    elif vis.meshOrigin:
-        origin_xyz_str = " ".join(map(str, vis.meshOrigin.get('xyz', [0,0,0])))
-        origin_rpy_str = " ".join(map(str, vis.meshOrigin.get('rpy', [0,0,0])))
-
-    visual_xml += f'      <origin xyz="{origin_xyz_str}" rpy="{origin_rpy_str}" />\n'
-    visual_xml += '      <geometry>\n'
-    visual_xml += geometry_xml
-    visual_xml += '      </geometry>\n'
-
-    if vis.color:
-        try:
-            r, g, b = int(vis.color[1:3], 16)/255, int(vis.color[3:5], 16)/255, int(vis.color[5:7], 16)/255
-            visual_xml += f'      <material name="{link_name}_color">\n'
-            visual_xml += f'        <color rgba="{r:.3f} {g:.3f} {b:.3f} 1.0" />\n'
-            visual_xml += '      </material>\n'
-        except Exception:
-            pass # Handle invalid color hex gracefully
-    
-    visual_xml += '    </visual>\n'
-    
-    collision_xml = visual_xml.replace('<visual>', '<collision>', 1).replace('</visual>', '</collision>', 1)
-
-    # --- Link XML ---
-    link_xml = f'  <link name="{link_name}">\n'
-    link_xml += visual_xml
-    link_xml += collision_xml
-    link_xml += '  </link>\n\n'
-    
-    return link_xml
 
 def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str]) -> Tuple[str, str]:
     """Generates the URDF XML content and returns (urdf_string, base_link_name)."""
 
     # Generate unique, valid names for all links first to ensure consistency.
-    unique_link_names = {
-        link_id: f"{to_snake_case(link.name)}_{link.id[:6]}"
-        for link_id, link in robot_data.links.items()
-    }
+    unique_link_names = {}
+    used_names = set()
+
+    for link_id, link in robot_data.links.items():
+        base_name = f"{to_snake_case(link.name)}_{link.id[:6]}"
+        final_name = base_name
+        counter = 1
+        while final_name in used_names:
+            final_name = f"{base_name}_{counter}"
+            counter += 1
+        
+        unique_link_names[link_id] = final_name
+        used_names.add(final_name)
     
     base_link_name = unique_link_names[robot_data.baseLinkId]
+
     
     # Generate XML for the base link
     links_xml = _generate_link_xml(robot_data.baseLinkId, base_link_name, robot_data, robot_name, mesh_files)
