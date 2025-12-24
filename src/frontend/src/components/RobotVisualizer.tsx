@@ -21,7 +21,7 @@ type GizmoMode = "translate" | "rotate";
 const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({ jointId, registerRef }) => {
   const joint = useRobotStore((state) => state.joints[jointId]);
   const { selectedItem, selectItem } = useRobotStore();
-  
+
   const originGroupRef = useRef<THREE.Group>(null!);
   const motionGroupRef = useRef<THREE.Group>(null!);
 
@@ -32,42 +32,84 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({
       return () => registerRef(jointId, null!);
     }
   }, [jointId, registerRef]);
-  
+
   useFrame(() => {
     if (!originGroupRef.current || !motionGroupRef.current) return;
 
-    originGroupRef.current.position.set(...(joint.origin?.xyz || [0,0,0]));
-    originGroupRef.current.rotation.set(...(joint.origin?.rpy || [0,0,0]));
+    originGroupRef.current.position.set(...(joint.origin?.xyz || [0, 0, 0]));
+    originGroupRef.current.rotation.set(...(joint.origin?.rpy || [0, 0, 0]));
 
     const motionGroup = motionGroupRef.current;
     if (joint.type === 'rotational') {
-        const euler = new THREE.Euler(
-            joint.dof.roll ? joint.currentValues.roll : 0,
-            joint.dof.pitch ? joint.currentValues.pitch : 0,
-            joint.dof.yaw ? joint.currentValues.yaw : 0,
-            'ZYX' 
-        );
-        motionGroup.quaternion.setFromEuler(euler);
-        motionGroup.position.set(0, 0, 0);
+      const euler = new THREE.Euler(
+        joint.dof.roll ? joint.currentValues.roll : 0,
+        joint.dof.pitch ? joint.currentValues.pitch : 0,
+        joint.dof.yaw ? joint.currentValues.yaw : 0,
+        'ZYX'
+      );
+      motionGroup.quaternion.setFromEuler(euler);
+      motionGroup.position.set(0, 0, 0);
     } else if (joint.type === 'prismatic') {
-        const axis = new THREE.Vector3(...joint.axis).normalize();
-        motionGroup.position.copy(axis).multiplyScalar(joint.currentValues.displacement);
-        motionGroup.quaternion.set(0,0,0,1);
+      const axis = new THREE.Vector3(...joint.axis).normalize();
+      motionGroup.position.copy(axis).multiplyScalar(joint.currentValues.displacement);
+      motionGroup.quaternion.set(0, 0, 0, 1);
     } else {
-        motionGroup.position.set(0, 0, 0);
-        motionGroup.quaternion.set(0,0,0,1);
+      motionGroup.position.set(0, 0, 0);
+      motionGroup.quaternion.set(0, 0, 0, 1);
     }
   });
 
   const axes = useMemo(() => new THREE.AxesHelper(0.2), []);
 
+  const renderVisual = () => {
+    // Default small handle if no visual is set
+    if (!joint.visual || joint.visual.type === 'none') {
+      return (
+        <Sphere args={[0.02, 16, 16]} onClick={(e) => { e.stopPropagation(); selectItem(joint.id, 'joint'); }}>
+          <meshStandardMaterial color={selectedItem.id === jointId ? HIGHLIGHT_COLOR : 'yellow'} />
+        </Sphere>
+      );
+    }
+
+    const { type, dimensions, color, meshUrl, meshScale, meshOrigin } = joint.visual;
+    const isSelected = selectedItem.id === jointId;
+    const materialColor = isSelected ? HIGHLIGHT_COLOR : (color || '#888888');
+    const clickHandler = (e: any) => { e.stopPropagation(); selectItem(joint.id, 'joint'); };
+
+    if (type === 'mesh') {
+      if (!meshUrl) return null;
+      return (
+        <group onClick={clickHandler}>
+          <STLMesh
+            linkId={jointId} // passing jointId as linkId for caching purposes is fine
+            url={meshUrl}
+            scale={meshScale}
+            origin={meshOrigin}
+            color={materialColor}
+          />
+        </group>
+      );
+    }
+
+    const props = { onClick: clickHandler };
+    const dims = dimensions || [0.05, 0.05, 0.05];
+
+    switch (type) {
+      case 'box':
+        return <Box {...props} args={dims as [number, number, number]}><meshStandardMaterial color={materialColor} /></Box>;
+      case 'cylinder':
+        return <Cylinder {...props} args={[dims[0], dims[0], dims[1], 16]}><meshStandardMaterial color={materialColor} /></Cylinder>;
+      case 'sphere':
+        return <Sphere {...props} args={[dims[0], 16, 16]}><meshStandardMaterial color={materialColor} /></Sphere>;
+      default: return null;
+    }
+  };
+
   return (
     <group ref={originGroupRef}>
       <group ref={motionGroupRef}>
         <primitive object={axes} />
-        <Sphere args={[0.02, 16, 16]} onClick={(e) => { e.stopPropagation(); selectItem(joint.id, 'joint'); }}>
-            <meshStandardMaterial color={selectedItem.id === jointId ? HIGHLIGHT_COLOR : 'yellow'} />
-        </Sphere>
+        {renderVisual()}
         {joint.childLinkId && <RecursiveLink linkId={joint.childLinkId} registerRef={registerRef} />}
       </group>
     </group>
@@ -98,91 +140,91 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
 
     const isSelected = selectedItem.id === linkId;
     const materialColor = isSelected ? HIGHLIGHT_COLOR : color;
-    
+
     const clickHandler = (e: any) => { e.stopPropagation(); selectItem(link.id, 'link'); };
 
     // Handle mesh type first
     if (type === 'mesh') {
-        if (!meshUrl) return null; // Don't render if no URL
-        return (
-            // Wrap STLMesh in a group to handle the click, as STLMesh uses Suspense
-            <group onClick={clickHandler}>
-                <STLMesh
-                    linkId={linkId}
-                    url={meshUrl}
-                    scale={meshScale}
-                    origin={meshOrigin}
-                    color={materialColor}
-                />
-            </group>
-        );
+      if (!meshUrl) return null; // Don't render if no URL
+      return (
+        // Wrap STLMesh in a group to handle the click, as STLMesh uses Suspense
+        <group onClick={clickHandler}>
+          <STLMesh
+            linkId={linkId}
+            url={meshUrl}
+            scale={meshScale}
+            origin={meshOrigin}
+            color={materialColor}
+          />
+        </group>
+      );
     }
 
     const props = {
-        onClick: clickHandler,
+      onClick: clickHandler,
     };
 
     switch (type) {
-      case 'box': 
+      case 'box':
         // Box is centered at origin by default, this is usually fine.
         return <Box {...props} args={dimensions as [number, number, number]} >
-            <meshStandardMaterial color={materialColor} />
+          <meshStandardMaterial color={materialColor} />
         </Box>;
 
       case 'cylinder': {
         // This is a connecting link in a chain.
         if (link.childJoints.length === 1) {
-            const childJoint = getJoint(link.childJoints[0]);
-            if (childJoint) {
-                const start = new THREE.Vector3(0, 0, 0);
-                const end = new THREE.Vector3(...childJoint.origin.xyz);
-                
-                if (end.lengthSq() < 0.0001) return null; // Avoid zero-length cylinder
+          const childJoint = getJoint(link.childJoints[0]);
+          if (childJoint) {
+            const start = new THREE.Vector3(0, 0, 0);
+            const end = new THREE.Vector3(...childJoint.origin.xyz);
 
-                const JOINT_VISUAL_RADIUS = 0.02; // Matches the Sphere args in JointWrapper
-                const GAP_OFFSET = JOINT_VISUAL_RADIUS * 1.5; // Create a visible gap
+            if (end.lengthSq() < 0.0001) return null; // Avoid zero-length cylinder
 
-                const originalLength = start.distanceTo(end);
-                const length = Math.max(0, originalLength - (GAP_OFFSET * 2)); // Don't allow negative length
-                
-                // If the link is too short to be visible, don't render it.
-                if (length <= 0) return null;
+            const JOINT_VISUAL_RADIUS = 0.02; // Matches the Sphere args in JointWrapper
+            const GAP_OFFSET = JOINT_VISUAL_RADIUS * 1.5; // Create a visible gap
 
-                const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            const originalLength = start.distanceTo(end);
+            const length = Math.max(0, originalLength - (GAP_OFFSET * 2)); // Don't allow negative length
 
-                const orientation = new THREE.Quaternion();
-                const up = new THREE.Vector3(0, 1, 0); // Default Cylinder axis is Y
-                const direction = new THREE.Vector3().subVectors(end, start).normalize();
-                
-                orientation.setFromUnitVectors(up, direction);
+            // If the link is too short to be visible, don't render it.
+            if (length <= 0) return null;
 
-                const radius = dimensions[0] || 0.05;
-                const cylinderArgs: [number, number, number, number] = [radius, radius, length, 16];
+            const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
 
-                return (
-                    <group position={midPoint} quaternion={orientation}>
-                        <Cylinder args={cylinderArgs} {...props}>
-                            <meshStandardMaterial color={materialColor} />
-                        </Cylinder>
-                    </group>
-                );
-            }
+            const orientation = new THREE.Quaternion();
+            const up = new THREE.Vector3(0, 1, 0); // Default Cylinder axis is Y
+            const direction = new THREE.Vector3().subVectors(end, start).normalize();
+
+            orientation.setFromUnitVectors(up, direction);
+
+            const radius = dimensions[0] || 0.05;
+            const cylinderArgs: [number, number, number, number] = [radius, radius, length, 16];
+
+            return (
+              <group position={midPoint} quaternion={orientation}>
+                <Cylinder args={cylinderArgs} {...props}>
+                  <meshStandardMaterial color={materialColor} />
+                </Cylinder>
+              </group>
+            );
+          }
         }
-        
+
         // Fallback for terminal or branching links.
         const radius = dimensions[0] || 0.05;
         const length = dimensions[1] || 0.5;
         const cylinderProps: [number, number, number, number] = [radius, radius, length, 16];
         // For a terminal cylinder, stand it on the XY plane (Y-up). Its base is at y=0.
         return <Cylinder {...props} args={cylinderProps} position={[0, length / 2, 0]} >
-            <meshStandardMaterial color={materialColor} />
+          <meshStandardMaterial color={materialColor} />
         </Cylinder>;
       }
-        
+
       case 'sphere':
         // Sphere is centered at origin.
         return <Sphere {...props} args={[(dimensions[0] || 0.1), 32, 32]} >
-             <meshStandardMaterial color={materialColor} />
+          <meshStandardMaterial color={materialColor} />
         </Sphere>;
 
       default: return null;
@@ -219,28 +261,28 @@ const RobotVisualizer: React.FC = () => {
     const target = (selectedItem.type === 'joint' && selectedItem.id) ? objectRefs.get(selectedItem.id) : null;
 
     if (target) {
-        controls.attach(target);
-        controls.visible = true;
+      controls.attach(target);
+      controls.visible = true;
     } else {
-        controls.detach();
-        controls.visible = false;
+      controls.detach();
+      controls.visible = false;
     }
-    
+
     // This logic to disable camera controls during object dragging is now more complex
     // because the controls are managed in CameraManager. We'll handle this with a new state.
     // For now, we focus on the main task. A simple way is to check the `dragging` property.
     if (controls) {
-        // Guard against race condition: cameraControls might not be set yet.
-        const cameraControls = (scene.userData.cameraControls as any);
-        if (!cameraControls) {
-          return;
-        }
+      // Guard against race condition: cameraControls might not be set yet.
+      const cameraControls = (scene.userData.cameraControls as any);
+      if (!cameraControls) {
+        return;
+      }
 
-        const callback = (event: any) => {
-            if (cameraControls) cameraControls.enabled = !event.value
-        };
-        controls.addEventListener('dragging-changed', callback);
-        return () => controls.removeEventListener('dragging-changed', callback);
+      const callback = (event: any) => {
+        if (cameraControls) cameraControls.enabled = !event.value
+      };
+      controls.addEventListener('dragging-changed', callback);
+      return () => controls.removeEventListener('dragging-changed', callback);
     }
   }, [selectedItem, objectRefs, scene]);
 
@@ -260,9 +302,9 @@ const RobotVisualizer: React.FC = () => {
     <>
       <Html position={[-4, 2, 0]} wrapperClass="w-32">
         <div className="bg-gray-800 bg-opacity-80 p-1 rounded-lg flex justify-around">
-            {/* These buttons now control the CAMERA mode, not the transform gizmo */}
-            <button onClick={() => setCameraMode("pan")} className={`p-2 rounded ${cameraMode==='pan' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`}> <Move size={16}/> </button>
-            <button onClick={() => setCameraMode("rotate")} className={`p-2 rounded ${cameraMode==='rotate' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`}> <RotateCw size={16}/> </button>
+          {/* These buttons now control the CAMERA mode, not the transform gizmo */}
+          <button onClick={() => setCameraMode("pan")} className={`p-2 rounded ${cameraMode === 'pan' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`}> <Move size={16} /> </button>
+          <button onClick={() => setCameraMode("rotate")} className={`p-2 rounded ${cameraMode === 'rotate' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`}> <RotateCw size={16} /> </button>
         </div>
       </Html>
       {baseLinkId && <RecursiveLink linkId={baseLinkId} registerRef={registerRef} />}

@@ -40,6 +40,11 @@ const createDefaultJoint = (parentLinkId: string): RobotJoint => ({
         yaw: { lower: -Math.PI, upper: Math.PI },
         displacement: { lower: -1, upper: 1 },
     },
+    visual: {
+        type: 'none',
+        dimensions: [0.05, 0.05, 0.05], // Default small box if enabled
+        color: '#888888',
+    },
     origin: { xyz: [0, 0, 0], rpy: [0, 0, 0] },
 });
 
@@ -109,26 +114,22 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
     uploadAndSetMesh: async (itemId, itemType, file) => {
         const { joints, links } = getState();
-        let targetLinkId: string | null = null;
 
-        if (itemType === 'link') {
-            targetLinkId = itemId;
-        } else if (itemType === 'joint') {
-            const joint = joints[itemId];
-            if (joint && joint.childLinkId) {
-                targetLinkId = joint.childLinkId;
-            } else {
-                console.error("Cannot add mesh: Selected joint has no child link.");
-                return;
-            }
-        }
+        // Previous logic forced joints to apply to their child link.
+        // We now support applying directly to the joint (e.g. for motor housing).
 
-        if (!targetLinkId || !links[targetLinkId]) {
+        let targetId = itemId;
+        let targetType = itemType;
+
+        // Validation
+        if (targetType === 'link' && !links[targetId]) {
             console.error("Cannot add mesh: Target link not found.");
             return;
         }
-
-        const finalTargetLinkId = targetLinkId;
+        if (targetType === 'joint' && !joints[targetId]) {
+            console.error("Cannot add mesh: Target joint not found.");
+            return;
+        }
 
         const formData = new FormData();
         formData.append('file', file);
@@ -147,22 +148,38 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             const meshUrl = `http://localhost:8000${result.url}`;
 
             setState(state => {
-                const linkToUpdate = state.links[finalTargetLinkId];
-                if (!linkToUpdate) return {};
+                if (targetType === 'link') {
+                    const linkToUpdate = state.links[targetId];
+                    if (!linkToUpdate) return {};
 
-                const updatedLink = updateDeep(linkToUpdate, 'visual', {
-                    ...linkToUpdate.visual,
-                    type: 'mesh',
-                    meshUrl: meshUrl,
-                    meshScale: [1, 1, 1],
-                    meshOrigin: { xyz: [0, 0, 0], rpy: [0, 0, 0] },
-                    meshBoundingBox: undefined, // Reset bounding box on new mesh upload
-                });
+                    const updatedLink = updateDeep(linkToUpdate, 'visual', {
+                        ...linkToUpdate.visual,
+                        type: 'mesh',
+                        meshUrl: meshUrl,
+                        meshScale: [1, 1, 1],
+                        meshOrigin: { xyz: [0, 0, 0], rpy: [0, 0, 0] },
+                        meshBoundingBox: undefined,
+                    });
+                    return { links: { ...state.links, [targetId]: updatedLink } };
+                } else {
+                    // Joint
+                    const jointToUpdate = state.joints[targetId];
+                    if (!jointToUpdate) return {};
 
-                return { links: { ...state.links, [finalTargetLinkId]: updatedLink } };
+                    const updatedJoint = updateDeep(jointToUpdate, 'visual', {
+                        ...jointToUpdate.visual,
+                        type: 'mesh',
+                        meshUrl: meshUrl,
+                        meshScale: [1, 1, 1],
+                        meshOrigin: { xyz: [0, 0, 0], rpy: [0, 0, 0] },
+                        // Joints don't usually need bounding box for length fitting like links do, but we can store it if we want.
+                        // The Visual type has it optional.
+                    });
+                    return { joints: { ...state.joints, [targetId]: updatedJoint } };
+                }
             });
 
-        } catch (error) {
+        } catch (error: any) {
             console.error("Failed to upload and set mesh:", error);
             alert(`Failed to upload mesh. Make sure the backend server is running. Error: ${error.message}`);
         }
@@ -212,33 +229,40 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
     updateMeshTransform: (itemId, itemType, transform) => {
         setState(state => {
-            let targetLinkId: string | null = null;
+            let targetId = itemId;
+            let targetType = itemType;
 
-            if (itemType === 'link') {
-                targetLinkId = itemId;
-            } else if (itemType === 'joint') {
-                const joint = state.joints[itemId];
-                if (joint && joint.childLinkId) {
-                    targetLinkId = joint.childLinkId;
+            if (targetType === 'link') {
+                if (!state.links[targetId]) return {};
+                let updatedLink = state.links[targetId];
+
+                if (transform.scale) {
+                    updatedLink = updateDeep(updatedLink, 'visual.meshScale', transform.scale);
                 }
-            }
+                if (transform.origin?.xyz) {
+                    updatedLink = updateDeep(updatedLink, 'visual.meshOrigin.xyz', transform.origin.xyz);
+                }
+                if (transform.origin?.rpy) {
+                    updatedLink = updateDeep(updatedLink, 'visual.meshOrigin.rpy', transform.origin.rpy);
+                }
+                return { links: { ...state.links, [targetId]: updatedLink } };
 
-            if (!targetLinkId || !state.links[targetLinkId]) return {};
+            } else {
+                // Joint
+                if (!state.joints[targetId]) return {};
+                let updatedJoint = state.joints[targetId];
 
-            const linkToUpdate = state.links[targetLinkId];
-            let updatedLink = linkToUpdate;
-
-            if (transform.scale) {
-                updatedLink = updateDeep(updatedLink, 'visual.meshScale', transform.scale);
+                if (transform.scale) {
+                    updatedJoint = updateDeep(updatedJoint, 'visual.meshScale', transform.scale);
+                }
+                if (transform.origin?.xyz) {
+                    updatedJoint = updateDeep(updatedJoint, 'visual.meshOrigin.xyz', transform.origin.xyz);
+                }
+                if (transform.origin?.rpy) {
+                    updatedJoint = updateDeep(updatedJoint, 'visual.meshOrigin.rpy', transform.origin.rpy);
+                }
+                return { joints: { ...state.joints, [targetId]: updatedJoint } };
             }
-            if (transform.origin?.xyz) {
-                updatedLink = updateDeep(updatedLink, 'visual.meshOrigin.xyz', transform.origin.xyz);
-            }
-            if (transform.origin?.rpy) {
-                updatedLink = updateDeep(updatedLink, 'visual.meshOrigin.rpy', transform.origin.rpy);
-            }
-
-            return { links: { ...state.links, [targetLinkId]: updatedLink } };
         });
     },
 
@@ -440,6 +464,15 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                         joint.limits.displacement = { ...defaultLimit };
                     }
                     delete joint.limit; // Remove the old property
+                }
+
+                // Ensure visual property exists (Migration for new feature)
+                if (!joint.visual) {
+                    joint.visual = {
+                        type: 'none',
+                        dimensions: [0.05, 0.05, 0.05],
+                        color: '#888888',
+                    };
                 }
             }
             // --- End Migration Logic ---

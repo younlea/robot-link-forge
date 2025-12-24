@@ -409,25 +409,62 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
 
 
 
+            {/* --- Visuals Section (New) --- */}
+            <div className="p-2 bg-gray-900/50 rounded space-y-3">
+                <p className="text-sm font-semibold">Visuals (e.g. Motor Housing)</p>
+                <div>
+                    <label className="text-xs text-gray-400">Visual Type</label>
+                    <select value={joint.visual?.type || 'none'} onChange={(e) => updateJoint(joint.id, 'visual.type', e.target.value)}
+                        className="w-full bg-gray-700 rounded p-1 mt-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        <option value="box">Box</option>
+                        <option value="cylinder">Cylinder</option>
+                        <option value="sphere">Sphere</option>
+                        <option value="mesh">Mesh (STL)</option>
+                        <option value="none">None</option>
+                    </select>
+                </div>
+
+                {joint.visual && joint.visual.type !== 'none' && (
+                    <>
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs text-gray-400">Color</label>
+                            <input
+                                type="color"
+                                value={joint.visual.color || '#888888'}
+                                onChange={(e) => updateJoint(joint.id, 'visual.color', e.target.value)}
+                                className="w-24 h-8 bg-gray-900 rounded p-0 border-2 border-gray-700 cursor-pointer"
+                            />
+                        </div>
+
+                        {joint.visual.type !== 'mesh' && (
+                            <Vector3Input label="Dimensions" value={joint.visual.dimensions || [0.05, 0.05, 0.05]} onChange={(p, v) => updateJoint(joint.id, `visual.${p}`, v)} path="dimensions" />
+                        )}
+
+                        {/* --- STL/Mesh Controls --- */}
+                        <input type="file" ref={stlInputRef} onChange={handleFileChange} className="hidden" accept=".stl" />
+
+                        {joint.visual.type === 'mesh' && (
+                            <>
+                                <button onClick={handleStlUploadClick} className="flex items-center justify-center w-full bg-purple-600 hover:bg-purple-700 p-2 rounded text-sm">
+                                    <Upload className="mr-2 h-4 w-4" /> Upload STL for Joint
+                                </button>
+
+                                <div className="space-y-3 pt-2">
+                                    <h4 className="text-md font-semibold text-gray-300 border-t border-gray-700 pt-3">Mesh Properties</h4>
+                                    <p className="text-xs text-gray-400 truncate">URL: {joint.visual.meshUrl || 'N/A'}</p>
+                                    <Vector3Input label="Mesh Scale" value={joint.visual.meshScale || [1, 1, 1]} onChange={(p, v) => updateJoint(joint.id, `visual.meshScale${p.substring(p.indexOf('['))}`, v)} path="meshScale" />
+                                    <Vector3Input label="Mesh Origin XYZ" value={joint.visual.meshOrigin?.xyz || [0, 0, 0]} onChange={(p, v) => updateJoint(joint.id, `visual.meshOrigin.xyz${p.substring(p.indexOf('['))}`, v)} path="xyz" />
+                                    <Vector3RadianDegreeInput label="Mesh Origin RPY" value={joint.visual.meshOrigin?.rpy || [0, 0, 0]} onChange={(p, v) => updateJoint(joint.id, `visual.meshOrigin.rpy${p.substring(p.indexOf('['))}`, v)} path="rpy" />
+                                </div>
+                            </>
+                        )}
+                    </>
+                )}
+            </div>
+
             {/* Action Buttons */}
 
             <div className="space-y-2 pt-2 border-t border-gray-700">
-
-                {joint.childLinkId && (
-
-                    <>
-
-                        <input type="file" ref={stlInputRef} onChange={handleFileChange} className="hidden" accept=".stl" />
-
-                        <button onClick={handleStlUploadClick} title="Applies a mesh to the child link of this joint" className="flex items-center justify-center w-full bg-purple-600 hover:bg-purple-700 p-2 rounded text-sm">
-
-                            <Upload className="mr-2 h-4 w-4" /> Upload STL to Child Link
-
-                        </button>
-
-                    </>
-
-                )}
 
                 {!joint.childLinkId && (
 

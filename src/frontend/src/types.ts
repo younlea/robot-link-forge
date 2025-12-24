@@ -62,6 +62,9 @@ export interface RobotJoint {
   // Current values for sliders
   currentValues: JointValues;
 
+  // Visual representation of the joint (e.g. motor housing)
+  visual: Visual;
+
   // Limits for each potential degree of freedom
   limits: {
     roll: Limit;
