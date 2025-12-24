@@ -67,25 +67,26 @@ const createRobotZip = async (state: RobotState) => {
 
     // Create a deep copy to modify URLs without affecting current state
     const linksToSave = JSON.parse(JSON.stringify(links));
+    const jointsToSave = JSON.parse(JSON.stringify(joints));
 
     const meshFolder = zip.folder('meshes');
     if (!meshFolder) throw new Error("Failed to create 'meshes' folder in zip.");
 
     const meshUrlMap = new Map<string, string>();
 
-    for (const link of Object.values(linksToSave as Record<string, RobotLink>)) {
-        if (link.visual.type === 'mesh' && link.visual.meshUrl && (link.visual.meshUrl.startsWith('http') || link.visual.meshUrl.startsWith('blob:'))) {
+    const processVisual = async (item: any, name: string) => {
+        if (item.visual.type === 'mesh' && item.visual.meshUrl && (item.visual.meshUrl.startsWith('http') || item.visual.meshUrl.startsWith('blob:'))) {
             // Check if we've already processed this URL
-            if (meshUrlMap.has(link.visual.meshUrl)) {
-                link.visual.meshUrl = meshUrlMap.get(link.visual.meshUrl);
-                continue;
+            if (meshUrlMap.has(item.visual.meshUrl)) {
+                item.visual.meshUrl = meshUrlMap.get(item.visual.meshUrl);
+                return;
             }
 
             try {
-                const response = await fetch(link.visual.meshUrl);
+                const response = await fetch(item.visual.meshUrl);
                 if (!response.ok) {
-                    console.warn(`Could not fetch mesh for ${link.name}: ${link.visual.meshUrl}`);
-                    continue;
+                    console.warn(`Could not fetch mesh for ${name}: ${item.visual.meshUrl}`);
+                    return;
                 }
                 const blob = await response.blob();
                 const newMeshName = `${uuidv4()}.stl`;
@@ -94,15 +95,23 @@ const createRobotZip = async (state: RobotState) => {
                 meshFolder.file(newMeshName, blob);
 
                 // Update the URL in our data-to-be-saved
-                link.visual.meshUrl = relativePath;
-                meshUrlMap.set(link.visual.meshUrl, relativePath); // Store original for mapping
+                meshUrlMap.set(item.visual.meshUrl, relativePath); // Store original for mapping
+                item.visual.meshUrl = relativePath;
             } catch (e) {
                 console.warn(`Error fetching mesh during save: ${e}`);
             }
         }
+    };
+
+    for (const link of Object.values(linksToSave as Record<string, RobotLink>)) {
+        await processVisual(link, link.name);
     }
 
-    const robotData = { links: linksToSave, joints, baseLinkId };
+    for (const joint of Object.values(jointsToSave as Record<string, RobotJoint>)) {
+        await processVisual(joint, joint.name);
+    }
+
+    const robotData = { links: linksToSave, joints: jointsToSave, baseLinkId };
     zip.file('robot-scene.json', JSON.stringify(robotData, null, 2));
 
     return await zip.generateAsync({ type: 'blob' });
@@ -535,17 +544,30 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
                 const meshFolder = zip.folder('meshes');
                 if (meshFolder) {
-                    for (const link of Object.values(robotData.links as Record<string, RobotLink>)) {
-                        if (link.visual.type === 'mesh' && link.visual.meshUrl) {
-                            const meshFile = meshFolder.file(link.visual.meshUrl.replace('meshes/', ''));
+                    const resolveMeshUrl = async (item: any) => {
+                        if (item.visual.type === 'mesh' && item.visual.meshUrl) {
+                            const meshFile = meshFolder.file(item.visual.meshUrl.replace('meshes/', ''));
                             if (meshFile) {
                                 const blob = await meshFile.async('blob');
-                                link.visual.meshUrl = URL.createObjectURL(blob);
+                                item.visual.meshUrl = URL.createObjectURL(blob);
                             } else {
-                                console.warn(`Mesh file not found in zip: ${link.visual.meshUrl}`);
-                                link.visual.meshUrl = null;
+                                // Fallback for bad legacy saves or cross-origin issues
+                                if (item.visual.meshUrl.includes('localhost:8000')) {
+                                    console.warn(`Patching localhost URL for ${item.name}: ${item.visual.meshUrl}`);
+                                    item.visual.meshUrl = item.visual.meshUrl.replace(/https?:\/\/localhost:8000/, API_BASE_URL);
+                                } else {
+                                    console.warn(`Mesh file not found in zip: ${item.visual.meshUrl}`);
+                                    // Don't null it, leave it so user sees it broken but URL is preserved
+                                }
                             }
                         }
+                    };
+
+                    for (const link of Object.values(robotData.links as Record<string, RobotLink>)) {
+                        await resolveMeshUrl(link);
+                    }
+                    for (const joint of Object.values(robotData.joints as Record<string, RobotJoint>)) {
+                        await resolveMeshUrl(joint);
                     }
                 }
                 processAndSetState(robotData);
