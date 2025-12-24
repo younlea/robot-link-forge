@@ -159,6 +159,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                         meshScale: [1, 1, 1],
                         meshOrigin: { xyz: [0, 0, 0], rpy: [0, 0, 0] },
                         meshBoundingBox: undefined,
+                        color: '#F0F0F0', // Default light gray for new meshes
                     });
                     return { links: { ...state.links, [targetId]: updatedLink } };
                 } else {
@@ -172,6 +173,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                         meshUrl: meshUrl,
                         meshScale: [1, 1, 1],
                         meshOrigin: { xyz: [0, 0, 0], rpy: [0, 0, 0] },
+                        color: '#F0F0F0', // Default light gray for new meshes
                         // Joints don't usually need bounding box for length fitting like links do, but we can store it if we want.
                         // The Visual type has it optional.
                     });
