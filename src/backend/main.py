@@ -728,28 +728,28 @@ else
     exit 1
 fi
 """
-    script_path = os.path.join(package_dir, "build_and_launch.sh")
-    with open(script_path, "w") as f:
-        f.write(build_script)
-    
-    # Make executable
-    os.chmod(script_path, 0o755)
+        script_path = os.path.join(package_dir, "build_and_launch.sh")
+        with open(script_path, "w") as f:
+            f.write(build_script)
+        
+        # Make executable
+        os.chmod(script_path, 0o755)
 
-    # Create the zip archive
-    archive_path = shutil.make_archive(
-        base_name=os.path.join(tmpdir, sanitized_robot_name),
-        format='zip',
-        root_dir=tmpdir,
-        base_dir=sanitized_robot_name
-    )
-    
-    background_tasks.add_task(shutil.rmtree, tmpdir)
-    
-    return FileResponse(
-        path=archive_path, 
-        media_type='application/zip', 
-        filename=f"{sanitized_robot_name}_ros2_package.zip"
-    )
+        # Create the zip archive
+        archive_path = shutil.make_archive(
+            base_name=os.path.join(tmpdir, sanitized_robot_name),
+            format='zip',
+            root_dir=tmpdir,
+            base_dir=sanitized_robot_name
+        )
+        
+        background_tasks.add_task(shutil.rmtree, tmpdir)
+        
+        return FileResponse(
+            path=archive_path, 
+            media_type='application/zip', 
+            filename=f"{sanitized_robot_name}_ros2_package.zip"
+        )
     except Exception as e:
         import traceback
         traceback.print_exc()
