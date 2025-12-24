@@ -62,9 +62,32 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                             </div>
                         </div>
                     </section>
+                    <section>
+                        <h3 className="text-xl font-semibold text-white mb-3">4. Collision Detection</h3>
+                        <p className="mb-2">
+                            Use the <strong>Settings</strong> button (Gear icon, bottom-left) to enable collision detection.
+                        </p>
+                        <div className="grid grid-cols-1 gap-4 mt-2">
+                            <div className="bg-gray-900 p-4 rounded border-l-4 border-yellow-500">
+                                <h4 className="font-bold text-yellow-500 mb-1">Cylinder (Fast) Mode</h4>
+                                <p className="text-sm text-gray-300">
+                                    Recommended. Wraps every part in a <strong>Proxy Cylinder</strong> that rotates with the part.
+                                    <br />
+                                    Use the slider to adjust the cylinder size (0.1x - 1.2x) to match your robot's skin tight.
+                                    collisions turn the parts <span className="text-red-500 font-bold">RED</span>.
+                                </p>
+                            </div>
+                            <div className="bg-gray-900 p-4 rounded border-l-4 border-green-500">
+                                <h4 className="font-bold text-green-500 mb-1">Mesh (Precise) Mode</h4>
+                                <p className="text-sm text-gray-300">
+                                    Uses the exact shape of your uploaded STL files. Computationally expensive. Use only for final checks.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
 
                     <section>
-                        <h3 className="text-xl font-semibold text-white mb-3">4. Exporting to ROS</h3>
+                        <h3 className="text-xl font-semibold text-white mb-3">5. Exporting to ROS</h3>
                         <p className="mb-2">
                             Click <strong>Export</strong> to generate a ROS-compatible package.
                         </p>
