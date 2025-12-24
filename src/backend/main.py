@@ -317,11 +317,19 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
             joints_xml += f'    <origin xyz="{" ".join(map(str, joint.origin.xyz))}" rpy="{" ".join(map(str, joint.origin.rpy))}"/>\n'
             
             if joint.type == 'rotational':
+            if joint.type == 'rotational':
                 if joint.axis:
                     axis_str = " ".join(map(str, joint.axis))
-                    joints_xml += f'    <axis xyz="{axis_str}"/>\n'
                 else: 
-                     joints_xml += f'    <axis xyz="1 0 0"/>\n'
+                     # Infer axis from DOF
+                     if joint.dof.pitch:
+                         axis_str = "0 1 0"
+                     elif joint.dof.yaw:
+                         axis_str = "0 0 1"
+                     else:
+                         axis_str = "1 0 0"
+                
+                joints_xml += f'    <axis xyz="{axis_str}"/>\n'
 
                 if joint.type == 'rotational': # Re-check type just for limits logic grouping
                      # Determine limit source based on flags
