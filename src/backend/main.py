@@ -111,8 +111,12 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
         unique_link_names[link_id] = final_name
         used_names.add(final_name)
     
-    base_link_name = unique_link_names[robot_data.baseLinkId]
+    if robot_data.baseLinkId not in unique_link_names:
+         # Fallback or Error? 
+         # Let's try to verify if we can proceed. If base is missing, we can't do anything.
+         raise ValueError(f"Base Link ID {robot_data.baseLinkId} not found in links map.")
 
+    base_link_name = unique_link_names[robot_data.baseLinkId]
     
     # Generate XML for the base link
     links_xml = _generate_link_xml(robot_data.baseLinkId, base_link_name, robot_data, robot_name, mesh_files)
@@ -127,6 +131,9 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
     q = [robot_data.baseLinkId]
     while q:
         parent_link_id = q.pop(0)
+        # Verify parent exists (it should if it was in queue)
+        if parent_link_id not in unique_link_names:
+             continue
         parent_link_name = unique_link_names[parent_link_id]
 
         # Ensure childJoints is iterable
@@ -137,12 +144,18 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
                 continue
             
             joint = robot_data.joints.get(joint_id)
+            # Check for missing child link in JOINT definition
             if not joint or not joint.childLinkId:
                 continue
+            
+            # CRITICAL CHECK: Does the child link actually EXIST?
+            child_link_id = joint.childLinkId
+            if child_link_id not in unique_link_names:
+                 print(f"Warning: Joint {joint_id} points to non-existent Child Link {child_link_id}")
+                 continue
 
             processed_joints.add(joint_id)
             
-            child_link_id = joint.childLinkId
             if child_link_id in processed_links:
                 continue
             
@@ -171,50 +184,38 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
             if joint.type == 'rotational':
                 if joint.axis:
                     axis_str = " ".join(map(str, joint.axis))
-                    active_dof = 'roll' # Defaulting limit check to roll if custom axis, or need logic
-                    # If using custom axis, we might need to know which limit to grab. 
-                    # Assuming 'roll' holds the limit for single-axis rotation in this simplified model 
-                    # OR we check which limit is non-zero/set. 
-                    # For now, let's stick to the boolean logic for LIMIT selection, but AXIS override.
-                    
-                    # Fallback logic for limits if custom axis is used:
-                    # We need to know which of roll/pitch/yaw user edited? 
-                    # In current frontend, 'rotational' implies one DOF.
-                    # As a heuristic, if axis is set, we still need a limit.
-                    # Let's check the booleans to pick the limit value, BUT use the custom axis vector.
-                    pass 
-                
-                # Determine limit source based on flags
-                limit = None
-                if joint.dof.roll:
-                    limit = joint.limits['roll']
-                    if not joint.axis: axis_str = "1 0 0"
-                elif joint.dof.pitch:
-                    limit = joint.limits['pitch']
-                    if not joint.axis: axis_str = "0 1 0"
-                elif joint.dof.yaw:
-                    limit = joint.limits['yaw']
-                    if not joint.axis: axis_str = "0 0 1"
-
-                joints_xml += f'    <axis xyz="{axis_str}"/>\n'
-                if limit:
-                    joints_xml += f'    <limit lower="{limit.lower}" upper="{limit.upper}" effort="10" velocity="1.0"/>\n'
+                    joints_xml += f'    <axis xyz="{axis_str}"/>\n'
                 else: 
-                     # Default safety fallback
-                     joints_xml += f'    <limit lower="-3.14" upper="3.14" effort="10" velocity="1.0"/>\n'
+                     joints_xml += f'    <axis xyz="1 0 0"/>\n'
 
+                if joint.type == 'rotational': # Re-check type just for limits logic grouping
+                     # Determine limit source based on flags
+                     limit = None
+                     if joint.dof.roll:
+                         limit = joint.limits['roll']
+                     elif joint.dof.pitch:
+                         limit = joint.limits['pitch']
+                     elif joint.dof.yaw:
+                         limit = joint.limits['yaw']
+ 
+                     if limit:
+                         joints_xml += f'    <limit lower="{limit.lower}" upper="{limit.upper}" effort="10" velocity="1.0"/>\n'
+                     else: 
+                          # Default safety fallback
+                          joints_xml += f'    <limit lower="-3.14" upper="3.14" effort="10" velocity="1.0"/>\n'
+ 
             elif joint.type == 'prismatic':
-                axis_str = " ".join(map(str, joint.axis)) if joint.axis else "1 0 0"
-                joints_xml += f'    <axis xyz="{axis_str}"/>\n'
-                limit = joint.limits['displacement']
-                joints_xml += f'    <limit lower="{limit.lower}" upper="{limit.upper}" effort="10" velocity="1.0"/>\n'
-
+                 axis_str = " ".join(map(str, joint.axis)) if joint.axis else "1 0 0"
+                 joints_xml += f'    <axis xyz="{axis_str}"/>\n'
+                 limit = joint.limits['displacement']
+                 joints_xml += f'    <limit lower="{limit.lower}" upper="{limit.upper}" effort="10" velocity="1.0"/>\n'
+ 
             joints_xml += '  </joint>\n\n'
-
+ 
     return f'<robot name="{robot_name}">\n{links_xml}{joints_xml}</robot>', base_link_name
 
-
 # --- API Endpoints ---
+
 @app.post("/api/upload-stl")
 async def upload_stl_file(file: UploadFile = File(...)):
     if not file.filename.lower().endswith('.stl'):
@@ -466,55 +467,56 @@ async def export_urdf_package_ros2(
     files: Optional[List[UploadFile]] = File(None)
 ):
     try:
-        data_dict = json.loads(robot_data)
-        robot = RobotData.parse_obj(data_dict)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
+        try:
+            data_dict = json.loads(robot_data)
+            robot = RobotData.parse_obj(data_dict)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
 
-    sanitized_robot_name = to_snake_case(robot_name)
-    if not sanitized_robot_name:
-        sanitized_robot_name = "my_robot"
-    
-    tmpdir = tempfile.mkdtemp()
-    
-    package_dir = os.path.join(tmpdir, sanitized_robot_name)
-    urdf_dir = os.path.join(package_dir, "urdf")
-    mesh_dir = os.path.join(package_dir, "meshes")
-    launch_dir = os.path.join(package_dir, "launch")
-    rviz_dir = os.path.join(package_dir, "rviz")
+        sanitized_robot_name = to_snake_case(robot_name)
+        if not sanitized_robot_name:
+            sanitized_robot_name = "my_robot"
+        
+        tmpdir = tempfile.mkdtemp()
+        
+        package_dir = os.path.join(tmpdir, sanitized_robot_name)
+        urdf_dir = os.path.join(package_dir, "urdf")
+        mesh_dir = os.path.join(package_dir, "meshes")
+        launch_dir = os.path.join(package_dir, "launch")
+        rviz_dir = os.path.join(package_dir, "rviz")
 
-    os.makedirs(urdf_dir, exist_ok=True)
-    os.makedirs(mesh_dir, exist_ok=True)
-    os.makedirs(launch_dir, exist_ok=True)
-    os.makedirs(rviz_dir, exist_ok=True)
-    # Process and save mesh files
-    mesh_files_map = {}
-    if files:
-        for file in files:
-            form_field_name = file.filename
-            link_id = form_field_name.replace('mesh_', '')
+        os.makedirs(urdf_dir, exist_ok=True)
+        os.makedirs(mesh_dir, exist_ok=True)
+        os.makedirs(launch_dir, exist_ok=True)
+        os.makedirs(rviz_dir, exist_ok=True)
+        # Process and save mesh files
+        mesh_files_map = {}
+        if files:
+            for file in files:
+                form_field_name = file.filename
+                link_id = form_field_name.replace('mesh_', '')
 
-            if link_id in robot.links:
-                # FIX: Append link ID snippet to partial name to ensure uniqueness
-                safe_filename = f"{to_snake_case(robot.links[link_id].name)}_{link_id[:6]}.stl"
-                file_path = os.path.join(mesh_dir, safe_filename)
-                
-                with open(file_path, "wb") as f:
-                    shutil.copyfileobj(file.file, f)
-                
-                mesh_files_map[link_id] = safe_filename
+                if link_id in robot.links:
+                    # FIX: Append link ID snippet to partial name to ensure uniqueness
+                    safe_filename = f"{to_snake_case(robot.links[link_id].name)}_{link_id[:6]}.stl"
+                    file_path = os.path.join(mesh_dir, safe_filename)
+                    
+                    with open(file_path, "wb") as f:
+                        shutil.copyfileobj(file.file, f)
+                    
+                    mesh_files_map[link_id] = safe_filename
 
-    # Generate and save URDF file
-    urdf_content, base_link_name = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map)
-    with open(os.path.join(urdf_dir, f"{sanitized_robot_name}.urdf"), "w") as f:
-        f.write(urdf_content)
+        # Generate and save URDF file
+        urdf_content, base_link_name = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map)
+        with open(os.path.join(urdf_dir, f"{sanitized_robot_name}.urdf"), "w") as f:
+            f.write(urdf_content)
 
-    # Create ROS2 specific files
-    package_xml = f"""<?xml version="1.0"?>\n<package format=\"3\">\n  <name>{sanitized_robot_name}</name>\n  <version>0.1.0</version>\n  <description>A description of {sanitized_robot_name}</description>\n  <maintainer email=\"user@example.com\">Your Name</maintainer>\n  <license>MIT</license>\n\n  <buildtool_depend>ament_cmake</buildtool_depend>\n\n  <exec_depend>joint_state_publisher</exec_depend>\n  <exec_depend>joint_state_publisher_gui</exec_depend>\n  <exec_depend>robot_state_publisher</exec_depend>\n  <exec_depend>rviz2</exec_depend>\n  <exec_depend>xacro</exec_depend>\n\n  <test_depend>ament_lint_auto</test_depend>\n  <test_depend>ament_lint_common</test_depend>\n\n  <export>\n    <build_type>ament_cmake</build_type>\n  </export>\n</package>\n"""
-    with open(os.path.join(package_dir, "package.xml"), "w") as f:
-        f.write(package_xml)
+        # Create ROS2 specific files
+        package_xml = f"""<?xml version="1.0"?>\n<package format=\"3\">\n  <name>{sanitized_robot_name}</name>\n  <version>0.1.0</version>\n  <description>A description of {sanitized_robot_name}</description>\n  <maintainer email=\"user@example.com\">Your Name</maintainer>\n  <license>MIT</license>\n\n  <buildtool_depend>ament_cmake</buildtool_depend>\n\n  <exec_depend>joint_state_publisher</exec_depend>\n  <exec_depend>joint_state_publisher_gui</exec_depend>\n  <exec_depend>robot_state_publisher</exec_depend>\n  <exec_depend>rviz2</exec_depend>\n  <exec_depend>xacro</exec_depend>\n\n  <test_depend>ament_lint_auto</test_depend>\n  <test_depend>ament_lint_common</test_depend>\n\n  <export>\n    <build_type>ament_cmake</build_type>\n  </export>\n</package>\n"""
+        with open(os.path.join(package_dir, "package.xml"), "w") as f:
+            f.write(package_xml)
 
-    cmakelists_txt = f"""cmake_minimum_required(VERSION 3.8)
+        cmakelists_txt = f"""cmake_minimum_required(VERSION 3.8)
 project({sanitized_robot_name})
 
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -529,10 +531,10 @@ install(
 
 ament_package()
 """
-    with open(os.path.join(package_dir, "CMakeLists.txt"), "w") as f:
-        f.write(cmakelists_txt)
+        with open(os.path.join(package_dir, "CMakeLists.txt"), "w") as f:
+            f.write(cmakelists_txt)
 
-    display_launch_py = f"""import os
+        display_launch_py = f"""import os
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
@@ -594,9 +596,9 @@ def generate_launch_description():
             arguments=['-d', rviz_config_file])
     ])
 """
-    with open(os.path.join(launch_dir, "display.launch.py"), "w") as f:
-        f.write(display_launch_py)
-    rviz_config = f"""Panels:
+        with open(os.path.join(launch_dir, "display.launch.py"), "w") as f:
+            f.write(display_launch_py)
+        rviz_config = f"""Panels:
 - Class: rviz_common/Displays
   Help Height: 78
   Name: Displays
@@ -696,15 +698,15 @@ Visualization Manager:
       Value: Orbit (rviz)
       Yaw: 1.57
 """
-    with open(os.path.join(rviz_dir, "display.rviz"), "w") as f:
-        f.write(rviz_config)
+        with open(os.path.join(rviz_dir, "display.rviz"), "w") as f:
+            f.write(rviz_config)
 
-    guide_src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'URDF_export_ros2.md'))
-    if os.path.exists(guide_src_path):
-        shutil.copy(guide_src_path, os.path.join(package_dir, 'URDF_export_guide_ros2.md'))
+        guide_src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'URDF_export_ros2.md'))
+        if os.path.exists(guide_src_path):
+            shutil.copy(guide_src_path, os.path.join(package_dir, 'URDF_export_guide_ros2.md'))
 
-    # Create build_and_launch.sh script
-    build_script = f"""#!/bin/bash
+        # Create build_and_launch.sh script
+        build_script = f"""#!/bin/bash
 # Convenience script to build and launch the package
 # Usage: Run this script from your ROS2 workspace root after placing the package in src/
 
