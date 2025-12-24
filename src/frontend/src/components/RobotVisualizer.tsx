@@ -257,9 +257,47 @@ const useCollisionContext = (id: string) => {
   return set.has(id);
 };
 
+// --- Helper to visualize the collision box ---
+const CollisionBoxHelper: React.FC<{ objectRef: THREE.Object3D; scale: number; visible: boolean; color: string }> = ({ objectRef, scale, visible, color }) => {
+  const [box] = useState(() => new THREE.Box3());
+
+  useFrame(() => {
+    if (!visible || !objectRef) return;
+
+    // Find the mesh inside the objectRef (Group)
+    let mesh: THREE.Mesh | undefined;
+    if ((objectRef as THREE.Mesh).isMesh) {
+      mesh = objectRef as THREE.Mesh;
+    } else {
+      objectRef.traverse((child) => {
+        if ((child as THREE.Mesh).isMesh) {
+          if (!mesh) mesh = child as THREE.Mesh;
+        }
+      });
+    }
+
+    if (mesh) {
+      mesh.updateMatrixWorld();
+      box.setFromObject(mesh);
+
+      // Apply shrinkage
+      const center = new THREE.Vector3();
+      box.getCenter(center);
+      const size = new THREE.Vector3();
+      box.getSize(size);
+      size.multiplyScalar(scale);
+      box.setFromCenterAndSize(center, size);
+    }
+  });
+
+  if (!visible) return null;
+
+  return <primitive object={new THREE.Box3Helper(box, new THREE.Color(color))} />;
+};
+
 // --- Main Visualizer with Gizmo Logic ---
 const RobotVisualizer: React.FC = () => {
-  const { baseLinkId, selectedItem, updateJoint, cameraMode, setCameraMode, collisionMode, joints } = useRobotStore();
+  const { baseLinkId, selectedItem, updateJoint, cameraMode, setCameraMode, collisionMode, joints, collisionBoxScale } = useRobotStore();
   const transformControlsRef = useRef<any>(null!);
   const [objectRefs] = useState(() => new Map<string, THREE.Object3D>());
   const [collidingLinks, setCollidingLinks] = useState<Set<string>>(new Set());
@@ -593,6 +631,18 @@ const RobotVisualizer: React.FC = () => {
         space={gizmoProps.space}
         size={0.7}
       />
+
+      {/* Debug render for collision boxes */}
+      {collisionMode === 'box' && Array.from(objectRefs.entries()).map(([id, ref]) => (
+        <CollisionBoxHelper
+          key={id}
+          objectRef={ref}
+          scale={collisionBoxScale}
+          visible={true}
+          color={collidingLinks.has(id) ? '#ff0000' : '#ffff00'}
+        />
+      ))}
+
     </CollisionContext.Provider>
   );
 };

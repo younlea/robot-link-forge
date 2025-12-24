@@ -24,6 +24,7 @@ const createInitialState = (): RobotState => {
         serverProjects: [],
         importUnit: 'm', // Default to Meters
         collisionMode: 'off', // Default collision off
+        collisionBoxScale: 0.8,
     };
 };
 
@@ -486,6 +487,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
     setImportUnit: (unit) => setState({ importUnit: unit }),
     setCollisionMode: (mode) => setState({ collisionMode: mode }),
+    setCollisionBoxScale: (scale) => setState({ collisionBoxScale: scale }),
 
     loadRobot: async (file: File) => {
         const processAndSetState = (robotData: any) => {

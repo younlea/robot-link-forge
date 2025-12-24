@@ -634,7 +634,7 @@ const GlobalJointController = () => {
 
 
 const Sidebar = () => {
-    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot, exportURDF, exportURDF_ROS2, resetProject, saveProjectToServer, getProjectList, serverProjects, loadProjectFromServer, importUnit, setImportUnit, collisionMode, setCollisionMode } = useRobotStore();
+    const { selectedItem, links, joints, selectItem, saveRobot, loadRobot, exportURDF, exportURDF_ROS2, resetProject, saveProjectToServer, getProjectList, serverProjects, loadProjectFromServer, importUnit, setImportUnit, collisionMode, setCollisionMode, collisionBoxScale, setCollisionBoxScale } = useRobotStore();
     const selectedLink = selectedItem.type === 'link' ? links[selectedItem.id!] : null;
     const selectedJoint = selectedItem.type === 'joint' ? joints[selectedItem.id!] : null;
 
@@ -826,6 +826,24 @@ const Sidebar = () => {
                                     </div>
                                 </label>
                             </div>
+
+                            {collisionMode === 'box' && (
+                                <div className="mt-4 p-2 bg-gray-900 rounded">
+                                    <label className="block text-sm text-gray-400 mb-1">
+                                        Box Size Factor: {useRobotStore.getState().collisionBoxScale.toFixed(2)}x
+                                    </label>
+                                    <input
+                                        type="range"
+                                        min="0.5"
+                                        max="1.2"
+                                        step="0.05"
+                                        value={useRobotStore.getState().collisionBoxScale}
+                                        onChange={(e) => setCollisionBoxScale(parseFloat(e.target.value))}
+                                        className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                    <p className="text-xs text-gray-500 mt-1">Adjust if detection is too loose or strict.</p>
+                                </div>
+                            )}
                         </div>
 
                         <div className="flex justify-end">

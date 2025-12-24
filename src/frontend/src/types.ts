@@ -95,6 +95,7 @@ export interface RobotState {
   serverProjects: string[];
   importUnit: 'm' | 'cm' | 'mm';
   collisionMode: 'box' | 'mesh' | 'off';
+  collisionBoxScale: number;
 }
 
 export interface RobotActions {
@@ -147,4 +148,5 @@ export interface RobotActions {
   // Settings
   setImportUnit: (unit: 'm' | 'cm' | 'mm') => void;
   setCollisionMode: (mode: 'box' | 'mesh' | 'off') => void;
+  setCollisionBoxScale: (scale: number) => void;
 }
