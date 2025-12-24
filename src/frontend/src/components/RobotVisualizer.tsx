@@ -251,14 +251,38 @@ const RobotVisualizer: React.FC = () => {
   const transformControlsRef = useRef<any>(null!);
   const [objectRefs] = useState(() => new Map<string, THREE.Object3D>());
 
+  // Gizmo Mode State
+  const [gizmoMode, setGizmoMode] = useState<GizmoMode>("translate");
+
   const registerRef: RegisterRef = (id, ref) => {
     if (ref) objectRefs.set(id, ref);
     else objectRefs.delete(id);
   };
 
+  // Helper to find parent joint for a link
+  const getParentJointId = (linkId: string): string | null => {
+    const joints = useRobotStore.getState().joints;
+    const entry = Object.values(joints).find(j => j.childLinkId === linkId);
+    return entry ? entry.id : null;
+  };
+
   useEffect(() => {
     const controls = transformControlsRef.current;
-    const target = (selectedItem.type === 'joint' && selectedItem.id) ? objectRefs.get(selectedItem.id) : null;
+
+    let targetId = null;
+    if (selectedItem.id) {
+      if (selectedItem.type === 'joint') {
+        targetId = selectedItem.id;
+      } else if (selectedItem.type === 'link') {
+        // If checking link, find its parent joint
+        const parentJointId = getParentJointId(selectedItem.id);
+        if (parentJointId) {
+          targetId = parentJointId;
+        }
+      }
+    }
+
+    const target = targetId ? objectRefs.get(targetId) : null;
 
     if (target) {
       controls.attach(target);
@@ -284,32 +308,69 @@ const RobotVisualizer: React.FC = () => {
       controls.addEventListener('dragging-changed', callback);
       return () => controls.removeEventListener('dragging-changed', callback);
     }
-  }, [selectedItem, objectRefs, scene]);
+  }, [selectedItem, objectRefs, scene]); // Added dependencies for reliability
 
   const handleObjectChange = () => {
     const controls = transformControlsRef.current;
-    if (!controls || !controls.object || !selectedItem.id || selectedItem.type !== 'joint') return;
+
+    // Determine the actual Joint ID being modified
+    let actualJointId: string | null = null;
+    if (selectedItem.type === 'joint') {
+      actualJointId = selectedItem.id;
+    } else if (selectedItem.type === 'link') {
+      actualJointId = getParentJointId(selectedItem.id || "");
+    }
+
+    if (!controls || !controls.object || !actualJointId) return;
 
     const { object } = controls;
     const newPos = object.position.toArray();
-    const newRot = [object.rotation.x, object.rotation.y, object.rotation.z];
+    // Use ZYX order for consistency with common robotics conventions, but Three.js default is XYZ. 
+    // We should probably stick to what the store expects. The initial code used an Euler with 'ZYX' in JointWrapper.
+    // Let's grab the rotation as Euler 'ZYX' to be safe since we set it that way.
+    const euler = new THREE.Euler().setFromQuaternion(object.quaternion, 'ZYX');
+    const newRot = [euler.x, euler.y, euler.z];
 
-    updateJoint(selectedItem.id, 'origin.xyz', newPos);
-    updateJoint(selectedItem.id, 'origin.rpy', newRot);
+    updateJoint(actualJointId, 'origin.xyz', newPos);
+    updateJoint(actualJointId, 'origin.rpy', newRot);
   }
 
   return (
     <>
       <Html position={[-4, 2, 0]} wrapperClass="w-32">
-        <div className="bg-gray-800 bg-opacity-80 p-1 rounded-lg flex justify-around">
-          {/* These buttons now control the CAMERA mode, not the transform gizmo */}
-          <button onClick={() => setCameraMode("pan")} className={`p-2 rounded ${cameraMode === 'pan' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`}> <Move size={16} /> </button>
-          <button onClick={() => setCameraMode("rotate")} className={`p-2 rounded ${cameraMode === 'rotate' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`}> <RotateCw size={16} /> </button>
+        <div className="bg-gray-800 bg-opacity-80 p-1 rounded-lg flex flex-col gap-2">
+          <div className="flex justify-around border-b border-gray-600 pb-1 mb-1">
+            {/* Camera Modes */}
+            <button onClick={() => setCameraMode("pan")} className={`p-2 rounded ${cameraMode === 'pan' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`} title="Camera Pan"> <Move size={16} /> </button>
+            <button onClick={() => setCameraMode("rotate")} className={`p-2 rounded ${cameraMode === 'rotate' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`} title="Camera Rotate"> <RotateCw size={16} /> </button>
+          </div>
+          <div className="flex justify-around">
+            {/* Gizmo Modes - Only active if we have a valid selection */}
+            <button
+              onClick={() => setGizmoMode("translate")}
+              className={`p-2 rounded ${gizmoMode === 'translate' ? 'bg-green-600' : 'bg-gray-700'} hover:bg-green-500`}
+              title="Move Object"
+            >
+              <Move size={16} color={gizmoMode === 'translate' ? 'white' : '#aaa'} />
+            </button>
+            <button
+              onClick={() => setGizmoMode("rotate")}
+              className={`p-2 rounded ${gizmoMode === 'rotate' ? 'bg-green-600' : 'bg-gray-700'} hover:bg-green-500`}
+              title="Rotate Object"
+            >
+              <RotateCw size={16} color={gizmoMode === 'rotate' ? 'white' : '#aaa'} />
+            </button>
+          </div>
         </div>
       </Html>
       {baseLinkId && <RecursiveLink linkId={baseLinkId} registerRef={registerRef} />}
-      {/* The transform gizmo is independent. Let's default it to translate. The user can cycle with 'e' key. */}
-      <TransformControls ref={transformControlsRef} onObjectChange={handleObjectChange} mode={"translate"} />
+
+      <TransformControls
+        ref={transformControlsRef}
+        onObjectChange={handleObjectChange}
+        mode={gizmoMode}
+        size={0.7}
+      />
     </>
   );
 };
