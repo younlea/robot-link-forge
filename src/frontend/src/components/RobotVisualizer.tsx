@@ -257,42 +257,92 @@ const useCollisionContext = (id: string) => {
   return set.has(id);
 };
 
-// --- Helper to visualize the collision box ---
-const CollisionBoxHelper: React.FC<{ objectRef: THREE.Object3D; scale: number; visible: boolean; color: string }> = ({ objectRef, scale, visible, color }) => {
-  const [box] = useState(() => new THREE.Box3());
+// --- Helper to create Proxy Cylinder Geometry ---
+const createProxyCylinder = (mesh: THREE.Mesh, scale: number): THREE.BufferGeometry | null => {
+  if (!mesh.geometry) return null;
+  if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+  const box = mesh.geometry.boundingBox;
+  if (!box) return null;
+
+  const size = new THREE.Vector3();
+  box.getSize(size);
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+
+  // Determine Axis
+  let radius = 0;
+  let height = 0;
+  let axis = 'z';
+
+  if (size.z >= size.x && size.z >= size.y) { // Z-up
+    height = size.z;
+    radius = Math.max(size.x, size.y) / 2;
+    axis = 'z';
+  } else if (size.y >= size.x && size.y >= size.z) { // Y-up
+    height = size.y;
+    radius = Math.max(size.x, size.z) / 2;
+    axis = 'y';
+  } else { // X-up
+    height = size.x;
+    radius = Math.max(size.y, size.z) / 2;
+    axis = 'x';
+  }
+
+  radius *= scale;
+  height *= scale;
+
+  // Create Cylinder (defaults to Y-aligned)
+  const geometry = new THREE.CylinderGeometry(radius, radius, height, 12);
+
+  // Align Axis
+  if (axis === 'z') {
+    geometry.rotateX(Math.PI / 2);
+  } else if (axis === 'x') {
+    geometry.rotateZ(Math.PI / 2);
+  }
+  // Offset to center
+  geometry.translate(center.x, center.y, center.z);
+
+  return geometry;
+};
+
+// --- Helper to visualize the collision cylinder (Proxy) ---
+const CollisionCylinderHelper: React.FC<{ objectRef: THREE.Object3D; scale: number; visible: boolean; color: string }> = ({ objectRef, scale, visible, color }) => {
+  const meshRef = useRef<THREE.Mesh>(null!);
 
   useFrame(() => {
-    if (!visible || !objectRef) return;
+    if (!visible || !objectRef || !meshRef.current) return;
 
-    // Find the mesh inside the objectRef (Group)
-    let mesh: THREE.Mesh | undefined;
-    if ((objectRef as THREE.Mesh).isMesh) {
-      mesh = objectRef as THREE.Mesh;
-    } else {
+    let targetMesh: THREE.Mesh | undefined;
+    if ((objectRef as THREE.Mesh).isMesh) targetMesh = objectRef as THREE.Mesh;
+    else {
       objectRef.traverse((child) => {
-        if ((child as THREE.Mesh).isMesh) {
-          if (!mesh) mesh = child as THREE.Mesh;
-        }
+        if ((child as THREE.Mesh).isMesh && !targetMesh) targetMesh = child as THREE.Mesh;
       });
     }
 
-    if (mesh) {
-      mesh.updateMatrixWorld();
-      box.setFromObject(mesh);
+    if (targetMesh) {
+      const proxyGeom = createProxyCylinder(targetMesh, scale);
+      if (proxyGeom) {
+        if (meshRef.current.geometry) meshRef.current.geometry.dispose();
+        meshRef.current.geometry = proxyGeom;
 
-      // Apply shrinkage
-      const center = new THREE.Vector3();
-      box.getCenter(center);
-      const size = new THREE.Vector3();
-      box.getSize(size);
-      size.multiplyScalar(scale);
-      box.setFromCenterAndSize(center, size);
+        // Match Transform
+        targetMesh.updateMatrixWorld();
+        meshRef.current.matrix.copy(targetMesh.matrixWorld);
+        // We must disable auto-update since we manually set the matrix
+        meshRef.current.matrixAutoUpdate = false;
+      }
     }
   });
 
   if (!visible) return null;
 
-  return <primitive object={new THREE.Box3Helper(box, new THREE.Color(color))} />;
+  return (
+    <mesh ref={meshRef}>
+      <meshBasicMaterial color={color} wireframe />
+    </mesh>
+  );
 };
 
 // --- Main Visualizer with Gizmo Logic ---
@@ -414,35 +464,36 @@ const RobotVisualizer: React.FC = () => {
 
         try {
           if (collisionMode === 'box') {
-            const box1 = new THREE.Box3().setFromObject(mesh1);
-            const box2 = new THREE.Box3().setFromObject(mesh2);
+            // CYLINDER MODE (Internally mapped to 'box' for now)
+            const geom1 = createProxyCylinder(mesh1, collisionBoxScale);
+            const geom2 = createProxyCylinder(mesh2, collisionBoxScale);
 
-            // Shrink boxes to be slightly smaller (e.g. 80% of original size)
-            // This prevents "grazing" or large AABB false positives
-            const shrinkBox = (box: THREE.Box3) => {
-              const center = new THREE.Vector3();
-              box.getCenter(center);
-              const size = new THREE.Vector3();
-              box.getSize(size);
-              size.multiplyScalar(0.8); // 80% size
-              box.setFromCenterAndSize(center, size);
-            };
+            if (geom1 && geom2) {
+              if (!geom1.boundsTree) geom1.computeBoundsTree!();
+              if (!geom2.boundsTree) geom2.computeBoundsTree!();
 
-            shrinkBox(box1);
-            shrinkBox(box2);
+              // Check intersection
+              // geom1 is in Local Space of mesh1.
+              // We need to check (mesh1 * geom1) vs (mesh2 * geom2).
+              // mesh1.matrixWorld transforms geom1 to World.
+              // matrix2to1 = mesh1.inv * mesh2.
+              const matrix2to1 = new THREE.Matrix4().copy(mesh1.matrixWorld).invert().multiply(mesh2.matrixWorld);
+              if (geom1.boundsTree && geom2.boundsTree) {
+                // intersection
+                if (geom1.boundsTree.intersectsGeometry(geom2, matrix2to1)) {
+                  intersection = true;
+                }
+              }
+              // Cleanup
+              geom1.dispose();
+              geom1.disposeBoundsTree!();
+              geom2.dispose();
+              geom2.disposeBoundsTree!();
+            }
 
-            if (box1.intersectsBox(box2)) intersection = true;
           } else if (collisionMode === 'mesh') {
-            // BVH Check
-            // Ensure geometry has bounds tree computed (lazy init)
             if (!mesh1.geometry.boundsTree) mesh1.geometry.computeBoundsTree!();
             if (!mesh2.geometry.boundsTree) mesh2.geometry.computeBoundsTree!();
-
-            // Use the built-in intersectsGeometry which transforms mesh2 into mesh1's space
-            // The type definitions might be tricky, checking docs pattern:
-            // bvh.intersectsGeometry(otherGeometry, otherMatrixFromLocalToWorld)
-            // But we need to account for both transforms. 
-            // Effectively: mesh1.geometry.boundsTree.intersectsGeometry(mesh2.geometry, mesh1.matrixWorld.invert() * mesh2.matrixWorld)
 
             if (mesh1.geometry.boundsTree && mesh2.geometry.boundsTree) {
               const matrix2to1 = new THREE.Matrix4().copy(mesh1.matrixWorld).invert().multiply(mesh2.matrixWorld);
@@ -476,7 +527,7 @@ const RobotVisualizer: React.FC = () => {
     if (collisionMode !== 'off') {
       checkCollisions();
     }
-  }, [joints, collisionMode, objectRefs]);
+  }, [joints, collisionMode, objectRefs, collisionBoxScale]);
 
   useEffect(() => {
     const controls = transformControlsRef.current;
@@ -634,7 +685,7 @@ const RobotVisualizer: React.FC = () => {
 
       {/* Debug render for collision boxes */}
       {collisionMode === 'box' && Array.from(objectRefs.entries()).map(([id, ref]) => (
-        <CollisionBoxHelper
+        <CollisionCylinderHelper
           key={id}
           objectRef={ref}
           scale={collisionBoxScale}
