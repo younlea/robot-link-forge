@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRobotStore } from '../store';
 import { RobotLink, RobotJoint, JointType } from '../types';
-import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, Upload, RotateCcw, Trash2, FilePlus } from 'lucide-react';
+import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, Upload, RotateCcw, Trash2, FilePlus, HelpCircle } from 'lucide-react';
+import HelpModal from './HelpModal';
 
 // --- Reusable Input Components (with fixes) ---
 const NumberInput = ({ label, value, onChange, step = 0.01 }: { label: string, value: number, onChange: (val: number) => void, step?: number }) => {
@@ -649,6 +650,7 @@ const Sidebar = () => {
     // State for Save/Load Modals
     const [showSaveModal, setShowSaveModal] = useState(false);
     const [showLoadModal, setShowLoadModal] = useState(false);
+    const [showHelpModal, setShowHelpModal] = useState(false);
     const [saveProjectName, setSaveProjectName] = useState('');
 
     const handleLoadClick = () => {
@@ -718,6 +720,9 @@ const Sidebar = () => {
 
     return (
         <>
+            {/* Help Modal */}
+            {showHelpModal && <HelpModal onClose={() => setShowHelpModal(false)} />}
+
             {/* Export Modal */}
             {showExportModal && (
                 <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-20">
@@ -835,17 +840,17 @@ const Sidebar = () => {
                 {/* File Operations */}
                 <div className="pb-4 mb-4 border-b border-gray-700">
                     <h2 className="text-xl font-bold">Robot Link Forge</h2>
-                    <div className="flex space-x-2 mt-2">
+                    <div className="flex flex-wrap gap-2 mt-2">
                         <button
                             onClick={() => { setSaveProjectName('MyRobot'); setShowSaveModal(true); }}
-                            className="flex-1 flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 p-2 rounded text-sm"
+                            className="flex-1 min-w-[30%] flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 p-2 rounded text-sm"
                         >
                             <Save className="mr-2 h-4 w-4" /> Save
                         </button>
 
                         <button
                             onClick={() => { getProjectList(); setShowLoadModal(true); }}
-                            className="flex-1 flex items-center justify-center bg-gray-600 hover:bg-gray-700 p-2 rounded text-sm"
+                            className="flex-1 min-w-[30%] flex items-center justify-center bg-gray-600 hover:bg-gray-700 p-2 rounded text-sm"
                         >
                             <FolderOpen className="mr-2 h-4 w-4" /> Load
                         </button>
@@ -856,10 +861,10 @@ const Sidebar = () => {
                             className="hidden"
                             accept=".zip,application/zip,.json,application/json"
                         />
-                        <div className="relative" ref={exportMenuRef}>
+                        <div className="relative flex-1 min-w-[30%]" ref={exportMenuRef}>
                             <button
                                 onClick={() => setExportMenuOpen(!isExportMenuOpen)}
-                                className="flex-1 flex items-center justify-center bg-green-600 hover:bg-green-700 p-2 rounded text-sm"
+                                className="w-full flex items-center justify-center bg-green-600 hover:bg-green-700 p-2 rounded text-sm"
                             >
                                 <Upload className="mr-2 h-4 w-4" /> Export
                             </button>
@@ -876,6 +881,14 @@ const Sidebar = () => {
                             title="New Project (Reset)"
                         >
                             <FilePlus className="h-4 w-4" />
+                        </button>
+
+                        <button
+                            onClick={() => setShowHelpModal(true)}
+                            className="flex-none flex items-center justify-center bg-blue-600 hover:bg-blue-700 p-2 rounded text-sm"
+                            title="User Guide / Help"
+                        >
+                            <HelpCircle className="h-4 w-4" />
                         </button>
                     </div>
                 </div>
