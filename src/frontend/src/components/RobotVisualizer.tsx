@@ -285,6 +285,8 @@ const RobotVisualizer: React.FC = () => {
 
   // --- Collision Logic ---
   const checkCollisions = () => {
+    if (collisionMode !== 'off') console.log("running collision check", collisionMode);
+
     if (collisionMode === 'off') {
       if (collidingLinks.size > 0) setCollidingLinks(new Set());
       return false;
@@ -415,6 +417,13 @@ const RobotVisualizer: React.FC = () => {
 
     return collisionSet.size > 0;
   };
+
+  // Effect to check collisions whenever joints change (covers Sidebar/Undo/Redo)
+  useEffect(() => {
+    if (collisionMode !== 'off') {
+      checkCollisions();
+    }
+  }, [joints, collisionMode, objectRefs]);
 
   useEffect(() => {
     const controls = transformControlsRef.current;
