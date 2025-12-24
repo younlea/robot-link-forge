@@ -603,25 +603,11 @@ const RobotVisualizer: React.FC = () => {
     // object.updateMatrixWorld(true); // force update down the tree?
 
     // 3. Check Collision
-    // We run the check. If it returns true, we REVERT.
-    const hasCollision = checkCollisions();
+    // We run the check to update the visual feedback (red color), but we DO NOT block movement.
+    // Blocking movement causes detailed deadlocks (can't move out of collision).
+    checkCollisions();
 
-    if (hasCollision) {
-      // If collision:
-      // 1. Do NOT update store.
-      // 2. The visual object is currently in the "bad" place because of TransformControls.
-      // 3. We should force it back? 
-      // Note: TransformControls is tricky. If we just don't update store, the object might snap back on next render?
-      // Actually, if we don't update store, the `useFrame` hook will reset the position/rotation to the OLD store value!
-      // So simply doing nothing here is synonymous with "reverting".
-      // HOWEVER, we want to update the visualization of RED color. `checkCollisions` called `setCollidingLinks`.
-      // We probably want to allow the user to see they are colliding?
-      // The user asked to "stop" (not move through).
-      // So we strictly DO NOT update the store.
-      return;
-    }
-
-    // If no collision, we commit the values
+    // Commit the values
     updateJoint(actualJointId, 'currentValues', proposedValues);
   }
 
