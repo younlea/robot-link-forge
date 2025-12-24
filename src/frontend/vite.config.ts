@@ -10,8 +10,8 @@ export default defineConfig({
   },
   optimizeDeps: {
     esbuildOptions: {
-        # Disable source maps for dependencies to avoid "No sources declared" warnings
-        sourcemap: false,
+      // Disable source maps for dependencies to avoid "No sources declared" warnings
+      sourcemap: false as boolean | 'inline' | 'external' | 'both',
     },
   },
   build: {
