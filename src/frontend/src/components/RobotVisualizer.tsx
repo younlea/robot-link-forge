@@ -71,7 +71,7 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef; isColl
     // Default small handle if no visual is set
     if (!joint.visual || joint.visual.type === 'none') {
       return (
-        <Sphere args={[0.02, 16, 16]} onClick={(e) => { e.stopPropagation(); selectItem(joint.id, 'joint'); }}>
+        <Sphere args={[0.02, 16, 16]} onClick={(e) => { e.stopPropagation(); selectItem(joint.id, 'joint'); }} userData={{ isVisual: true, ownerId: jointId }}>
           <meshStandardMaterial color={isColliding ? COLLISION_COLOR : (selectedItem.id === jointId ? HIGHLIGHT_COLOR : 'yellow')} />
         </Sphere>
       );
@@ -85,7 +85,7 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef; isColl
     if (type === 'mesh') {
       if (!meshUrl) return null;
       return (
-        <group onClick={clickHandler}>
+        <group onClick={clickHandler} userData={{ isVisual: true, ownerId: jointId }}>
           <STLMesh
             linkId={jointId}
             url={meshUrl}
@@ -97,7 +97,7 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef; isColl
       );
     }
 
-    const props = { onClick: clickHandler };
+    const props = { onClick: clickHandler, userData: { isVisual: true, ownerId: jointId } };
     const dims = dimensions || [0.05, 0.05, 0.05];
 
     switch (type) {
@@ -167,7 +167,7 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
     if (type === 'mesh') {
       if (!meshUrl) return null;
       return (
-        <group onClick={clickHandler}>
+        <group onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
           <STLMesh
             linkId={linkId}
             url={meshUrl}
@@ -181,6 +181,7 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
 
     const props = {
       onClick: clickHandler,
+      userData: { isVisual: true, ownerId: linkId }
     };
 
     switch (type) {
@@ -326,11 +327,33 @@ const RobotVisualizer: React.FC = () => {
 
         if (ignoredPairs.has(`${id1}+${id2}`)) continue;
 
-        // Traverse to find meshes
+        // Traverse to find meshes strictly owned by this ID
         let mesh1: THREE.Mesh | undefined;
         let mesh2: THREE.Mesh | undefined;
-        group1.traverse((child) => { if ((child as THREE.Mesh).isMesh) mesh1 = child as THREE.Mesh; });
-        group2.traverse((child) => { if ((child as THREE.Mesh).isMesh) mesh2 = child as THREE.Mesh; });
+
+        // Custom Traverse to find the visual owned by this ID
+        group1.traverse((child) => {
+          if (child.userData?.ownerId === id1) {
+            if ((child as THREE.Mesh).isMesh) mesh1 = child as THREE.Mesh;
+            // If it's a group (STL loader wrapper), check its children
+            if (child.type === 'Group') {
+              child.traverse((subChild) => {
+                if ((subChild as THREE.Mesh).isMesh) mesh1 = subChild as THREE.Mesh;
+              });
+            }
+          }
+        });
+
+        group2.traverse((child) => {
+          if (child.userData?.ownerId === id2) {
+            if ((child as THREE.Mesh).isMesh) mesh2 = child as THREE.Mesh;
+            if (child.type === 'Group') {
+              child.traverse((subChild) => {
+                if ((subChild as THREE.Mesh).isMesh) mesh2 = subChild as THREE.Mesh;
+              });
+            }
+          }
+        });
 
         if (!mesh1 || !mesh2) continue;
 
@@ -345,33 +368,40 @@ const RobotVisualizer: React.FC = () => {
         // Optimisation: Broadphase Bounding Sphere check first?
         const sphere1 = mesh1.geometry.boundingSphere?.clone().applyMatrix4(mesh1.matrixWorld);
         const sphere2 = mesh2.geometry.boundingSphere?.clone().applyMatrix4(mesh2.matrixWorld);
+
+        // Safety check to avoid crash if bounding sphere is null
         if (sphere1 && sphere2 && !sphere1.intersectsSphere(sphere2)) continue;
 
-        if (collisionMode === 'box') {
-          const box1 = new THREE.Box3().setFromObject(mesh1);
-          const box2 = new THREE.Box3().setFromObject(mesh2);
-          if (box1.intersectsBox(box2)) intersection = true;
-        } else if (collisionMode === 'mesh') {
-          // BVH Check
-          // Ensure geometry has bounds tree computed (lazy init)
-          if (!mesh1.geometry.boundsTree) mesh1.geometry.computeBoundsTree!();
-          if (!mesh2.geometry.boundsTree) mesh2.geometry.computeBoundsTree!();
+        try {
+          if (collisionMode === 'box') {
+            const box1 = new THREE.Box3().setFromObject(mesh1);
+            const box2 = new THREE.Box3().setFromObject(mesh2);
+            if (box1.intersectsBox(box2)) intersection = true;
+          } else if (collisionMode === 'mesh') {
+            // BVH Check
+            // Ensure geometry has bounds tree computed (lazy init)
+            if (!mesh1.geometry.boundsTree) mesh1.geometry.computeBoundsTree!();
+            if (!mesh2.geometry.boundsTree) mesh2.geometry.computeBoundsTree!();
 
-          // Use the built-in intersectsGeometry which transforms mesh2 into mesh1's space
-          if (mesh1.geometry.boundsTree && mesh2.geometry.boundsTree) {
+            // Use the built-in intersectsGeometry which transforms mesh2 into mesh1's space
             // The type definitions might be tricky, checking docs pattern:
             // bvh.intersectsGeometry(otherGeometry, otherMatrixFromLocalToWorld)
             // But we need to account for both transforms. 
             // Effectively: mesh1.geometry.boundsTree.intersectsGeometry(mesh2.geometry, mesh1.matrixWorld.invert() * mesh2.matrixWorld)
 
-            const matrix2to1 = new THREE.Matrix4().copy(mesh1.matrixWorld).invert().multiply(mesh2.matrixWorld);
-            if (mesh1.geometry.boundsTree.intersectsGeometry(mesh2.geometry, matrix2to1)) {
-              intersection = true;
+            if (mesh1.geometry.boundsTree && mesh2.geometry.boundsTree) {
+              const matrix2to1 = new THREE.Matrix4().copy(mesh1.matrixWorld).invert().multiply(mesh2.matrixWorld);
+              if (mesh1.geometry.boundsTree.intersectsGeometry(mesh2.geometry, matrix2to1)) {
+                intersection = true;
+              }
             }
           }
+        } catch (e) {
+          console.error("Collision check failed", e);
         }
 
         if (intersection) {
+          console.warn(`Collision detected between ${id1} and ${id2}`);
           collisionSet.add(id1);
           collisionSet.add(id2);
         }
