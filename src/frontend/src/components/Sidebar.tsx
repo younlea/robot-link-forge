@@ -168,15 +168,37 @@ const Checkbox = ({ label, checked, onChange }: { label: string, checked: boolea
     </label>
 )
 // --- JointSliderInput (New) ---
-const JointSliderInput = ({ label, value, min, max, step = 0.01, onChange }: { label: string, value: number, min: number, max: number, step?: number, onChange: (val: number) => void }) => {
-    const [strValue, setStrValue] = useState(value.toFixed(2));
+// --- JointSliderInput (New) ---
+const JointSliderInput = ({
+    label,
+    value,
+    min,
+    max,
+    step = 0.01,
+    onChange,
+    unit = "",
+    toUser = (v) => v,
+    fromUser = (v) => v
+}: {
+    label: string,
+    value: number,
+    min: number,
+    max: number,
+    step?: number,
+    onChange: (val: number) => void,
+    unit?: string,
+    toUser?: (v: number) => number,
+    fromUser?: (v: number) => number
+}) => {
+    // Initialize strValue based on the user-facing value
+    const [strValue, setStrValue] = useState(toUser(value).toFixed(2));
     const [isEditing, setIsEditing] = useState(false);
 
     useEffect(() => {
         if (!isEditing) {
-            setStrValue(value.toFixed(2));
+            setStrValue(toUser(value).toFixed(2));
         }
-    }, [value, isEditing]);
+    }, [value, isEditing, toUser]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setStrValue(e.target.value);
@@ -185,12 +207,15 @@ const JointSliderInput = ({ label, value, min, max, step = 0.01, onChange }: { l
     const commitValue = () => {
         let num = parseFloat(strValue);
         if (isNaN(num)) {
-            setStrValue(value.toFixed(2));
+            setStrValue(toUser(value).toFixed(2));
         } else {
-            // Clamp value
-            num = Math.min(Math.max(num, min), max);
-            onChange(num);
-            setStrValue(num.toFixed(2));
+            // Convert user input back to internal value
+            const internalVal = fromUser(num);
+            // Clamp value (internal limits)
+            const clamped = Math.min(Math.max(internalVal, min), max);
+            onChange(clamped);
+            // Update display string to match the clamped value
+            setStrValue(toUser(clamped).toFixed(2));
         }
         setIsEditing(false);
     };
@@ -206,15 +231,18 @@ const JointSliderInput = ({ label, value, min, max, step = 0.01, onChange }: { l
         <div className="mb-2">
             <div className="flex justify-between items-center mb-1">
                 <label className="text-xs text-gray-400">{label}</label>
-                <input
-                    type="text" // Use text to allow typing "-" or "." comfortably
-                    value={strValue}
-                    onChange={handleInputChange}
-                    onFocus={() => setIsEditing(true)}
-                    onBlur={commitValue}
-                    onKeyDown={handleKeyDown}
-                    className="w-16 bg-gray-900 rounded p-0.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
-                />
+                <div className="flex items-center">
+                    <input
+                        type="text"
+                        value={strValue}
+                        onChange={handleInputChange}
+                        onFocus={() => setIsEditing(true)}
+                        onBlur={commitValue}
+                        onKeyDown={handleKeyDown}
+                        className="w-16 bg-gray-900 rounded p-0.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    {unit && <span className="ml-1 text-xs text-gray-500">{unit}</span>}
+                </div>
             </div>
             <input
                 type="range"
@@ -554,6 +582,9 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                             max={joint.limits.roll.upper}
                             value={joint.currentValues.roll}
                             onChange={(v) => updateJoint(joint.id, 'currentValues.roll', v)}
+                            unit="°"
+                            toUser={(rad) => rad * 180 / Math.PI}
+                            fromUser={(deg) => deg * Math.PI / 180}
                         />
                     )}
 
@@ -564,6 +595,9 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                             max={joint.limits.pitch.upper}
                             value={joint.currentValues.pitch}
                             onChange={(v) => updateJoint(joint.id, 'currentValues.pitch', v)}
+                            unit="°"
+                            toUser={(rad) => rad * 180 / Math.PI}
+                            fromUser={(deg) => deg * Math.PI / 180}
                         />
                     )}
 
@@ -574,6 +608,9 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                             max={joint.limits.yaw.upper}
                             value={joint.currentValues.yaw}
                             onChange={(v) => updateJoint(joint.id, 'currentValues.yaw', v)}
+                            unit="°"
+                            toUser={(rad) => rad * 180 / Math.PI}
+                            fromUser={(deg) => deg * Math.PI / 180}
                         />
                     )}
 
@@ -584,6 +621,9 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                             max={joint.limits.displacement.upper}
                             value={joint.currentValues.displacement}
                             onChange={(v) => updateJoint(joint.id, 'currentValues.displacement', v)}
+                            unit="mm"
+                            toUser={(m) => m * 1000}
+                            fromUser={(mm) => mm / 1000}
                         />
                     )}
                 </div>
@@ -678,6 +718,9 @@ const GlobalJointController = () => {
                                 max={joint.limits.roll.upper}
                                 value={joint.currentValues.roll}
                                 onChange={(v) => updateJoint(joint.id, 'currentValues.roll', v)}
+                                unit="°"
+                                toUser={(rad) => rad * 180 / Math.PI}
+                                fromUser={(deg) => deg * Math.PI / 180}
                             />
                         )}
 
@@ -688,6 +731,9 @@ const GlobalJointController = () => {
                                 max={joint.limits.pitch.upper}
                                 value={joint.currentValues.pitch}
                                 onChange={(v) => updateJoint(joint.id, 'currentValues.pitch', v)}
+                                unit="°"
+                                toUser={(rad) => rad * 180 / Math.PI}
+                                fromUser={(deg) => deg * Math.PI / 180}
                             />
                         )}
 
@@ -698,6 +744,9 @@ const GlobalJointController = () => {
                                 max={joint.limits.yaw.upper}
                                 value={joint.currentValues.yaw}
                                 onChange={(v) => updateJoint(joint.id, 'currentValues.yaw', v)}
+                                unit="°"
+                                toUser={(rad) => rad * 180 / Math.PI}
+                                fromUser={(deg) => deg * Math.PI / 180}
                             />
                         )}
 
@@ -708,6 +757,9 @@ const GlobalJointController = () => {
                                 max={joint.limits.displacement.upper}
                                 value={joint.currentValues.displacement}
                                 onChange={(v) => updateJoint(joint.id, 'currentValues.displacement', v)}
+                                unit="mm"
+                                toUser={(m) => m * 1000}
+                                fromUser={(mm) => mm / 1000}
                             />
                         )}
 
