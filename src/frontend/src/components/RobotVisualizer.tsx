@@ -581,9 +581,23 @@ const RobotVisualizer: React.FC = () => {
     // 1. Calculate Proposed Values
     if (joint.type === 'rotational') {
       const euler = new THREE.Euler().setFromQuaternion(object.quaternion, 'ZYX');
-      if (joint.dof.yaw) proposedValues.yaw = clamp(euler.z, joint.limits.yaw.lower, joint.limits.yaw.upper);
-      if (joint.dof.pitch) proposedValues.pitch = clamp(euler.y, joint.limits.pitch.lower, joint.limits.pitch.upper);
-      if (joint.dof.roll) proposedValues.roll = clamp(euler.x, joint.limits.roll.lower, joint.limits.roll.upper);
+
+      const axis = controls.axis; // 'X', 'Y', 'Z' corresponding to Roll, Pitch, Yaw in local space (roughly)
+      // Note: TransformControls axis: X=Roll, Y=Pitch, Z=Yaw when aligned.
+      // We only update the value corresponding to the dragged handle to prevent Euler decomposition
+      // from flipping other values (gimbal lock/interaction issues).
+
+      if (axis === 'X' && joint.dof.roll) proposedValues.roll = clamp(euler.x, joint.limits.roll.lower, joint.limits.roll.upper);
+      if (axis === 'Y' && joint.dof.pitch) proposedValues.pitch = clamp(euler.y, joint.limits.pitch.lower, joint.limits.pitch.upper);
+      if (axis === 'Z' && joint.dof.yaw) proposedValues.yaw = clamp(euler.z, joint.limits.yaw.lower, joint.limits.yaw.upper);
+
+      // Fallback: If axis is null or weird (e.g. freemove), update all enabled
+      if (!axis || axis === 'XYZ') {
+        if (joint.dof.roll) proposedValues.roll = clamp(euler.x, joint.limits.roll.lower, joint.limits.roll.upper);
+        if (joint.dof.pitch) proposedValues.pitch = clamp(euler.y, joint.limits.pitch.lower, joint.limits.pitch.upper);
+        if (joint.dof.yaw) proposedValues.yaw = clamp(euler.z, joint.limits.yaw.lower, joint.limits.yaw.upper);
+      }
+
     } else if (joint.type === 'prismatic') {
       const pos = object.position;
       const axis = new THREE.Vector3(...joint.axis).normalize();
