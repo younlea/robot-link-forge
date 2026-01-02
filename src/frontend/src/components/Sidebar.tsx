@@ -293,7 +293,9 @@ const TextInput = ({ value, onChange, className }: { value: string, onChange: (v
 
 // --- Inspector for Links ---
 const LinkInspector = ({ link }: { link: RobotLink }) => {
-    const { updateLink, addJoint, uploadAndSetMesh, fitMeshToLink, deleteItem } = useRobotStore();
+    const { updateLink, addJoint, uploadAndSetMesh, fitMeshToLink, deleteItem, joints, updateJoint } = useRobotStore();
+    // Find parent joint (the joint that acts on this link)
+    const parentJoint = Object.values(joints).find(j => j.childLinkId === link.id);
     const stlInputRef = useRef<HTMLInputElement>(null);
 
     const handleStlUploadClick = () => stlInputRef.current?.click();
@@ -312,6 +314,63 @@ const LinkInspector = ({ link }: { link: RobotLink }) => {
                 <TextInput value={link.name} onChange={(val) => updateLink(link.id, 'name', val)}
                     className="text-lg font-bold bg-transparent focus:bg-gray-800 rounded p-1 -m-1 w-full" />
             </div>
+
+            {/* Parent Joint Control (Mirroring JointInspector) */}
+            {parentJoint && parentJoint.type !== 'fixed' && (
+                <div className="p-2 bg-blue-900/20 border border-blue-900/50 rounded space-y-2">
+                    <p className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">
+                        Parent Joint Control ({parentJoint.name})
+                    </p>
+                    {parentJoint.type === 'rotational' && parentJoint.dof.roll && (
+                        <JointSliderInput
+                            label="Roll"
+                            min={parentJoint.limits.roll.lower}
+                            max={parentJoint.limits.roll.upper}
+                            value={parentJoint.currentValues.roll}
+                            onChange={(v) => updateJoint(parentJoint.id, 'currentValues.roll', v)}
+                            unit="°"
+                            toUser={(rad) => rad * 180 / Math.PI}
+                            fromUser={(deg) => deg * Math.PI / 180}
+                        />
+                    )}
+                    {parentJoint.type === 'rotational' && parentJoint.dof.pitch && (
+                        <JointSliderInput
+                            label="Pitch"
+                            min={parentJoint.limits.pitch.lower}
+                            max={parentJoint.limits.pitch.upper}
+                            value={parentJoint.currentValues.pitch}
+                            onChange={(v) => updateJoint(parentJoint.id, 'currentValues.pitch', v)}
+                            unit="°"
+                            toUser={(rad) => rad * 180 / Math.PI}
+                            fromUser={(deg) => deg * Math.PI / 180}
+                        />
+                    )}
+                    {parentJoint.type === 'rotational' && parentJoint.dof.yaw && (
+                        <JointSliderInput
+                            label="Yaw"
+                            min={parentJoint.limits.yaw.lower}
+                            max={parentJoint.limits.yaw.upper}
+                            value={parentJoint.currentValues.yaw}
+                            onChange={(v) => updateJoint(parentJoint.id, 'currentValues.yaw', v)}
+                            unit="°"
+                            toUser={(rad) => rad * 180 / Math.PI}
+                            fromUser={(deg) => deg * Math.PI / 180}
+                        />
+                    )}
+                    {parentJoint.type === 'prismatic' && (
+                        <JointSliderInput
+                            label="Displacement"
+                            min={parentJoint.limits.displacement.lower}
+                            max={parentJoint.limits.displacement.upper}
+                            value={parentJoint.currentValues.displacement}
+                            onChange={(v) => updateJoint(parentJoint.id, 'currentValues.displacement', v)}
+                            unit="mm"
+                            toUser={(m) => m * 1000}
+                            fromUser={(mm) => mm / 1000}
+                        />
+                    )}
+                </div>
+            )}
 
             {/* Visuals Section */}
             <div className="p-2 bg-gray-900/50 rounded space-y-3">
