@@ -167,8 +167,68 @@ const Checkbox = ({ label, checked, onChange }: { label: string, checked: boolea
         <span className="text-sm">{label}</span>
     </label>
 )
+// --- JointSliderInput (New) ---
+const JointSliderInput = ({ label, value, min, max, step = 0.01, onChange }: { label: string, value: number, min: number, max: number, step?: number, onChange: (val: number) => void }) => {
+    const [strValue, setStrValue] = useState(value.toFixed(2));
+    const [isEditing, setIsEditing] = useState(false);
 
-// --- TextInput for IME Support ---
+    useEffect(() => {
+        if (!isEditing) {
+            setStrValue(value.toFixed(2));
+        }
+    }, [value, isEditing]);
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setStrValue(e.target.value);
+    };
+
+    const commitValue = () => {
+        let num = parseFloat(strValue);
+        if (isNaN(num)) {
+            setStrValue(value.toFixed(2));
+        } else {
+            // Clamp value
+            num = Math.min(Math.max(num, min), max);
+            onChange(num);
+            setStrValue(num.toFixed(2));
+        }
+        setIsEditing(false);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Enter') {
+            commitValue();
+            e.currentTarget.blur();
+        }
+    };
+
+    return (
+        <div className="mb-2">
+            <div className="flex justify-between items-center mb-1">
+                <label className="text-xs text-gray-400">{label}</label>
+                <input
+                    type="text" // Use text to allow typing "-" or "." comfortably
+                    value={strValue}
+                    onChange={handleInputChange}
+                    onFocus={() => setIsEditing(true)}
+                    onBlur={commitValue}
+                    onKeyDown={handleKeyDown}
+                    className="w-16 bg-gray-900 rounded p-0.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+            </div>
+            <input
+                type="range"
+                min={min}
+                max={max}
+                step={step}
+                value={value}
+                onChange={(e) => onChange(parseFloat(e.target.value))}
+                className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+            />
+        </div>
+    );
+};
+
 const TextInput = ({ value, onChange, className }: { value: string, onChange: (val: string) => void, className?: string }) => {
     const [localValue, setLocalValue] = useState(value);
 
@@ -488,29 +548,44 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                     <p className="text-sm font-semibold">Test Driver</p>
 
                     {joint.type === 'rotational' && joint.dof.roll && (
-
-                        <div><label className="text-xs">Roll</label><input type="range" min={joint.limits.roll.lower} max={joint.limits.roll.upper} step={0.01} value={joint.currentValues.roll} onChange={e => updateJoint(joint.id, 'currentValues.roll', parseFloat(e.target.value))} className="w-full" /></div>
-
+                        <JointSliderInput
+                            label="Roll"
+                            min={joint.limits.roll.lower}
+                            max={joint.limits.roll.upper}
+                            value={joint.currentValues.roll}
+                            onChange={(v) => updateJoint(joint.id, 'currentValues.roll', v)}
+                        />
                     )}
 
                     {joint.type === 'rotational' && joint.dof.pitch && (
-
-                        <div><label className="text-xs">Pitch</label><input type="range" min={joint.limits.pitch.lower} max={joint.limits.pitch.upper} step={0.01} value={joint.currentValues.pitch} onChange={e => updateJoint(joint.id, 'currentValues.pitch', parseFloat(e.target.value))} className="w-full" /></div>
-
+                        <JointSliderInput
+                            label="Pitch"
+                            min={joint.limits.pitch.lower}
+                            max={joint.limits.pitch.upper}
+                            value={joint.currentValues.pitch}
+                            onChange={(v) => updateJoint(joint.id, 'currentValues.pitch', v)}
+                        />
                     )}
 
                     {joint.type === 'rotational' && joint.dof.yaw && (
-
-                        <div><label className="text-xs">Yaw</label><input type="range" min={joint.limits.yaw.lower} max={joint.limits.yaw.upper} step={0.01} value={joint.currentValues.yaw} onChange={e => updateJoint(joint.id, 'currentValues.yaw', parseFloat(e.target.value))} className="w-full" /></div>
-
+                        <JointSliderInput
+                            label="Yaw"
+                            min={joint.limits.yaw.lower}
+                            max={joint.limits.yaw.upper}
+                            value={joint.currentValues.yaw}
+                            onChange={(v) => updateJoint(joint.id, 'currentValues.yaw', v)}
+                        />
                     )}
 
                     {joint.type === 'prismatic' && (
-
-                        <div><label className="text-xs">Displacement</label><input type="range" min={joint.limits.displacement.lower} max={joint.limits.displacement.upper} step={0.01} value={joint.currentValues.displacement} onChange={e => updateJoint(joint.id, 'currentValues.displacement', parseFloat(e.target.value))} className="w-full" /></div>
-
+                        <JointSliderInput
+                            label="Displacement"
+                            min={joint.limits.displacement.lower}
+                            max={joint.limits.displacement.upper}
+                            value={joint.currentValues.displacement}
+                            onChange={(v) => updateJoint(joint.id, 'currentValues.displacement', v)}
+                        />
                     )}
-
                 </div>
 
             )}
@@ -597,27 +672,43 @@ const GlobalJointController = () => {
                     <div className="space-y-2">
 
                         {joint.type === 'rotational' && joint.dof.roll && (
-
-                            <div><label className="text-xs flex justify-between"><span>Roll</span> <span>{joint.currentValues.roll.toFixed(2)}</span></label><input type="range" min={joint.limits.roll.lower} max={joint.limits.roll.upper} step={0.01} value={joint.currentValues.roll} onChange={e => updateJoint(joint.id, 'currentValues.roll', parseFloat(e.target.value))} className="w-full" /></div>
-
+                            <JointSliderInput
+                                label="Roll"
+                                min={joint.limits.roll.lower}
+                                max={joint.limits.roll.upper}
+                                value={joint.currentValues.roll}
+                                onChange={(v) => updateJoint(joint.id, 'currentValues.roll', v)}
+                            />
                         )}
 
                         {joint.type === 'rotational' && joint.dof.pitch && (
-
-                            <div><label className="text-xs flex justify-between"><span>Pitch</span> <span>{joint.currentValues.pitch.toFixed(2)}</span></label><input type="range" min={joint.limits.pitch.lower} max={joint.limits.pitch.upper} step={0.01} value={joint.currentValues.pitch} onChange={e => updateJoint(joint.id, 'currentValues.pitch', parseFloat(e.target.value))} className="w-full" /></div>
-
+                            <JointSliderInput
+                                label="Pitch"
+                                min={joint.limits.pitch.lower}
+                                max={joint.limits.pitch.upper}
+                                value={joint.currentValues.pitch}
+                                onChange={(v) => updateJoint(joint.id, 'currentValues.pitch', v)}
+                            />
                         )}
 
                         {joint.type === 'rotational' && joint.dof.yaw && (
-
-                            <div><label className="text-xs flex justify-between"><span>Yaw</span> <span>{joint.currentValues.yaw.toFixed(2)}</span></label><input type="range" min={joint.limits.yaw.lower} max={joint.limits.yaw.upper} step={0.01} value={joint.currentValues.yaw} onChange={e => updateJoint(joint.id, 'currentValues.yaw', parseFloat(e.target.value))} className="w-full" /></div>
-
+                            <JointSliderInput
+                                label="Yaw"
+                                min={joint.limits.yaw.lower}
+                                max={joint.limits.yaw.upper}
+                                value={joint.currentValues.yaw}
+                                onChange={(v) => updateJoint(joint.id, 'currentValues.yaw', v)}
+                            />
                         )}
 
                         {joint.type === 'prismatic' && (
-
-                            <div><label className="text-xs flex justify-between"><span>Displacement</span> <span>{joint.currentValues.displacement.toFixed(2)}</span></label><input type="range" min={joint.limits.displacement.lower} max={joint.limits.displacement.upper} step={0.01} value={joint.currentValues.displacement} onChange={e => updateJoint(joint.id, 'currentValues.displacement', parseFloat(e.target.value))} className="w-full" /></div>
-
+                            <JointSliderInput
+                                label="Displacement"
+                                min={joint.limits.displacement.lower}
+                                max={joint.limits.displacement.upper}
+                                value={joint.currentValues.displacement}
+                                onChange={(v) => updateJoint(joint.id, 'currentValues.displacement', v)}
+                            />
                         )}
 
                     </div>
