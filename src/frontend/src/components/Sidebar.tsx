@@ -178,7 +178,8 @@ const JointSliderInput = ({
     onChange,
     unit = "",
     toUser = (v) => v,
-    fromUser = (v) => v
+    fromUser = (v) => v,
+    autoFocus = false
 }: {
     label: string,
     value: number,
@@ -188,7 +189,8 @@ const JointSliderInput = ({
     onChange: (val: number) => void,
     unit?: string,
     toUser?: (v: number) => number,
-    fromUser?: (v: number) => number
+    fromUser?: (v: number) => number,
+    autoFocus?: boolean
 }) => {
     // Initialize strValue based on the user-facing value
     const [strValue, setStrValue] = useState(toUser(value).toFixed(2));
@@ -239,6 +241,7 @@ const JointSliderInput = ({
                         onFocus={() => setIsEditing(true)}
                         onBlur={commitValue}
                         onKeyDown={handleKeyDown}
+                        autoFocus={autoFocus}
                         className="w-16 bg-gray-900 rounded p-0.5 text-xs text-right focus:outline-none focus:ring-1 focus:ring-blue-500"
                     />
                     {unit && <span className="ml-1 text-xs text-gray-500">{unit}</span>}
@@ -392,6 +395,64 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                 <TextInput value={joint.name} onChange={(val) => updateJoint(joint.id, 'name', val)}
                     className="text-lg font-bold bg-transparent focus:bg-gray-800 rounded p-1 -m-1 w-full" />
             </div>
+
+            {joint.type !== 'fixed' && (
+                <div className="p-2 bg-blue-900/20 border border-blue-900/50 rounded space-y-2">
+                    <p className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">Joint Control</p>
+                    {joint.type === 'rotational' && joint.dof.roll && (
+                        <JointSliderInput
+                            label="Roll"
+                            min={joint.limits.roll.lower}
+                            max={joint.limits.roll.upper}
+                            value={joint.currentValues.roll}
+                            onChange={(v) => updateJoint(joint.id, 'currentValues.roll', v)}
+                            unit="°"
+                            toUser={(rad) => rad * 180 / Math.PI}
+                            fromUser={(deg) => deg * Math.PI / 180}
+                            autoFocus={true}
+                        />
+                    )}
+                    {joint.type === 'rotational' && joint.dof.pitch && (
+                        <JointSliderInput
+                            label="Pitch"
+                            min={joint.limits.pitch.lower}
+                            max={joint.limits.pitch.upper}
+                            value={joint.currentValues.pitch}
+                            onChange={(v) => updateJoint(joint.id, 'currentValues.pitch', v)}
+                            unit="°"
+                            toUser={(rad) => rad * 180 / Math.PI}
+                            fromUser={(deg) => deg * Math.PI / 180}
+                            autoFocus={!joint.dof.roll}
+                        />
+                    )}
+                    {joint.type === 'rotational' && joint.dof.yaw && (
+                        <JointSliderInput
+                            label="Yaw"
+                            min={joint.limits.yaw.lower}
+                            max={joint.limits.yaw.upper}
+                            value={joint.currentValues.yaw}
+                            onChange={(v) => updateJoint(joint.id, 'currentValues.yaw', v)}
+                            unit="°"
+                            toUser={(rad) => rad * 180 / Math.PI}
+                            fromUser={(deg) => deg * Math.PI / 180}
+                            autoFocus={!joint.dof.roll && !joint.dof.pitch}
+                        />
+                    )}
+                    {joint.type === 'prismatic' && (
+                        <JointSliderInput
+                            label="Displacement"
+                            min={joint.limits.displacement.lower}
+                            max={joint.limits.displacement.upper}
+                            value={joint.currentValues.displacement}
+                            onChange={(v) => updateJoint(joint.id, 'currentValues.displacement', v)}
+                            unit="mm"
+                            toUser={(m) => m * 1000}
+                            fromUser={(mm) => mm / 1000}
+                            autoFocus={true}
+                        />
+                    )}
+                </div>
+            )}
 
             <Vector3Input label="Origin XYZ" value={joint.origin?.xyz || [0, 0, 0]} onChange={(p, v) => updateJoint(joint.id, `origin.xyz${p.substring(p.indexOf('['))}`, v)} path="xyz" />
             <Vector3RadianDegreeInput label="Origin RPY" value={joint.origin?.rpy || [0, 0, 0]} onChange={(p, v) => updateJoint(joint.id, `origin.rpy${p.substring(p.indexOf('['))}`, v)} path="rpy" />
@@ -569,66 +630,7 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
 
 
 
-            {joint.type !== 'fixed' && (
 
-                <div className="p-2 bg-gray-900/50 rounded space-y-2">
-
-                    <p className="text-sm font-semibold">Test Driver</p>
-
-                    {joint.type === 'rotational' && joint.dof.roll && (
-                        <JointSliderInput
-                            label="Roll"
-                            min={joint.limits.roll.lower}
-                            max={joint.limits.roll.upper}
-                            value={joint.currentValues.roll}
-                            onChange={(v) => updateJoint(joint.id, 'currentValues.roll', v)}
-                            unit="°"
-                            toUser={(rad) => rad * 180 / Math.PI}
-                            fromUser={(deg) => deg * Math.PI / 180}
-                        />
-                    )}
-
-                    {joint.type === 'rotational' && joint.dof.pitch && (
-                        <JointSliderInput
-                            label="Pitch"
-                            min={joint.limits.pitch.lower}
-                            max={joint.limits.pitch.upper}
-                            value={joint.currentValues.pitch}
-                            onChange={(v) => updateJoint(joint.id, 'currentValues.pitch', v)}
-                            unit="°"
-                            toUser={(rad) => rad * 180 / Math.PI}
-                            fromUser={(deg) => deg * Math.PI / 180}
-                        />
-                    )}
-
-                    {joint.type === 'rotational' && joint.dof.yaw && (
-                        <JointSliderInput
-                            label="Yaw"
-                            min={joint.limits.yaw.lower}
-                            max={joint.limits.yaw.upper}
-                            value={joint.currentValues.yaw}
-                            onChange={(v) => updateJoint(joint.id, 'currentValues.yaw', v)}
-                            unit="°"
-                            toUser={(rad) => rad * 180 / Math.PI}
-                            fromUser={(deg) => deg * Math.PI / 180}
-                        />
-                    )}
-
-                    {joint.type === 'prismatic' && (
-                        <JointSliderInput
-                            label="Displacement"
-                            min={joint.limits.displacement.lower}
-                            max={joint.limits.displacement.upper}
-                            value={joint.currentValues.displacement}
-                            onChange={(v) => updateJoint(joint.id, 'currentValues.displacement', v)}
-                            unit="mm"
-                            toUser={(m) => m * 1000}
-                            fromUser={(mm) => mm / 1000}
-                        />
-                    )}
-                </div>
-
-            )}
 
 
 
