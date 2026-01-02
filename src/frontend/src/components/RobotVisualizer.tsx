@@ -72,7 +72,7 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef; isColl
     if (!joint.visual || joint.visual.type === 'none') {
       return (
         <Sphere args={[0.02, 16, 16]} onClick={(e) => { e.stopPropagation(); selectItem(joint.id, 'joint'); }} userData={{ isVisual: true, ownerId: jointId }}>
-          <meshStandardMaterial color={isColliding ? COLLISION_COLOR : (selectedItem.id === jointId ? HIGHLIGHT_COLOR : 'yellow')} />
+          <meshStandardMaterial color={isColliding ? COLLISION_COLOR : (selectedItem.id === jointId ? HIGHLIGHT_COLOR : 'yellow')} side={THREE.DoubleSide} />
         </Sphere>
       );
     }
@@ -102,11 +102,11 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef; isColl
 
     switch (type) {
       case 'box':
-        return <Box {...props} args={dims as [number, number, number]}><meshStandardMaterial color={materialColor} /></Box>;
+        return <Box {...props} args={dims as [number, number, number]}><meshStandardMaterial color={materialColor} side={THREE.DoubleSide} /></Box>;
       case 'cylinder':
-        return <Cylinder {...props} args={[dims[0], dims[0], dims[1], 16]}><meshStandardMaterial color={materialColor} /></Cylinder>;
+        return <Cylinder {...props} args={[dims[0], dims[0], dims[1], 16]}><meshStandardMaterial color={materialColor} side={THREE.DoubleSide} /></Cylinder>;
       case 'sphere':
-        return <Sphere {...props} args={[dims[0], 16, 16]}><meshStandardMaterial color={materialColor} /></Sphere>;
+        return <Sphere {...props} args={[dims[0], 16, 16]}><meshStandardMaterial color={materialColor} side={THREE.DoubleSide} /></Sphere>;
       default: return null;
     }
   };
@@ -187,7 +187,7 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
     switch (type) {
       case 'box':
         return <Box {...props} args={dimensions as [number, number, number]} >
-          <meshStandardMaterial color={materialColor} />
+          <meshStandardMaterial color={materialColor} side={THREE.DoubleSide} />
         </Box>;
 
       case 'cylinder': {
@@ -216,7 +216,7 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
             return (
               <group position={midPoint} quaternion={orientation}>
                 <Cylinder args={cylinderArgs} {...props}>
-                  <meshStandardMaterial color={materialColor} />
+                  <meshStandardMaterial color={materialColor} side={THREE.DoubleSide} />
                 </Cylinder>
               </group>
             );
@@ -226,13 +226,13 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
         const length = dimensions[1] || 0.5;
         const cylinderProps: [number, number, number, number] = [radius, radius, length, 16];
         return <Cylinder {...props} args={cylinderProps} position={[0, length / 2, 0]} >
-          <meshStandardMaterial color={materialColor} />
+          <meshStandardMaterial color={materialColor} side={THREE.DoubleSide} />
         </Cylinder>;
       }
 
       case 'sphere':
         return <Sphere {...props} args={[(dimensions[0] || 0.1), 32, 32]} >
-          <meshStandardMaterial color={materialColor} />
+          <meshStandardMaterial color={materialColor} side={THREE.DoubleSide} />
         </Sphere>;
 
       default: return null;

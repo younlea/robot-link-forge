@@ -27,6 +27,7 @@ function LoadedMesh({ url, scale, origin, color, linkId }: STLMeshProps) {
       // We compute the bounding box and store its size in our global state.
       // This is crucial for the "Fit to Link" functionality.
       geom.computeBoundingBox();
+      geom.computeBoundsTree(); // Compute BVH for accelerated raycasting
       const box = geom.boundingBox;
       if (box) {
         const size = box.getSize(new THREE.Vector3());
@@ -43,7 +44,7 @@ function LoadedMesh({ url, scale, origin, color, linkId }: STLMeshProps) {
     <group position={groupPosition} rotation={groupRotation} scale={scale || [1, 1, 1]}>
       <mesh>
         <primitive object={geom} attach="geometry" />
-        <meshStandardMaterial color={color || '#ff8800'} />
+        <meshStandardMaterial color={color || '#ff8800'} side={THREE.DoubleSide} />
       </mesh>
     </group>
   );
