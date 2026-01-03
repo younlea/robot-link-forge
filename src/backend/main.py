@@ -368,7 +368,127 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
         if parent_link_id not in unique_link_names:
              continue
         parent_link_name = unique_link_names[parent_link_id]
-# ... rest of generate_urdf_xml remains similar, just remove the top block ...
+        # Ensure childJoints is iterable
+        child_joints = robot_data.links[parent_link_id].childJoints or []
+        
+        for joint_id in child_joints:
+            if joint_id in processed_joints:
+                continue
+            
+            joint = robot_data.joints.get(joint_id)
+            # Check for missing child link in JOINT definition
+            if not joint or not joint.childLinkId:
+                continue
+            
+            # CRITICAL CHECK: Does the child link actually EXIST?
+            child_link_id = joint.childLinkId
+            if child_link_id not in unique_link_names:
+                 print(f"Warning: Joint {joint_id} points to non-existent Child Link {child_link_id}")
+                 continue
+
+            processed_joints.add(joint_id)
+            
+            if child_link_id in processed_links:
+                continue
+            
+            child_link_name = unique_link_names[child_link_id]
+            processed_links.add(child_link_id)
+            q.append(child_link_id)
+
+            # --- Link XML for Child ---
+            links_xml += _generate_link_xml(child_link_id, child_link_name, robot_data, robot_name, mesh_files)
+
+            # Determine Active DOFs
+            active_rotations = []
+            if joint.type == 'rotational':
+                if joint.dof.roll: active_rotations.append(('roll', '1 0 0', joint.limits['roll']))
+                if joint.dof.pitch: active_rotations.append(('pitch', '0 1 0', joint.limits['pitch']))
+                if joint.dof.yaw: active_rotations.append(('yaw', '0 0 1', joint.limits['yaw']))
+            
+            # Identify Prismatic vs Fixed loops for generic handling
+            sub_joints = []
+            if joint.type == 'rotational' and active_rotations:
+                # Multi-DOF (or Single-DOF) Rotational
+                for dof_name, axis_val, limit_val in active_rotations:
+                    sub_joints.append({
+                        'type': 'revolute',
+                        'suffix': dof_name,
+                        'axis': axis_val,
+                        'limit': limit_val
+                    })
+            elif joint.type == 'prismatic':
+                 axis_str = " ".join(map(str, joint.axis)) if joint.axis else "1 0 0"
+                 sub_joints.append({
+                     'type': 'prismatic',
+                     'suffix': 'prism',
+                     'axis': axis_str,
+                     'limit': joint.limits['displacement']
+                 })
+            else:
+                 # Fixed or empty rotational
+                 sub_joints.append({
+                     'type': 'fixed',
+                     'suffix': 'fixed',
+                     'axis': '0 0 0',
+                     'limit': None
+                 })
+
+            # Base name for constructing unique joint names
+            current_parent_link = parent_link_name
+            base_joint_unique_id = f"{to_snake_case(joint.name)}_{joint.id[:6]}"
+            
+            # Iterate through sub-joints (Decomposition)
+            for i, sub in enumerate(sub_joints):
+                is_last = (i == len(sub_joints) - 1)
+                is_first = (i == 0)
+                
+                # Determine Name
+                raw_name = f"{base_joint_unique_id}_{sub['suffix']}"
+                # Ensure uniqueness globally
+                final_joint_name = raw_name
+                ctr = 1
+                while final_joint_name in generated_joint_names:
+                    final_joint_name = f"{raw_name}_{ctr}"
+                    ctr += 1
+                generated_joint_names.add(final_joint_name)
+                
+                # Determine Child Link
+                if is_last:
+                    current_child_link = child_link_name
+                else:
+                    # Create Dummy Link
+                    dummy_link_name = f"dummy_{final_joint_name}_link"
+                    links_xml += f'  <link name="{dummy_link_name}">\n'
+                    links_xml += f'    <inertial><mass value="0.001"/><inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/></inertial>\n'
+                    links_xml += f'  </link>\n'
+                    current_child_link = dummy_link_name
+
+                # XML Generation
+                joints_xml += f'  <joint name="{final_joint_name}" type="{sub["type"]}">\n'
+                joints_xml += f'    <parent link="{current_parent_link}"/>\n'
+                joints_xml += f'    <child link="{current_child_link}"/>\n'
+                
+                # Origin: Only the First joint uses the structural origin. Others are 0 0 0.
+                if is_first:
+                    converted_origin_rpy = convert_euler_xyz_to_zyx(joint.origin.rpy)
+                    joints_xml += f'    <origin xyz="{" ".join(map(str, joint.origin.xyz))}" rpy="{" ".join(map(str, converted_origin_rpy))}"/>\n'
+                else:
+                    joints_xml += f'    <origin xyz="0 0 0" rpy="0 0 0"/>\n'
+                
+                # Axis & Limit (if applicable)
+                if sub['type'] != 'fixed':
+                    joints_xml += f'    <axis xyz="{sub["axis"]}"/>\n'
+                    if sub['limit']:
+                        joints_xml += f'    <limit lower="{sub["limit"].lower}" upper="{sub["limit"].upper}" effort="10" velocity="1.0"/>\n'
+                    else:
+                        joints_xml += f'    <limit lower="-3.14" upper="3.14" effort="10" velocity="1.0"/>\n'
+                
+                joints_xml += '  </joint>\n\n'
+                
+                # Advance parent
+                current_parent_link = current_child_link
+ 
+    return f'<robot name="{robot_name}">\n{links_xml}{joints_xml}</robot>', base_link_name
 
 @app.post("/api/export-urdf")
 async def export_urdf_package(
