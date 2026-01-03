@@ -43,7 +43,7 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef; isColl
     if (!originGroupRef.current || !motionGroupRef.current) return;
 
     originGroupRef.current.position.set(...(joint.origin?.xyz || [0, 0, 0]));
-    originGroupRef.current.rotation.set((joint.origin?.rpy?.[0] || 0), (joint.origin?.rpy?.[1] || 0), (joint.origin?.rpy?.[2] || 0), 'ZYX');
+    originGroupRef.current.rotation.set(...(joint.origin?.rpy || [0, 0, 0]));
 
     const motionGroup = motionGroupRef.current;
     if (joint.type === 'rotational') {
