@@ -551,8 +551,12 @@ async def export_urdf_package(
     if files:
         for file in files:
             form_field_name = file.filename
-            link_id = form_field_name.replace('mesh_', '')
-
+            # Robustly parse link_id
+            if form_field_name and form_field_name.startswith('mesh_'):
+                link_id = form_field_name[5:] 
+            else:
+                link_id = form_field_name
+            
             if link_id in robot.links:
                 # FIX: Append link ID snippet to partial name to ensure uniqueness
                 safe_filename = f"{to_snake_case(robot.links[link_id].name)}_{link_id[:6]}.stl"
