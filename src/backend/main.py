@@ -843,16 +843,26 @@ async def export_urdf_package_ros2(
         os.makedirs(mesh_dir, exist_ok=True)
         os.makedirs(launch_dir, exist_ok=True)
         os.makedirs(rviz_dir, exist_ok=True)
+        os.makedirs(rviz_dir, exist_ok=True)
+        
+        # Pre-calculate unique names for consistent file mapping and URDF naming
+        unique_link_names = generate_unique_names(robot)
+
         # Process and save mesh files
         mesh_files_map = {}
         if files:
             for file in files:
                 form_field_name = file.filename
-                link_id = form_field_name.replace('mesh_', '')
-
+                # Robustly parse link_id
+                if form_field_name and form_field_name.startswith('mesh_'):
+                    link_id = form_field_name[5:] 
+                else:
+                    link_id = form_field_name
+                
                 if link_id in robot.links:
-                    # FIX: Append link ID snippet to partial name to ensure uniqueness
-                    safe_filename = f"{to_snake_case(robot.links[link_id].name)}_{link_id[:6]}.stl"
+                    # Use clean unique name for file (e.g. leg_1.stl)
+                    clean_name = unique_link_names[link_id]
+                    safe_filename = f"{clean_name}.stl"
                     file_path = os.path.join(mesh_dir, safe_filename)
                     
                     with open(file_path, "wb") as f:
@@ -861,7 +871,7 @@ async def export_urdf_package_ros2(
                     mesh_files_map[link_id] = safe_filename
 
         # Generate and save URDF file
-        urdf_content, base_link_name = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map)
+        urdf_content, base_link_name = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
         with open(os.path.join(urdf_dir, f"{sanitized_robot_name}.urdf"), "w") as f:
             f.write(urdf_content)
 
