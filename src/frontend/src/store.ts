@@ -816,7 +816,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                 return;
             }
 
-            const safeRobotName = robotName.replace(/[^a-zA-Z0-9]/g, '_');
+            // safeRobotName is already declared above
             const fileName = `${safeRobotName}_ros2_package.zip`;
 
             console.log("URDF Export: Triggering download for", fileName);
