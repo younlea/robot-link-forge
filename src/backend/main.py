@@ -297,15 +297,41 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
     
     return link_xml
 
-def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str]) -> Tuple[str, str]:
-    """Generates the URDF XML content and returns (urdf_string, base_link_name)."""
 
-    # Generate unique, valid names for all links first to ensure consistency.
+def generate_unique_names(robot_data: RobotData) -> Dict[str, str]:
+    """Generates a mapping of link_id -> unique_clean_name."""
     unique_link_names = {}
     used_names = set()
 
-    for link_id, link in robot_data.links.items():
-        base_name = f"{to_snake_case(link.name)}_{link.id[:6]}"
+    # Pre-sort IDs to ensure deterministic order (e.g. by creation time if implied, or just stable ID sort)
+    # Since IDs are UUIDs, sorting by them is effectively random but stable.
+    # Ideally we'd traverse the tree, but flat list is fine for uniqueness.
+    # Tree traversal order is better for "link_1, link_2" numbering to match hierarchy.
+    
+    # Do a BFS traversal to give meaningful sequential numbers
+    sorted_ids = []
+    q = [robot_data.baseLinkId]
+    visited = {robot_data.baseLinkId}
+    while q:
+        curr = q.pop(0)
+        sorted_ids.append(curr)
+        if curr in robot_data.links:
+             for child_joint in robot_data.links[curr].childJoints:
+                 joint = robot_data.joints.get(child_joint)
+                 if joint and joint.childLinkId and joint.childLinkId not in visited:
+                     visited.add(joint.childLinkId)
+                     q.append(joint.childLinkId)
+    
+    # Add any disconnected links (if any) at the end
+    for lid in robot_data.links:
+        if lid not in visited:
+            sorted_ids.append(lid)
+
+    for link_id in sorted_ids:
+        link = robot_data.links[link_id]
+        base_name = to_snake_case(link.name)
+        if not base_name: base_name = "link"
+        
         final_name = base_name
         counter = 1
         while final_name in used_names:
@@ -315,9 +341,12 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
         unique_link_names[link_id] = final_name
         used_names.add(final_name)
     
+    return unique_link_names
+
+def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str], unique_link_names: Dict[str, str]) -> Tuple[str, str]:
+    """Generates the URDF XML content and returns (urdf_string, base_link_name)."""
+
     if robot_data.baseLinkId not in unique_link_names:
-         # Fallback or Error? 
-         # Let's try to verify if we can proceed. If base is missing, we can't do anything.
          raise ValueError(f"Base Link ID {robot_data.baseLinkId} not found in links map.")
 
     base_link_name = unique_link_names[robot_data.baseLinkId]
@@ -339,6 +368,75 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
         if parent_link_id not in unique_link_names:
              continue
         parent_link_name = unique_link_names[parent_link_id]
+# ... rest of generate_urdf_xml remains similar, just remove the top block ...
+
+@app.post("/api/export-urdf")
+async def export_urdf_package(
+    background_tasks: BackgroundTasks,
+    robot_data: str = Form(...), 
+    robot_name: str = Form(...), 
+    files: Optional[List[UploadFile]] = File(None)
+):
+    try:
+        data_dict = json.loads(robot_data)
+        robot = RobotData.parse_obj(data_dict)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
+
+    sanitized_robot_name = to_snake_case(robot_name)
+    if not sanitized_robot_name:
+        sanitized_robot_name = "my_robot"
+    
+    tmpdir = tempfile.mkdtemp()
+    
+    package_dir = os.path.join(tmpdir, sanitized_robot_name)
+    urdf_dir = os.path.join(package_dir, "urdf")
+    mesh_dir = os.path.join(package_dir, "meshes")
+    launch_dir = os.path.join(package_dir, "launch")
+
+    os.makedirs(urdf_dir, exist_ok=True)
+    os.makedirs(mesh_dir, exist_ok=True)
+    os.makedirs(launch_dir, exist_ok=True)
+
+    # Pre-calculate unique names for consistent file mapping and URDF naming
+    unique_link_names = generate_unique_names(robot)
+
+    # Process and save mesh files
+    mesh_files_map = {}
+    if files:
+        for file in files:
+            form_field_name = file.filename
+            # Robustly parse link_id
+            if form_field_name and form_field_name.startswith('mesh_'):
+                link_id = form_field_name[5:] 
+            else:
+                link_id = form_field_name
+            
+            if link_id in robot.links:
+                # Use clean unique name for file (e.g. leg_1.stl)
+                clean_name = unique_link_names[link_id]
+                safe_filename = f"{clean_name}.stl"
+                file_path = os.path.join(mesh_dir, safe_filename)
+                
+                with open(file_path, "wb") as f:
+                    shutil.copyfileobj(file.file, f)
+                
+                mesh_files_map[link_id] = safe_filename
+
+    # Generate and save URDF file
+    urdf_content, base_link_name = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
+    with open(os.path.join(urdf_dir, f"{sanitized_robot_name}.urdf"), "w") as f:
+        f.write(urdf_content)
+
+    # Create other package files
+    package_xml = f"""<package format=\"2\">\n<name>{sanitized_robot_name}</name>\n<version>0.1.0</version>\n<description>A description of {sanitized_robot_name}</description>\n<maintainer email=\"user@example.com\">Your Name</maintainer>\n<license>MIT</license>\n<buildtool_depend>catkin</buildtool_depend>\n<depend>roslaunch</depend>\n<depend>robot_state_publisher</depend>\n<depend>rviz</depend>\n<depend>joint_state_publisher_gui</depend>\n</package>\n"""
+    with open(os.path.join(package_dir, "package.xml"), "w") as f:
+        f.write(package_xml)
+
+    cmakelists_txt = f"""cmake_minimum_required(VERSION 3.0.2)\nproject({sanitized_robot_name})\nfind_package(catkin REQUIRED COMPONENTS roslaunch robot_state_publisher rviz joint_state_publisher_gui)\ncatkin_package()\n"""
+    with open(os.path.join(package_dir, "CMakeLists.txt"), "w") as f:
+        f.write(cmakelists_txt)
+
 
         # Ensure childJoints is iterable
         child_joints = robot_data.links[parent_link_id].childJoints or []
