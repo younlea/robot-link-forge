@@ -95,7 +95,7 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef; isColl
             url={meshUrl}
             scale={meshScale}
             origin={meshOrigin}
-            color={materialColor}
+            color={displayColor}
           />
         </group>
       );
