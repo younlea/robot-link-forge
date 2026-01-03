@@ -128,6 +128,69 @@ def calculate_cylinder_transform(start_point: List[float], end_point: List[float
     return length, [mx, my, mz], [0.0, pitch, yaw]
 
 
+def euler_xyz_to_rotation_matrix(x, y, z):
+    """
+    Constructs a rotation matrix from Euler angles (Intrinsic X-Y-Z order).
+    This matches the Three.js 'XYZ' Euler order used in the frontend.
+    """
+    cx, sx = math.cos(x), math.sin(x)
+    cy, sy = math.cos(y), math.sin(y)
+    cz, sz = math.cos(z), math.sin(z)
+    
+    # R = R_x * R_y * R_z
+    # (Row 0): [ cy*cz,              -cy*sz,             sy     ]
+    # (Row 1): [ cx*sz + sx*sy*cz,   cx*cz - sx*sy*sz,   -sx*cy ]
+    # (Row 2): [ sx*sz - cx*sy*cz,   sx*cz + cx*sy*sz,   cx*cy  ]
+    
+    R = [
+        [cy*cz,              -cy*sz,              sy],
+        [cx*sz + sx*sy*cz,   cx*cz - sx*sy*sz,   -sx*cy],
+        [sx*sz - cx*sy*cz,   sx*cz + cx*sy*sz,   cx*cy]
+    ]
+    return R
+
+def rotation_matrix_to_euler_zyx(R):
+    """
+    Decomposes Rotation Matrix into Euler ZYX (Intrinsic) / XYZ (Fixed).
+    Matches URDF <origin rpy="r p y" /> which expects Fixed Axis rotations.
+    """
+    r20 = R[2][0]
+    r21 = R[2][1]
+    r22 = R[2][2]
+    r10 = R[1][0]
+    r00 = R[0][0]
+    
+    # Pitch (Y axis rotation) - R20 = -sin(p)
+    if r20 < 1.0:
+        if r20 > -1.0:
+            p = math.asin(-r20)
+            r = math.atan2(r21, r22)
+            y = math.atan2(r10, r00)
+        else:
+             # Gimbal lock: p = 90deg
+            p = math.pi / 2
+            y = 0
+            r = math.atan2(R[0][1], R[0][2])
+    else:
+        # Gimbal lock: p = -90deg
+        p = -math.pi / 2
+        y = 0
+        r = math.atan2(-R[1][2], R[1][1])
+
+    return [r, p, y]
+
+def convert_euler_xyz_to_zyx(rpy):
+    """
+    Converts a list/tuple of [roll, pitch, yaw] from Intrinsic XYZ (Frontend)
+    to Intrinsic ZYX (URDF Standard).
+    """
+    if not rpy or len(rpy) != 3:
+        return [0.0, 0.0, 0.0]
+    R = euler_xyz_to_rotation_matrix(rpy[0], rpy[1], rpy[2])
+    return rotation_matrix_to_euler_zyx(R)
+
+
+
 def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str]) -> str:
     """Generates the XML content for a single link (visual, collision, etc.)."""
     
@@ -200,7 +263,10 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
     # Priority 2: Manual meshOrigin from visual properties (only if not overridden)
     elif vis.meshOrigin:
         origin_xyz_str = " ".join(map(str, vis.meshOrigin.get('xyz', [0,0,0])))
-        origin_rpy_str = " ".join(map(str, vis.meshOrigin.get('rpy', [0,0,0])))
+        # Convert Frontend XYZ Euler to URDF ZYX Euler
+        raw_rpy = vis.meshOrigin.get('rpy', [0,0,0])
+        converted_rpy = convert_euler_xyz_to_zyx(raw_rpy)
+        origin_rpy_str = " ".join(map(str, converted_rpy))
     elif vis.type == 'cylinder' and not override_origin_xyz:
          # Fix for Three.js (Y-up) vs URDF (Z-up) cylinder mismatch
          origin_rpy_str = "-1.570796 0 0"
@@ -317,7 +383,8 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
             joints_xml += f'  <joint name="{joint_name}" type="{joint_type}">\n'
             joints_xml += f'    <parent link="{parent_link_name}"/>\n'
             joints_xml += f'    <child link="{child_link_name}"/>\n'
-            joints_xml += f'    <origin xyz="{" ".join(map(str, joint.origin.xyz))}" rpy="{" ".join(map(str, joint.origin.rpy))}"/>\n'
+            converted_origin_rpy = convert_euler_xyz_to_zyx(joint.origin.rpy)
+            joints_xml += f'    <origin xyz="{" ".join(map(str, joint.origin.xyz))}" rpy="{" ".join(map(str, converted_origin_rpy))}"/>\n'
             
             if joint.type == 'rotational':
                 if joint.axis:
