@@ -122,7 +122,8 @@ const createRobotZip = async (state: RobotState) => {
 };
 
 // Define API Base URL dynamically to support remote access
-const API_BASE_URL = `http://${window.location.hostname}:8000`;
+// Use relative path for API calls to support remote access via Vite Proxy
+const API_BASE_URL = '';
 
 export const useRobotStore = create<RobotState & RobotActions>((setState, getState) => ({
     ...createInitialState(),

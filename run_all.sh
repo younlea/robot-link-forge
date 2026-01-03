@@ -15,6 +15,9 @@ if [ ! -d "src/backend/venv" ]; then
     python3 -m venv src/backend/venv
 fi
 
+# Ensure local traffic bypasses any system proxies
+export NO_PROXY=localhost,127.0.0.1,0.0.0.0,::1,.local
+
 source src/backend/venv/bin/activate
 echo ">> [Backend] Installing dependencies..."
 pip install -r src/backend/requirements.txt
