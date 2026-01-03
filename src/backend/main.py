@@ -387,16 +387,14 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
             joints_xml += f'    <origin xyz="{" ".join(map(str, joint.origin.xyz))}" rpy="{" ".join(map(str, converted_origin_rpy))}"/>\n'
             
             if joint.type == 'rotational':
-                if joint.axis:
-                    axis_str = " ".join(map(str, joint.axis))
-                else: 
-                     # Infer axis from DOF
-                     if joint.dof.pitch:
-                         axis_str = "0 1 0"
-                     elif joint.dof.yaw:
-                         axis_str = "0 0 1"
-                     else:
-                         axis_str = "1 0 0"
+                # Force inference from DOF for rotational joints
+                # (Ignore joint.axis which might be default [0,0,1])
+                if joint.dof.pitch:
+                     axis_str = "0 1 0"
+                elif joint.dof.yaw:
+                     axis_str = "0 0 1"
+                else:
+                     axis_str = "1 0 0"
                 
                 joints_xml += f'    <axis xyz="{axis_str}"/>\n'
 
