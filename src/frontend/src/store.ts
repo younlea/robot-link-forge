@@ -19,6 +19,7 @@ const createInitialState = (): RobotState => {
         joints: {},
         baseLinkId: baseLinkId,
         selectedItem: { id: baseLinkId, type: 'link' },
+        highlightedItem: { id: null, type: null },
         cameraMode: 'rotate', // Default camera mode
         cameraControls: null,
         serverProjects: [],
@@ -307,7 +308,12 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         getState().cameraControls?.dolly(0.5, true);
     },
 
+    zoomOut: () => {
+        getState().cameraControls?.dolly(0.5, true);
+    },
+
     selectItem: (id, type) => setState({ selectedItem: { id, type } }),
+    setHighlightedItem: (id, type) => setState({ highlightedItem: { id, type } }),
     setCameraMode: (mode) => setState({ cameraMode: mode }),
 
     resetJointsToZero: () => {
@@ -340,7 +346,72 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                 if (newType === 'rotational') updatedJoint = updateDeep(updatedJoint, 'currentValues.displacement', 0);
                 else if (newType === 'prismatic') updatedJoint = updateDeep(updatedJoint, 'currentValues', { roll: 0, pitch: 0, yaw: 0, displacement: updatedJoint.currentValues.displacement });
             }
-            return { joints: { ...state.joints, [id]: updatedJoint } };
+
+            // Apply the update
+            const nextJoints = { ...state.joints, [id]: updatedJoint };
+
+            // --- Passive Joint Recalculation ---
+            // We iterate ONCE over all joints to find passive ones and evaluate their equations.
+            // This assumes no deeply nested chains of passive joints for now (A -> B -> C).
+            // Even if we did, doing 1 pass is safe against infinite loops.
+
+            // Context builder: Create a map of "JointName" -> { roll, pitch, yaw, displacement }
+            const context: Record<string, any> = {};
+            Object.values(nextJoints).forEach(j => {
+                // Sanitize name for JS variable usage? simpler to just use it as key if user follows naming rules
+                // But user might name joint "Arm 1".
+                // We will access via `context['Arm 1'].roll` if we use a safe evaluator,
+                // OR we strictly bind them.
+                // For MVP, we pass the Whole JOINT object or just values.
+                // Let's pass values.
+                context[j.name] = { ...j.currentValues };
+            });
+
+            const evaluateEquation = (eq: string, ctx: any): number | null => {
+                try {
+                    // Create a function that takes the context keys as arguments and returns the result
+                    const keys = Object.keys(ctx);
+                    const values = Object.values(ctx);
+                    // Safe-ish eval: use Function constructor.
+                    // "return " + eq
+                    // But we want to access variables directly like "Joint1.roll".
+                    // So we wrap the execution.
+                    // Note: This relies on user knowing variable names.
+                    const func = new Function(...keys, `return ${eq};`);
+                    const result = func(...values);
+                    return typeof result === 'number' && !isNaN(result) ? result : null;
+                } catch (e) {
+                    // console.warn("Equation error:", e); // Squelch during typing
+                    return null;
+                }
+            };
+
+            Object.values(nextJoints).forEach(j => {
+                if (j.isPassive && j.equation && j.id !== id) { // Don't self-update if we are editing the passive joint directly (though we block UI)
+                    const result = evaluateEquation(j.equation, context);
+                    if (result !== null) {
+                        // Apply result to the main degree of freedom
+                        let newVals = { ...j.currentValues };
+
+                        if (j.type === 'prismatic') {
+                            // Enforce limits? Maybe. Let's clamp.
+                            const clamped = Math.min(Math.max(result, j.limits.displacement.lower), j.limits.displacement.upper);
+                            newVals.displacement = clamped;
+                        } else if (j.type === 'rotational') {
+                            // Apply to available DOF. If multiple, assume Z (Yaw) or main?
+                            // Standard for passive is usually 1 DOF.
+                            // Let's try to infer or apply to all enabled? No, formula usually returns scalar.
+                            // Let's apply to the first enabled DOF in order R P Y.
+                            if (j.dof.roll) newVals.roll = Math.min(Math.max(result, j.limits.roll.lower), j.limits.roll.upper);
+                            if (j.dof.pitch) newVals.pitch = Math.min(Math.max(result, j.limits.pitch.lower), j.limits.pitch.upper);
+                            if (j.dof.yaw) newVals.yaw = Math.min(Math.max(result, j.limits.yaw.lower), j.limits.yaw.upper);
+                        }
+                        nextJoints[j.id] = { ...j, currentValues: newVals };
+                    }
+                }
+            });
+
+            return { joints: nextJoints };
         });
     },
 
@@ -526,6 +597,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                 joints: robotData.joints,
                 baseLinkId: robotData.baseLinkId,
                 selectedItem: { id: null, type: null },
+                highlightedItem: { id: null, type: null },
             });
         };
 

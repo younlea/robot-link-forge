@@ -79,7 +79,11 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef; isColl
 
     const { type, dimensions, color, meshUrl, meshScale, meshOrigin } = joint.visual;
     const isSelected = selectedItem.id === jointId;
-    const materialColor = isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : (color || '#888888'));
+    const isHighlighted = useRobotStore(s => s.highlightedItem.id === jointId);
+
+    // Highlight logic: if highlighted, override color to Cyan/White mixer
+    const displayColor = isHighlighted ? '#00FFFF' : (isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : (color || '#888888')));
+
     const clickHandler = (e: any) => { e.stopPropagation(); selectItem(joint.id, 'joint'); };
 
     if (type === 'mesh') {
@@ -102,11 +106,11 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef; isColl
 
     switch (type) {
       case 'box':
-        return <Box {...props} args={dims as [number, number, number]}><meshStandardMaterial color={materialColor} side={THREE.DoubleSide} /></Box>;
+        return <Box {...props} args={dims as [number, number, number]}><meshStandardMaterial color={displayColor} side={THREE.DoubleSide} /></Box>;
       case 'cylinder':
-        return <Cylinder {...props} args={[dims[0], dims[0], dims[1], 16]}><meshStandardMaterial color={materialColor} side={THREE.DoubleSide} /></Cylinder>;
+        return <Cylinder {...props} args={[dims[0], dims[0], dims[1], 16]}><meshStandardMaterial color={displayColor} side={THREE.DoubleSide} /></Cylinder>;
       case 'sphere':
-        return <Sphere {...props} args={[dims[0], 16, 16]}><meshStandardMaterial color={materialColor} side={THREE.DoubleSide} /></Sphere>;
+        return <Sphere {...props} args={[dims[0], 16, 16]}><meshStandardMaterial color={displayColor} side={THREE.DoubleSide} /></Sphere>;
       default: return null;
     }
   };

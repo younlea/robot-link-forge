@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRobotStore } from '../store';
 import { RobotLink, RobotJoint, JointType } from '../types';
-import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, Upload, RotateCcw, Trash2, FilePlus, HelpCircle, Settings } from 'lucide-react';
+import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, Upload, RotateCcw, Trash2, FilePlus, HelpCircle, Settings, Calculator } from 'lucide-react';
 import HelpModal from './HelpModal';
 
 // --- Reusable Input Components (with fixes) ---
@@ -434,10 +434,52 @@ const LinkInspector = ({ link }: { link: RobotLink }) => {
 
 // --- Inspector for Joints (with final workflow) ---
 const JointInspector = ({ joint }: { joint: RobotJoint }) => {
-    const { updateJoint, addChainedJoint, uploadAndSetMesh, deleteItem } = useRobotStore();
+    const { updateJoint, addChainedJoint, uploadAndSetMesh, deleteItem, joints, setHighlightedItem } = useRobotStore();
     const stlInputRef = useRef<HTMLInputElement>(null);
+    const eqInputRef = useRef<HTMLTextAreaElement>(null);
 
     const handleStlUploadClick = () => stlInputRef.current?.click();
+
+    // Helper to insert text at cursor position in equation textarea
+    const insertVariable = (varName: string) => {
+        const textarea = eqInputRef.current;
+        if (!textarea) return;
+
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const text = textarea.value;
+        const newText = text.substring(0, start) + varName + text.substring(end);
+
+        updateJoint(joint.id, 'equation', newText);
+
+        // Restore focus and cursor (next tick to allow React render)
+        setTimeout(() => {
+            textarea.focus();
+            textarea.setSelectionRange(start + varName.length, start + varName.length);
+        }, 0);
+    };
+
+    // Variable Helper Logic
+    const getSortedJoints = () => {
+        const otherJoints = Object.values(joints).filter(j => j.id !== joint.id && j.type !== 'fixed');
+        // Sort priorities:
+        // 1. Parent Joint
+        // 2. Sibling Joints (same parent Link)
+        // 3. Child Joints (child of this joint's child link)
+        // 4. Others
+
+        return otherJoints.sort((a, b) => {
+            const getScore = (j: RobotJoint) => {
+                if (j.childLinkId === joint.parentLinkId) return 4; // Parent (moves us)
+                if (j.parentLinkId === joint.parentLinkId) return 3; // Sibling
+                if (joint.childLinkId && j.parentLinkId === joint.childLinkId) return 2; // Child
+                return 1;
+            };
+            return getScore(b) - getScore(a);
+        });
+    };
+
+    const sortedVariables = getSortedJoints();
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
@@ -458,57 +500,122 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
             {joint.type !== 'fixed' && (
                 <div className="p-2 bg-blue-900/20 border border-blue-900/50 rounded space-y-2">
                     <p className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">Joint Control</p>
-                    {joint.type === 'rotational' && joint.dof.roll && (
-                        <JointSliderInput
-                            label="Roll"
-                            min={joint.limits.roll.lower}
-                            max={joint.limits.roll.upper}
-                            value={joint.currentValues.roll}
-                            onChange={(v) => updateJoint(joint.id, 'currentValues.roll', v)}
-                            unit="°"
-                            toUser={(rad) => rad * 180 / Math.PI}
-                            fromUser={(deg) => deg * Math.PI / 180}
-                            autoFocus={true}
-                        />
-                    )}
-                    {joint.type === 'rotational' && joint.dof.pitch && (
-                        <JointSliderInput
-                            label="Pitch"
-                            min={joint.limits.pitch.lower}
-                            max={joint.limits.pitch.upper}
-                            value={joint.currentValues.pitch}
-                            onChange={(v) => updateJoint(joint.id, 'currentValues.pitch', v)}
-                            unit="°"
-                            toUser={(rad) => rad * 180 / Math.PI}
-                            fromUser={(deg) => deg * Math.PI / 180}
-                            autoFocus={!joint.dof.roll}
-                        />
-                    )}
-                    {joint.type === 'rotational' && joint.dof.yaw && (
-                        <JointSliderInput
-                            label="Yaw"
-                            min={joint.limits.yaw.lower}
-                            max={joint.limits.yaw.upper}
-                            value={joint.currentValues.yaw}
-                            onChange={(v) => updateJoint(joint.id, 'currentValues.yaw', v)}
-                            unit="°"
-                            toUser={(rad) => rad * 180 / Math.PI}
-                            fromUser={(deg) => deg * Math.PI / 180}
-                            autoFocus={!joint.dof.roll && !joint.dof.pitch}
-                        />
-                    )}
-                    {joint.type === 'prismatic' && (
-                        <JointSliderInput
-                            label="Displacement"
-                            min={joint.limits.displacement.lower}
-                            max={joint.limits.displacement.upper}
-                            value={joint.currentValues.displacement}
-                            onChange={(v) => updateJoint(joint.id, 'currentValues.displacement', v)}
-                            unit="mm"
-                            toUser={(m) => m * 1000}
-                            fromUser={(mm) => mm / 1000}
-                            autoFocus={true}
-                        />
+
+                    {/* Passive Mode Toggle */}
+                    <div className="flex items-center justify-between mb-2 pb-2 border-b border-blue-900/30">
+                        <label className="flex items-center space-x-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={!!joint.isPassive}
+                                onChange={(e) => updateJoint(joint.id, 'isPassive', e.target.checked)}
+                                className="h-4 w-4 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500"
+                            />
+                            <span className="text-sm font-semibold text-gray-300 flex items-center">
+                                <Calculator className="h-4 w-4 mr-1 text-purple-400" /> Passive Mode
+                            </span>
+                        </label>
+                    </div>
+
+                    {!joint.isPassive ? (
+                        <>
+                            {joint.type === 'rotational' && joint.dof.roll && (
+                                <JointSliderInput
+                                    label="Roll"
+                                    min={joint.limits.roll.lower}
+                                    max={joint.limits.roll.upper}
+                                    value={joint.currentValues.roll}
+                                    onChange={(v) => updateJoint(joint.id, 'currentValues.roll', v)}
+                                    unit="°"
+                                    toUser={(rad) => rad * 180 / Math.PI}
+                                    fromUser={(deg) => deg * Math.PI / 180}
+                                    autoFocus={true}
+                                />
+                            )}
+                            {joint.type === 'rotational' && joint.dof.pitch && (
+                                <JointSliderInput
+                                    label="Pitch"
+                                    min={joint.limits.pitch.lower}
+                                    max={joint.limits.pitch.upper}
+                                    value={joint.currentValues.pitch}
+                                    onChange={(v) => updateJoint(joint.id, 'currentValues.pitch', v)}
+                                    unit="°"
+                                    toUser={(rad) => rad * 180 / Math.PI}
+                                    fromUser={(deg) => deg * Math.PI / 180}
+                                    autoFocus={!joint.dof.roll}
+                                />
+                            )}
+                            {joint.type === 'rotational' && joint.dof.yaw && (
+                                <JointSliderInput
+                                    label="Yaw"
+                                    min={joint.limits.yaw.lower}
+                                    max={joint.limits.yaw.upper}
+                                    value={joint.currentValues.yaw}
+                                    onChange={(v) => updateJoint(joint.id, 'currentValues.yaw', v)}
+                                    unit="°"
+                                    toUser={(rad) => rad * 180 / Math.PI}
+                                    fromUser={(deg) => deg * Math.PI / 180}
+                                    autoFocus={!joint.dof.roll && !joint.dof.pitch}
+                                />
+                            )}
+                            {joint.type === 'prismatic' && (
+                                <JointSliderInput
+                                    label="Displacement"
+                                    min={joint.limits.displacement.lower}
+                                    max={joint.limits.displacement.upper}
+                                    value={joint.currentValues.displacement}
+                                    onChange={(v) => updateJoint(joint.id, 'currentValues.displacement', v)}
+                                    unit="mm"
+                                    toUser={(m) => m * 1000}
+                                    fromUser={(mm) => mm / 1000}
+                                    autoFocus={true}
+                                />
+                            )}
+                        </>
+                    ) : (
+                        <div className="space-y-2">
+                            <p className="text-xs text-gray-400">Formula (JavaScript): e.g., <code>Math.sin(Joint1.roll) * 0.5</code></p>
+                            <textarea
+                                ref={eqInputRef}
+                                value={joint.equation || ''}
+                                onChange={(e) => updateJoint(joint.id, 'equation', e.target.value)}
+                                className="w-full h-20 bg-gray-900 rounded p-2 text-sm text-green-400 font-mono border border-gray-700 focus:ring-1 focus:ring-blue-500"
+                                placeholder="Enter formula..."
+                            />
+
+                            {/* Variable Helper */}
+                            <div className="mt-2">
+                                <p className="text-xs text-gray-500 mb-1">Variable Helper (Click to insert):</p>
+                                <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto">
+                                    {sortedVariables.map(j => {
+                                        // Which prop to suggest? rotational usually roll/pitch/yaw?
+                                        // let's just suggest '.roll' or '.displacement' based on type for simplicity
+                                        // Or provide multiple chips for one joint?
+                                        // Let's provide chips for ACTIVE DOFs.
+                                        const dofs = [];
+                                        if (j.type === 'prismatic') dofs.push('displacement');
+                                        if (j.type === 'rotational') {
+                                            if (j.dof.roll) dofs.push('roll');
+                                            if (j.dof.pitch) dofs.push('pitch');
+                                            if (j.dof.yaw) dofs.push('yaw');
+                                        }
+
+                                        return dofs.map(dof => (
+                                            <button
+                                                key={`${j.id}_${dof}`}
+                                                type="button"
+                                                onClick={() => insertVariable(`${j.name}.${dof}`)}
+                                                onMouseEnter={() => setHighlightedItem(j.id, 'joint')}
+                                                onMouseLeave={() => setHighlightedItem(null, null)}
+                                                className="px-2 py-1 bg-gray-700 hover:bg-gray-600 rounded text-xs text-blue-200 border border-gray-600"
+                                                title={`Insert ${j.name}.${dof}`}
+                                            >
+                                                {j.name}.{dof}
+                                            </button>
+                                        ));
+                                    })}
+                                </div>
+                            </div>
+                        </div>
                     )}
                 </div>
             )}

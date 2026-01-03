@@ -59,6 +59,10 @@ export interface RobotJoint {
   // For 'prismatic'
   axis: [number, number, number];
 
+  // Passive Mode Config
+  isPassive?: boolean;
+  equation?: string;
+
   // Current values for sliders
   currentValues: JointValues;
 
@@ -90,6 +94,7 @@ export interface RobotState {
   joints: Record<string, RobotJoint>;
   baseLinkId: string;
   selectedItem: SelectedItem;
+  highlightedItem: SelectedItem; // Visual highlight for helper UI
   cameraMode: 'rotate' | 'pan';
   cameraControls: CameraControls | null;
   serverProjects: string[];
@@ -122,6 +127,7 @@ export interface RobotActions {
 
   // Selection
   selectItem: (id: string | null, type: 'link' | 'joint' | null) => void;
+  setHighlightedItem: (id: string | null, type: 'link' | 'joint' | null) => void;
 
   // Camera Control
   setCameraMode: (mode: 'rotate' | 'pan') => void;
