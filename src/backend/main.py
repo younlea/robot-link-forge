@@ -201,6 +201,9 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
     elif vis.meshOrigin:
         origin_xyz_str = " ".join(map(str, vis.meshOrigin.get('xyz', [0,0,0])))
         origin_rpy_str = " ".join(map(str, vis.meshOrigin.get('rpy', [0,0,0])))
+    elif vis.type == 'cylinder' and not override_origin_xyz:
+         # Fix for Three.js (Y-up) vs URDF (Z-up) cylinder mismatch
+         origin_rpy_str = "-1.570796 0 0"
 
     visual_xml += f'      <origin xyz="{origin_xyz_str}" rpy="{origin_rpy_str}" />\n'
     visual_xml += '      <geometry>\n'
