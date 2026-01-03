@@ -809,25 +809,31 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             const zipBlob = await response.blob();
             const safeRobotName = robotName.replace(/[^a-zA-Z0-9]/g, '_');
 
-            if ('showSaveFilePicker' in window) {
-                const handle = await window.showSaveFilePicker({
-                    suggestedName: `${safeRobotName}_ros2_package.zip`,
-                    types: [{ description: 'ROS2 Package (Zip)', accept: { 'application/zip': ['.zip'] } }],
-                });
-                const writable = await handle.createWritable();
-                await writable.write(zipBlob);
-                await writable.close();
-            } else {
-                const url = window.URL.createObjectURL(zipBlob);
-                const a = document.createElement('a');
-                a.style.display = 'none';
-                a.href = url;
-                a.download = `${safeRobotName}_ros2_package.zip`;
-                document.body.appendChild(a);
-                a.click();
-                window.URL.revokeObjectURL(url);
-                document.body.removeChild(a);
+            console.log("URDF Export: Received Blob size:", zipBlob.size);
+
+            if (zipBlob.size === 0) {
+                alert("Error: Received empty file from server.");
+                return;
             }
+
+            const safeRobotName = robotName.replace(/[^a-zA-Z0-9]/g, '_');
+            const fileName = `${safeRobotName}_ros2_package.zip`;
+
+            console.log("URDF Export: Triggering download for", fileName);
+
+            // Legacy Download Logic (Safest for all browsers/contexts)
+            const url = window.URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            console.log("URDF Export: Download click triggered.");
+            alert(`Export Success! File size: ${zipBlob.size} bytes. check your browser downloads.`);
 
             alert('URDF ROS2 package exported successfully!');
 
