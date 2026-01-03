@@ -308,10 +308,6 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         getState().cameraControls?.dolly(0.5, true);
     },
 
-    zoomOut: () => {
-        getState().cameraControls?.dolly(0.5, true);
-    },
-
     selectItem: (id, type) => setState({ selectedItem: { id, type } }),
     setHighlightedItem: (id, type) => setState({ highlightedItem: { id, type } }),
     setCameraMode: (mode) => setState({ cameraMode: mode }),
