@@ -559,7 +559,11 @@ async def export_urdf_package(
             
             if link_id in robot.links:
                 # FIX: Append link ID snippet to partial name to ensure uniqueness
-                safe_filename = f"{to_snake_case(robot.links[link_id].name)}_{link_id[:6]}.stl"
+                # Use LAST 6 chars as they are the random part of "link-UUID"
+                # "link-1234..."[:6] is always "link-1". Bad.
+                # "link-1234..."[-6:] is "...89ab". Good.
+                safe_id_suffix = link_id[-6:] if len(link_id) > 6 else link_id
+                safe_filename = f"{to_snake_case(robot.links[link_id].name)}_{safe_id_suffix}.stl"
                 file_path = os.path.join(mesh_dir, safe_filename)
                 
                 with open(file_path, "wb") as f:
