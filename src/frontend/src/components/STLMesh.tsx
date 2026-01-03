@@ -38,7 +38,7 @@ function LoadedMesh({ url, scale, origin, color, linkId }: STLMeshProps) {
 
   // The group will handle the user-defined origin transform.
   const groupPosition = origin?.xyz || [0, 0, 0];
-  const groupRotation = new Euler(...(origin?.rpy || [0, 0, 0]));
+  const groupRotation = new Euler(...(origin?.rpy || [0, 0, 0]), 'ZYX');
 
   return (
     <group position={groupPosition} rotation={groupRotation} scale={scale || [1, 1, 1]}>
