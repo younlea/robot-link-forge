@@ -161,7 +161,16 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
   if (!link) return null;
 
   const renderVisual = () => {
-    if (!link.visual || link.visual.type === 'none') return null;
+    if (!link.visual || link.visual.type === 'none') {
+      const isSelected = selectedItem.id === linkId;
+      const clickHandler = (e: any) => { e.stopPropagation(); selectItem(link.id, 'link'); };
+      // Render a "Ghost" visual (transparent wireframe box) to allow selection
+      return (
+        <Box args={[0.1, 0.1, 0.1]} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
+          <meshBasicMaterial color={isSelected ? HIGHLIGHT_COLOR : '#cccccc'} wireframe={true} transparent opacity={0.5} />
+        </Box>
+      );
+    }
     const { type, dimensions, color, meshUrl, meshScale, meshOrigin } = link.visual;
 
     const isSelected = selectedItem.id === linkId;
