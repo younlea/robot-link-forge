@@ -159,8 +159,8 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
   if (!link) return null;
 
   const renderVisual = () => {
+    if (!link.visual || link.visual.type === 'none') return null;
     const { type, dimensions, color, meshUrl, meshScale, meshOrigin } = link.visual;
-    if (type === 'none') return null;
 
     const isSelected = selectedItem.id === linkId;
     const materialColor = isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : color);
