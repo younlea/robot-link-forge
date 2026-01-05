@@ -297,7 +297,6 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
     link_xml += collision_xml
 
     # --- Joint Visuals (Attached to Parent Link) ---
-    if link.childJoints:
         for jid in link.childJoints:
             joint = robot_data.joints.get(jid)
             if joint and joint.visual and joint.visual.type != 'none':
@@ -583,7 +582,10 @@ async def export_urdf_package(
             else:
                 link_id = form_field_name
             
+            # print(f"DEBUG: Processing file {form_field_name}, extracted ID: {link_id}")
+
             if link_id in robot.links:
+                # print(f"DEBUG: ID {link_id} found in LINKS")
                 # Use clean unique name for file (e.g. leg_1.stl)
                 clean_name = unique_link_names[link_id]
                 safe_filename = f"{clean_name}.stl"
@@ -594,6 +596,7 @@ async def export_urdf_package(
                 
                 mesh_files_map[link_id] = safe_filename
             elif link_id in robot.joints:
+                 # print(f"DEBUG: ID {link_id} found in JOINTS")
                  # It's a joint mesh. Use snake_case joint name.
                  # Since joints don't have a global unique name map passed here yet effectively (unique_link_names is only links),
                  # we will generate a safe name here.
@@ -605,6 +608,8 @@ async def export_urdf_package(
                     shutil.copyfileobj(file.file, f)
                  
                  mesh_files_map[link_id] = safe_filename
+            else:
+                pass # print(f"DEBUG: ID {link_id} NOT FOUND ...")
 
     # Generate and save URDF file
     urdf_content, base_link_name = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
@@ -620,283 +625,6 @@ async def export_urdf_package(
     with open(os.path.join(package_dir, "CMakeLists.txt"), "w") as f:
         f.write(cmakelists_txt)
 
-
-        # Ensure childJoints is iterable
-        child_joints = robot_data.links[parent_link_id].childJoints or []
-        
-        for joint_id in child_joints:
-            if joint_id in processed_joints:
-                continue
-            
-            joint = robot_data.joints.get(joint_id)
-            # Check for missing child link in JOINT definition
-            if not joint or not joint.childLinkId:
-                continue
-            
-            # CRITICAL CHECK: Does the child link actually EXIST?
-            child_link_id = joint.childLinkId
-            if child_link_id not in unique_link_names:
-                 print(f"Warning: Joint {joint_id} points to non-existent Child Link {child_link_id}")
-                 continue
-
-            processed_joints.add(joint_id)
-            
-            if child_link_id in processed_links:
-                continue
-            
-            child_link_name = unique_link_names[child_link_id]
-            processed_links.add(child_link_id)
-            q.append(child_link_id)
-
-            # --- Link XML for Child ---
-            links_xml += _generate_link_xml(child_link_id, child_link_name, robot_data, robot_name, mesh_files)
-
-            # Determine Active DOFs
-            active_rotations = []
-            if joint.type == 'rotational':
-                if joint.dof.roll: active_rotations.append(('roll', '1 0 0', joint.limits['roll']))
-                if joint.dof.pitch: active_rotations.append(('pitch', '0 1 0', joint.limits['pitch']))
-                if joint.dof.yaw: active_rotations.append(('yaw', '0 0 1', joint.limits['yaw']))
-            
-            # Identify Prismatic vs Fixed loops for generic handling
-            sub_joints = []
-            if joint.type == 'rotational' and active_rotations:
-                # Multi-DOF (or Single-DOF) Rotational
-                for dof_name, axis_val, limit_val in active_rotations:
-                    sub_joints.append({
-                        'type': 'revolute',
-                        'suffix': dof_name,
-                        'axis': axis_val,
-                        'limit': limit_val
-                    })
-            elif joint.type == 'prismatic':
-                 axis_str = " ".join(map(str, joint.axis)) if joint.axis else "1 0 0"
-                 sub_joints.append({
-                     'type': 'prismatic',
-                     'suffix': 'prism',
-                     'axis': axis_str,
-                     'limit': joint.limits['displacement']
-                 })
-            else:
-                 # Fixed or empty rotational
-                 sub_joints.append({
-                     'type': 'fixed',
-                     'suffix': 'fixed',
-                     'axis': '0 0 0',
-                     'limit': None
-                 })
-
-            # Base name for constructing unique joint names
-            current_parent_link = parent_link_name
-            base_joint_unique_id = f"{to_snake_case(joint.name)}_{joint.id[:6]}"
-            
-            # Iterate through sub-joints (Decomposition)
-            for i, sub in enumerate(sub_joints):
-                is_last = (i == len(sub_joints) - 1)
-                is_first = (i == 0)
-                
-                # Determine Name
-                raw_name = f"{base_joint_unique_id}_{sub['suffix']}"
-                # Ensure uniqueness globally
-                final_joint_name = raw_name
-                ctr = 1
-                while final_joint_name in generated_joint_names:
-                    final_joint_name = f"{raw_name}_{ctr}"
-                    ctr += 1
-                generated_joint_names.add(final_joint_name)
-                
-                # Determine Child Link
-                if is_last:
-                    current_child_link = child_link_name
-                else:
-                    # Create Dummy Link
-                    dummy_link_name = f"dummy_{final_joint_name}_link"
-                    links_xml += f'  <link name="{dummy_link_name}">\n'
-                    links_xml += f'    <inertial><mass value="0.001"/><inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/></inertial>\n'
-                    links_xml += f'  </link>\n'
-                    current_child_link = dummy_link_name
-
-                # XML Generation
-                joints_xml += f'  <joint name="{final_joint_name}" type="{sub["type"]}">\n'
-                joints_xml += f'    <parent link="{current_parent_link}"/>\n'
-                joints_xml += f'    <child link="{current_child_link}"/>\n'
-                
-                # Origin: Only the First joint uses the structural origin. Others are 0 0 0.
-                if is_first:
-                    converted_origin_rpy = convert_euler_xyz_to_zyx(joint.origin.rpy)
-                    joints_xml += f'    <origin xyz="{" ".join(map(str, joint.origin.xyz))}" rpy="{" ".join(map(str, converted_origin_rpy))}"/>\n'
-                else:
-                    joints_xml += f'    <origin xyz="0 0 0" rpy="0 0 0"/>\n'
-                
-                # Axis & Limit (if applicable)
-                if sub['type'] != 'fixed':
-                    joints_xml += f'    <axis xyz="{sub["axis"]}"/>\n'
-                    if sub['limit']:
-                        joints_xml += f'    <limit lower="{sub["limit"].lower}" upper="{sub["limit"].upper}" effort="10" velocity="1.0"/>\n'
-                    else:
-                        joints_xml += f'    <limit lower="-3.14" upper="3.14" effort="10" velocity="1.0"/>\n'
-                
-                joints_xml += '  </joint>\n\n'
-                
-                # Advance parent
-                current_parent_link = current_child_link
- 
-    return f'<robot name="{robot_name}">\n{links_xml}{joints_xml}</robot>', base_link_name
-
-# --- API Endpoints ---
-
-@app.post("/api/upload-stl")
-async def upload_stl_file(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith('.stl'):
-        raise HTTPException(status_code=400, detail="Invalid file type. Only .stl files are accepted.")
-
-    unique_filename = f"{uuid.uuid4().hex}.stl"
-    file_path = os.path.join(MESH_DIR, unique_filename)
-
-    try:
-        with open(file_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Could not save file: {e}")
-
-    return {"url": f"/{file_path}"}
-
-
-# --- Project Save/Load Endpoints ---
-
-@app.post("/api/projects")
-async def save_project(file: UploadFile = File(...), project_name: str = Form(...)):
-    # Sanitize project name
-    safe_name = "".join(c for c in project_name if c.isalnum() or c in (' ', '_', '-')).strip()
-    if not safe_name:
-        raise HTTPException(status_code=400, detail="Invalid project name")
-    
-    filename = f"{safe_name}.zip"
-    file_location = os.path.join(PROJECTS_DIR, filename)
-    
-    try:
-        with open(file_location, "wb+") as file_object:
-            file_object.write(await file.read())
-        return {"message": "Project saved successfully", "filename": filename}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to save project: {str(e)}")
-
-@app.get("/api/projects")
-async def list_projects():
-    try:
-        if not os.path.exists(PROJECTS_DIR):
-            return {"projects": []}
-        # Filter out "soft deleted" files (part of the prompt requirement)
-        files = [f for f in os.listdir(PROJECTS_DIR) if f.endswith('.zip') and "_deleted_" not in f]
-        return {"projects": sorted(files)}
-    except Exception as e:
-        return {"projects": [], "error": str(e)}
-
-@app.delete("/api/projects/{filename}")
-async def delete_project(filename: str, request: Request):
-    """
-    Soft Delete: Renames the file instead of deleting it.
-    New name: {original_stem}_deleted_{timestamp}_{client_ip}.zip
-    """
-    file_path = os.path.join(PROJECTS_DIR, filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Project not found")
-    
-    try:
-        # Get client IP
-        client_ip = request.client.host if request.client else "unknown_ip"
-        
-        # Get Timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
-        # Construct new filename
-        # Assume valid zip extension from list_projects filtering
-        original_stem = os.path.splitext(filename)[0]
-        # Format: ProjectName_deleted_20260105_123.123.123.123.zip
-        new_filename = f"{original_stem}_deleted_{timestamp}_{client_ip}.zip"
-        new_file_path = os.path.join(PROJECTS_DIR, new_filename)
-        
-        os.rename(file_path, new_file_path)
-        
-        return {"message": f"Project soft-deleted. Renamed to {new_filename}", "deleted_tag": new_filename}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete project: {str(e)}")
-
-@app.get("/api/projects/{filename}")
-async def load_project(filename: str):
-    file_path = os.path.join(PROJECTS_DIR, filename)
-    if not os.path.exists(file_path):
-        raise HTTPException(status_code=404, detail="Project not found")
-    return FileResponse(file_path, media_type='application/zip', filename=filename)
-
-
-@app.post("/api/export-urdf")
-async def export_urdf_package(
-    background_tasks: BackgroundTasks,
-    robot_data: str = Form(...), 
-    robot_name: str = Form(...), 
-    files: Optional[List[UploadFile]] = File(None)
-):
-    try:
-        data_dict = json.loads(robot_data)
-        robot = RobotData.parse_obj(data_dict)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
-
-    sanitized_robot_name = to_snake_case(robot_name)
-    if not sanitized_robot_name:
-        sanitized_robot_name = "my_robot"
-    
-    tmpdir = tempfile.mkdtemp()
-    
-    package_dir = os.path.join(tmpdir, sanitized_robot_name)
-    urdf_dir = os.path.join(package_dir, "urdf")
-    mesh_dir = os.path.join(package_dir, "meshes")
-    launch_dir = os.path.join(package_dir, "launch")
-
-    os.makedirs(urdf_dir, exist_ok=True)
-    os.makedirs(mesh_dir, exist_ok=True)
-    os.makedirs(launch_dir, exist_ok=True)
-
-    # Process and save mesh files
-    mesh_files_map = {}
-    if files:
-        for file in files:
-            form_field_name = file.filename
-            # Robustly parse link_id
-            if form_field_name and form_field_name.startswith('mesh_'):
-                link_id = form_field_name[5:] 
-            else:
-                link_id = form_field_name
-            
-            if link_id in robot.links:
-                # FIX: Append link ID snippet to partial name to ensure uniqueness
-                # Use LAST 6 chars as they are the random part of "link-UUID"
-                # "link-1234..."[:6] is always "link-1". Bad.
-                # "link-1234..."[-6:] is "...89ab". Good.
-                safe_id_suffix = link_id[-6:] if len(link_id) > 6 else link_id
-                safe_filename = f"{to_snake_case(robot.links[link_id].name)}_{safe_id_suffix}.stl"
-                file_path = os.path.join(mesh_dir, safe_filename)
-                
-                with open(file_path, "wb") as f:
-                    shutil.copyfileobj(file.file, f)
-                
-                mesh_files_map[link_id] = safe_filename
-
-    # Generate and save URDF file
-    urdf_content, base_link_name = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map)
-    with open(os.path.join(urdf_dir, f"{sanitized_robot_name}.urdf"), "w") as f:
-        f.write(urdf_content)
-
-    # Create other package files
-    package_xml = f"""<package format=\"2\">\n<name>{sanitized_robot_name}</name>\n<version>0.1.0</version>\n<description>A description of {sanitized_robot_name}</description>\n<maintainer email=\"user@example.com\">Your Name</maintainer>\n<license>MIT</license>\n<buildtool_depend>catkin</buildtool_depend>\n<depend>roslaunch</depend>\n<depend>robot_state_publisher</depend>\n<depend>rviz</depend>\n<depend>joint_state_publisher_gui</depend>\n</package>\n"""
-    with open(os.path.join(package_dir, "package.xml"), "w") as f:
-        f.write(package_xml)
-
-    cmakelists_txt = f"""cmake_minimum_required(VERSION 3.0.2)\nproject({sanitized_robot_name})\nfind_package(catkin REQUIRED COMPONENTS roslaunch robot_state_publisher rviz joint_state_publisher_gui)\ncatkin_package()\n"""
-    with open(os.path.join(package_dir, "CMakeLists.txt"), "w") as f:
-        f.write(cmakelists_txt)
 
     display_launch = f"""<launch>\n<arg name=\"model\" default=\"$(find {sanitized_robot_name})/urdf/{sanitized_robot_name}.urdf\"/>\n<arg name=\"gui\" default=\"true\" />\n<param name=\"robot_description\" textfile=\"$(arg model)\" />\n<node name=\"joint_state_publisher_gui\" pkg=\"joint_state_publisher_gui\" type=\"joint_state_publisher_gui\" />\n<node name=\"robot_state_publisher\" pkg=\"robot_state_publisher\" type=\"robot_state_publisher\" />\n<node name=\"rviz\" pkg=\"rviz\" type=\"rviz\" args=\"-d $(find {sanitized_robot_name})/launch/display.rviz\" required=\"true\" />\n</launch>\n"""
     with open(os.path.join(launch_dir, "display.launch"), "w") as f:
@@ -1026,7 +754,6 @@ Visualization Manager:
         media_type='application/zip', 
         filename=f"{sanitized_robot_name}_ros_package.zip"
     )
-
 
 @app.post("/api/export-urdf-ros2")
 async def export_urdf_package_ros2(
