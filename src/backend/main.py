@@ -1067,3 +1067,90 @@ def read_root():
     Root endpoint for basic API health check.
     """
     return {"message": "RobotLinkForge Backend is running."}
+
+# --- API Endpoints for File Upload and Project Management ---
+
+@app.post("/api/upload-stl")
+async def upload_stl_file(file: UploadFile = File(...)):
+    if not file.filename.lower().endswith('.stl'):
+        raise HTTPException(status_code=400, detail="Invalid file type. Only .stl files are accepted.")
+
+    unique_filename = f"{uuid.uuid4().hex}.stl"
+    file_path = os.path.join(MESH_DIR, unique_filename)
+
+    try:
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Could not save file: {e}")
+
+    return {"url": f"/{file_path}"}
+
+
+# --- Project Save/Load Endpoints ---
+
+@app.post("/api/projects")
+async def save_project(file: UploadFile = File(...), project_name: str = Form(...)):
+    # Sanitize project name
+    safe_name = "".join(c for c in project_name if c.isalnum() or c in (' ', '_', '-')).strip()
+    if not safe_name:
+        raise HTTPException(status_code=400, detail="Invalid project name")
+    
+    filename = f"{safe_name}.zip"
+    file_location = os.path.join(PROJECTS_DIR, filename)
+    
+    try:
+        with open(file_location, "wb+") as file_object:
+            file_object.write(await file.read())
+        return {"message": "Project saved successfully", "filename": filename}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to save project: {str(e)}")
+
+@app.get("/api/projects")
+async def list_projects():
+    try:
+        if not os.path.exists(PROJECTS_DIR):
+            return {"projects": []}
+        # Filter out "soft deleted" files (part of the prompt requirement)
+        files = [f for f in os.listdir(PROJECTS_DIR) if f.endswith('.zip') and "_deleted_" not in f]
+        return {"projects": sorted(files)}
+    except Exception as e:
+        return {"projects": [], "error": str(e)}
+
+@app.delete("/api/projects/{filename}")
+async def delete_project(filename: str, request: Request):
+    """
+    Soft Delete: Renames the file instead of deleting it.
+    New name: {original_stem}_deleted_{timestamp}_{client_ip}.zip
+    """
+    file_path = os.path.join(PROJECTS_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Project not found")
+    
+    try:
+        # Get client IP
+        client_ip = request.client.host if request.client else "unknown_ip"
+        
+        # Get Timestamp
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
+        # Construct new filename
+        # Assume valid zip extension from list_projects filtering
+        original_stem = os.path.splitext(filename)[0]
+        # Format: ProjectName_deleted_20260105_123.123.123.123.zip
+        new_filename = f"{original_stem}_deleted_{timestamp}_{client_ip}.zip"
+        new_file_path = os.path.join(PROJECTS_DIR, new_filename)
+        
+        os.rename(file_path, new_file_path)
+        
+        return {"message": f"Project soft-deleted. Renamed to {new_filename}", "deleted_tag": new_filename}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to delete project: {str(e)}")
+
+@app.get("/api/projects/{filename}")
+async def load_project(filename: str):
+    file_path = os.path.join(PROJECTS_DIR, filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="Project not found")
+    return FileResponse(file_path, media_type='application/zip', filename=filename)
