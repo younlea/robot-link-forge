@@ -24,9 +24,11 @@ type RefMap = Map<string, THREE.Object3D>;
 type RegisterRef = (id: string, ref: THREE.Object3D) => void;
 
 // --- JointWrapper ---
-const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef; isColliding: boolean }> = ({ jointId, registerRef, isColliding }) => {
+const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({ jointId, registerRef }) => {
   const joint = useRobotStore((state) => state.joints[jointId]);
   const { selectedItem, selectItem } = useRobotStore();
+  const highlightedItemId = useRobotStore(s => s.highlightedItem.id);
+  const isColliding = useCollisionContext(jointId);
 
   const originGroupRef = useRef<THREE.Group>(null!);
   const motionGroupRef = useRef<THREE.Group>(null!);
@@ -79,7 +81,7 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef; isColl
 
     const { type, dimensions, color, meshUrl, meshScale, meshOrigin } = joint.visual;
     const isSelected = selectedItem.id === jointId;
-    const isHighlighted = useRobotStore(s => s.highlightedItem.id === jointId);
+    const isHighlighted = highlightedItemId === jointId;
 
     // Highlight logic: if highlighted, override color to Cyan/White mixer
     const displayColor = isHighlighted ? '#00FFFF' : (isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : (color || '#888888')));
@@ -247,7 +249,7 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
     <group ref={groupRef}>
       {renderVisual()}
       {link.childJoints.map((jointId) => (
-        <JointWrapper key={jointId} jointId={jointId} registerRef={registerRef} isColliding={useCollisionContext(jointId)} />
+        <JointWrapper key={jointId} jointId={jointId} registerRef={registerRef} />
       ))}
     </group>
   );
