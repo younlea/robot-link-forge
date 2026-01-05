@@ -50,19 +50,51 @@ function LoadedMesh({ url, scale, origin, color, linkId }: STLMeshProps) {
   );
 }
 
+// Simple Error Boundary to catch loader failures
+class ErrorBoundary extends React.Component<{ fallback: React.ReactNode, children: React.ReactNode }, { hasError: boolean }> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("STLMesh load error:", error, errorInfo);
+  }
+  render() {
+    if (this.state.hasError) {
+      return this.props.fallback;
+    }
+    return this.props.children;
+  }
+}
+
 export function STLMesh(props: STLMeshProps) {
   // A fallback while the mesh is loading.
-  // You can replace this with a more sophisticated placeholder.
-  const fallback = (
+  const loadingFallback = (
     <mesh scale={props.scale || [1, 1, 1]}>
       <boxGeometry args={[0.1, 0.1, 0.1]} />
       <meshBasicMaterial wireframe color="orange" />
     </mesh>
   );
 
+  // Fallback for error state
+  const errorFallback = (
+    <mesh scale={props.scale || [1, 1, 1]}>
+      <boxGeometry args={[0.2, 0.2, 0.2]} />
+      <meshBasicMaterial wireframe color="red" />
+    </mesh>
+  );
+
+  // If URL is missing/empty, return null immediately to avoid even trying (and potentially failing if <LoadedMesh> doesn't handle it)
+  if (!props.url) return null;
+
   return (
-    <Suspense fallback={fallback}>
-      {props.url && <LoadedMesh {...props} />}
-    </Suspense>
+    <ErrorBoundary fallback={errorFallback}>
+      <Suspense fallback={loadingFallback}>
+        <LoadedMesh {...props} />
+      </Suspense>
+    </ErrorBoundary>
   );
 }

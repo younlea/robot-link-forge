@@ -234,7 +234,14 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
 
     // Handle mesh type first
     if (type === 'mesh') {
-      if (!meshUrl) return null;
+      if (!meshUrl) {
+        // Render a placeholder box if mesh is selected but no URL (prevent invisible/unselectable link)
+        return (
+          <Box args={[0.1, 0.1, 0.1]} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
+            <meshBasicMaterial color="red" wireframe />
+          </Box>
+        );
+      }
       return (
         <group onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
           <STLMesh
