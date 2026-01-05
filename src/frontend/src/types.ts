@@ -147,6 +147,7 @@ export interface RobotActions {
   getProjectList: () => Promise<void>;
   saveProjectToServer: (name: string) => Promise<void>;
   loadProjectFromServer: (filename: string) => Promise<void>;
+  deleteProjectFromServer: (filename: string) => Promise<void>;
 
   deleteItem: (id: string, type: 'link' | 'joint') => void;
   resetProject: () => void;

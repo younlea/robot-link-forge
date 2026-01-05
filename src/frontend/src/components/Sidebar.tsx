@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useRobotStore } from '../store';
 import { RobotLink, RobotJoint, JointType } from '../types';
-import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, Upload, RotateCcw, Trash2, FilePlus, HelpCircle, Settings, Calculator } from 'lucide-react';
+import { PlusSquare, Trash2, Save, FolderOpen, Box, Move, Upload, Link as LinkIcon, Download, GitCommit, Calculator } from 'lucide-react';
 import HelpModal from './HelpModal';
 
 // --- Reusable Input Components (with fixes) ---
@@ -1250,16 +1250,55 @@ const Sidebar = () => {
                             {serverProjects.length === 0 ? (
                                 <p className="text-gray-500 text-sm italic">No projects found on server.</p>
                             ) : (
-                                <ul className="space-y-1">
-                                    {serverProjects.map(proj => (
-                                        <li key={proj} className="flex justify-between items-center bg-gray-800 hover:bg-gray-700 p-2 rounded cursor-pointer group">
-                                            <span className="text-sm truncate mr-2">{proj}</span>
-                                            <button onClick={() => handleLoadFromServer(proj)} className="text-xs bg-indigo-600 hover:bg-indigo-500 px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity">
-                                                Load
-                                            </button>
-                                        </li>
-                                    ))}
-                                </ul>
+// In components/Sidebar.tsx
+const Sidebar = () => {
+                                    const {
+                                        links, joints, baseLinkId, addLink, addJoint, exportURDF, exportURDF_ROS2,
+                                        saveRobot, loadRobot, getProjectList, serverProjects, saveProjectToServer,
+                                        loadProjectFromServer, deleteProjectFromServer,
+                                        resetProject, importUnit, setImportUnit, collisionMode, setCollisionMode, setCollisionBoxScale,
+                                        deleteItem // Ensure deleteItem is here too if used
+                                    } = useRobotStore();
+
+                                    // ... inside render ...
+
+                                    {/* Server List */ }
+                                    <div className="flex-1 overflow-y-auto min-h-[150px] mb-4 bg-gray-900/50 rounded p-2">
+                                        <h4 className="text-xs font-semibold text-gray-400 mb-2 uppercase">Server Projects</h4>
+                                        {serverProjects.length === 0 ? (
+                                            <p className="text-gray-500 text-sm italic">No projects found on server.</p>
+                                        ) : (
+                                            <ul className="space-y-1">
+                                                {serverProjects.map(proj => (
+                                                    <li key={proj} className="flex justify-between items-center bg-gray-800 hover:bg-gray-700 p-2 rounded group">
+                                                        {/* Fix contrast: Changed from default (gray-??) to text-gray-200 */}
+                                                        <span className="text-sm text-gray-200 truncate mr-2 flex-1 cursor-pointer" onClick={() => handleLoadFromServer(proj)}>{proj}</span>
+
+                                                        <div className="flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                            <button
+                                                                onClick={() => handleLoadFromServer(proj)}
+                                                                className="p-1 bg-indigo-600 hover:bg-indigo-500 rounded text-white"
+                                                                title="Load Project"
+                                                            >
+                                                                <Download className="h-3 w-3" />
+                                                            </button>
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (confirm(`Are you sure you want to delete "${proj}"? (Soft Delete)`)) {
+                                                                        deleteProjectFromServer(proj);
+                                                                    }
+                                                                }}
+                                                                className="p-1 bg-red-600 hover:bg-red-500 rounded text-white"
+                                                                title="Delete Project (Soft Delete)"
+                                                            >
+                                                                <Trash2 className="h-3 w-3" />
+                                                            </button>
+                                                        </div>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
                             )}
                         </div>
 

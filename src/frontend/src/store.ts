@@ -557,6 +557,26 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
     setCollisionMode: (mode) => setState({ collisionMode: mode }),
     setCollisionBoxScale: (scale) => setState({ collisionBoxScale: scale }),
 
+    deleteProjectFromServer: async (filename: string) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/api/projects/${filename}`, {
+                method: 'DELETE',
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText);
+            }
+
+            // Refresh list
+            await getState().getProjectList();
+            alert(`Project "${filename}" deleted (soft delete).`);
+        } catch (error: any) {
+            console.error("Failed to delete project:", error);
+            alert(`Failed to delete project: ${error.message}`);
+        }
+    },
+
     loadRobot: async (file: File) => {
         const processAndSetState = (robotData: any) => {
             // --- Migration Logic ---
