@@ -811,6 +811,16 @@ async def export_urdf_package_ros2(
                         shutil.copyfileobj(file.file, f)
                     
                     mesh_files_map[link_id] = safe_filename
+                elif link_id in robot.joints:
+                    # It's a joint mesh. Use snake_case joint name.
+                    joint_name = to_snake_case(robot.joints[link_id].name)
+                    safe_filename = f"{joint_name}_{link_id[:4]}.stl"
+                    file_path = os.path.join(mesh_dir, safe_filename)
+
+                    with open(file_path, "wb") as f:
+                        shutil.copyfileobj(file.file, f)
+                    
+                    mesh_files_map[link_id] = safe_filename
 
         # Generate and save URDF file
         urdf_content, base_link_name = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
