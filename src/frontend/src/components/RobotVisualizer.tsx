@@ -180,14 +180,20 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
             orientation.setFromUnitVectors(up, direction);
             const length = start.distanceTo(end);
 
-            // Thin rectangular beam
-            ghost = (
-              <group position={midPoint} quaternion={orientation} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
-                <Box args={[0.05, length, 0.05]}>
-                  <meshBasicMaterial color={isSelected ? HIGHLIGHT_COLOR : 'gray'} transparent opacity={0.3} depthWrite={false} />
-                </Box>
-              </group>
-            );
+            // Thin rectangular beam with gaps to avoid covering joints
+            const JOINT_GAP = 0.08; // Gap on each side
+            const renderLength = Math.max(0.01, length - (JOINT_GAP * 2));
+
+            // Only render if there's enough space between joints
+            if (renderLength > 0.02) {
+              ghost = (
+                <group position={midPoint} quaternion={orientation} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
+                  <Box args={[0.02, renderLength, 0.02]}>
+                    <meshBasicMaterial color={isSelected ? HIGHLIGHT_COLOR : 'gray'} transparent opacity={0.3} depthWrite={false} />
+                  </Box>
+                </group>
+              );
+            }
           }
         }
       }
