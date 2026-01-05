@@ -706,7 +706,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
             // 2. Fetch all necessary mesh files and convert them to a format the backend can handle
             const meshDataPromises = Object.values(robotData.links as Record<string, RobotLink>).map(async (link) => {
-                if (link.visual.type === 'mesh' && link.visual.meshUrl && (link.visual.meshUrl.startsWith('http') || link.visual.meshUrl.startsWith('blob:'))) {
+                if (link.visual.type === 'mesh' && link.visual.meshUrl && (link.visual.meshUrl.startsWith('http') || link.visual.meshUrl.startsWith('blob:') || link.visual.meshUrl.startsWith('/'))) {
                     try {
                         const response = await fetch(link.visual.meshUrl);
                         if (!response.ok) throw new Error(`Failed to fetch ${link.visual.meshUrl}`);
@@ -792,7 +792,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             const robotData = JSON.parse(JSON.stringify({ links, joints, baseLinkId }));
 
             const linkMeshDataPromises = Object.values(robotData.links as Record<string, RobotLink>).map(async (link) => {
-                if (link.visual.type === 'mesh' && link.visual.meshUrl && (link.visual.meshUrl.startsWith('http') || link.visual.meshUrl.startsWith('blob:'))) {
+                if (link.visual.type === 'mesh' && link.visual.meshUrl && (link.visual.meshUrl.startsWith('http') || link.visual.meshUrl.startsWith('blob:') || link.visual.meshUrl.startsWith('/'))) {
                     try {
                         const response = await fetch(link.visual.meshUrl);
                         if (!response.ok) throw new Error(`Failed to fetch ${link.visual.meshUrl}`);
@@ -815,7 +815,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             });
 
             const jointMeshDataPromises = Object.values(robotData.joints as Record<string, RobotJoint>).map(async (joint) => {
-                if (joint.visual.type === 'mesh' && joint.visual.meshUrl && (joint.visual.meshUrl.startsWith('http') || joint.visual.meshUrl.startsWith('blob:'))) {
+                if (joint.visual.type === 'mesh' && joint.visual.meshUrl && (joint.visual.meshUrl.startsWith('http') || joint.visual.meshUrl.startsWith('blob:') || joint.visual.meshUrl.startsWith('/'))) {
                     try {
                         const response = await fetch(joint.visual.meshUrl);
                         if (!response.ok) throw new Error(`Failed to fetch ${joint.visual.meshUrl}`);
