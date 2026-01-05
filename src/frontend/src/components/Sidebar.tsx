@@ -1178,7 +1178,7 @@ const Sidebar = () => {
                             value={robotName}
                             onChange={(e) => setRobotName(e.target.value)}
                             onFocus={e => e.target.select()}
-                            className="w-full bg-gray-900 rounded p-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                            className="w-full bg-gray-900 rounded p-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
                         <div className="flex justify-end space-x-2 mt-6">
                             <button
@@ -1213,7 +1213,7 @@ const Sidebar = () => {
                                     value={saveProjectName}
                                     onChange={(e) => setSaveProjectName(e.target.value)}
                                     placeholder="MyRobot"
-                                    className="flex-1 bg-gray-900 rounded p-2 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                    className="flex-1 bg-gray-900 rounded p-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                                 />
                                 <button onClick={handleSaveToServer} className="bg-indigo-600 hover:bg-indigo-700 p-2 rounded text-sm whitespace-nowrap">
                                     Save to Server
