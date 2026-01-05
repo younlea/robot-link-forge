@@ -72,6 +72,7 @@ class RobotJoint(BaseModel):
     axis: Optional[List[float]] = None
     limits: Dict[str, JointLimit]
     origin: JointOrigin
+    visual: Optional[Visual] = None
 
 class RobotData(BaseModel):
     links: Dict[str, RobotLink]
@@ -294,6 +295,55 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
     link_xml = f'  <link name="{link_name}">\n'
     link_xml += visual_xml
     link_xml += collision_xml
+
+    # --- Joint Visuals (Attached to Parent Link) ---
+    if link.childJoints:
+        for jid in link.childJoints:
+            joint = robot_data.joints.get(jid)
+            if joint and joint.visual and joint.visual.type != 'none':
+                # Use Joint Origin as the base placement for the visual
+                j_xyz = " ".join(map(str, joint.origin.xyz))
+                # Convert Joint RPY (XYZ) to URDF (ZYX)
+                j_rpy_zyx = convert_euler_xyz_to_zyx(joint.origin.rpy)
+                j_rpy = " ".join(map(str, j_rpy_zyx))
+                
+                # Check for mesh file
+                j_geom = ""
+                j_vis = joint.visual
+                
+                if j_vis.type == 'mesh' and joint.id in mesh_files:
+                    j_scale = " ".join(map(str, j_vis.meshScale)) if j_vis.meshScale else "1 1 1"
+                    j_geom = f'        <mesh filename="package://{robot_name}/meshes/{mesh_files[joint.id]}" scale="{j_scale}"/>\n'
+                elif j_vis.type == 'box' and j_vis.dimensions:
+                    j_geom = f'        <box size="{" ".join(map(str, j_vis.dimensions))}" />\n'
+                elif j_vis.type == 'cylinder' and j_vis.dimensions:
+                    l_val = j_vis.dimensions[1] if len(j_vis.dimensions) > 1 else 1.0
+                    j_geom = f'        <cylinder radius="{j_vis.dimensions[0]}" length="{l_val}" />\n'
+                elif j_vis.type == 'sphere' and j_vis.dimensions:
+                    j_geom = f'        <sphere radius="{j_vis.dimensions[0]}" />\n'
+                    
+                if j_geom:
+                    j_visual_xml = f'    <visual>\n'
+                    j_visual_xml += f'      <origin xyz="{j_xyz}" rpy="{j_rpy}" />\n'
+                    j_visual_xml += f'      <geometry>\n{j_geom}      </geometry>\n'
+                    
+                    if j_vis.color:
+                        try:
+                            r, g, b = int(j_vis.color[1:3], 16)/255, int(j_vis.color[3:5], 16)/255, int(j_vis.color[5:7], 16)/255
+                            j_visual_xml += f'      <material name="{joint.name}_color">\n'
+                            j_visual_xml += f'        <color rgba="{r:.3f} {g:.3f} {b:.3f} 1.0" />\n'
+                            j_visual_xml += '      </material>\n'
+                        except: pass
+                        
+                    j_visual_xml += '    </visual>\n'
+                    
+                    # Optional: Add collision for joint visual too? 
+                    # Usually motors have collision. Let's add it.
+                    j_collision_xml = j_visual_xml.replace('<visual>', '<collision>').replace('</visual>', '</collision>')
+                    
+                    link_xml += j_visual_xml
+                    link_xml += j_collision_xml
+
     link_xml += '  </link>\n\n'
     
     return link_xml
@@ -543,6 +593,18 @@ async def export_urdf_package(
                     shutil.copyfileobj(file.file, f)
                 
                 mesh_files_map[link_id] = safe_filename
+            elif link_id in robot.joints:
+                 # It's a joint mesh. Use snake_case joint name.
+                 # Since joints don't have a global unique name map passed here yet effectively (unique_link_names is only links),
+                 # we will generate a safe name here.
+                 joint_name = to_snake_case(robot.joints[link_id].name)
+                 safe_filename = f"{joint_name}_{link_id[:4]}.stl" # Append ID snippet for collision avoidance
+                 file_path = os.path.join(mesh_dir, safe_filename)
+
+                 with open(file_path, "wb") as f:
+                    shutil.copyfileobj(file.file, f)
+                 
+                 mesh_files_map[link_id] = safe_filename
 
     # Generate and save URDF file
     urdf_content, base_link_name = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)

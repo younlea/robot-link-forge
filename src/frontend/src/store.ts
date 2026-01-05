@@ -791,7 +791,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
             const robotData = JSON.parse(JSON.stringify({ links, joints, baseLinkId }));
 
-            const meshDataPromises = Object.values(robotData.links as Record<string, RobotLink>).map(async (link) => {
+            const linkMeshDataPromises = Object.values(robotData.links as Record<string, RobotLink>).map(async (link) => {
                 if (link.visual.type === 'mesh' && link.visual.meshUrl && (link.visual.meshUrl.startsWith('http') || link.visual.meshUrl.startsWith('blob:'))) {
                     try {
                         const response = await fetch(link.visual.meshUrl);
@@ -802,7 +802,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                         const filename = urlParts[urlParts.length - 1] || `${link.id}.stl`;
 
                         return {
-                            linkId: link.id,
+                            id: link.id,
                             filename: filename,
                             blob: blob,
                         };
@@ -814,7 +814,30 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                 return null;
             });
 
-            const meshDatas = (await Promise.all(meshDataPromises)).filter(m => m !== null);
+            const jointMeshDataPromises = Object.values(robotData.joints as Record<string, RobotJoint>).map(async (joint) => {
+                if (joint.visual.type === 'mesh' && joint.visual.meshUrl && (joint.visual.meshUrl.startsWith('http') || joint.visual.meshUrl.startsWith('blob:'))) {
+                    try {
+                        const response = await fetch(joint.visual.meshUrl);
+                        if (!response.ok) throw new Error(`Failed to fetch ${joint.visual.meshUrl}`);
+                        const blob = await response.blob();
+
+                        const urlParts = joint.visual.meshUrl.split('/');
+                        const filename = urlParts[urlParts.length - 1] || `${joint.id}.stl`;
+
+                        return {
+                            id: joint.id,
+                            filename: filename,
+                            blob: blob,
+                        };
+                    } catch (e) {
+                        console.error(`Error fetching mesh for joint ${joint.name}:`, e);
+                        return null;
+                    }
+                }
+                return null;
+            });
+
+            const meshDatas = (await Promise.all([...linkMeshDataPromises, ...jointMeshDataPromises])).filter(m => m !== null);
 
             const formData = new FormData();
             formData.append('robot_data', JSON.stringify(robotData));
@@ -822,7 +845,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
             for (const meshData of meshDatas) {
                 if (meshData) {
-                    formData.append(`files`, meshData.blob, `mesh_${meshData.linkId}`);
+                    formData.append(`files`, meshData.blob, `mesh_${meshData.id}`);
                 }
             }
 
