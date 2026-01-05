@@ -165,12 +165,42 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
       const isSelected = selectedItem.id === linkId;
       const clickHandler = (e: any) => { e.stopPropagation(); selectItem(link.id, 'link'); };
       // Render a "Ghost" visual (transparent box) to allow selection
-      // Use depthWrite={false} to avoid occluding the joint visual inside
-      return (
-        <Box args={[0.15, 0.15, 0.15]} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
-          <meshBasicMaterial color={isSelected ? HIGHLIGHT_COLOR : 'gray'} transparent opacity={0.2} depthWrite={false} />
-        </Box>
-      );
+      // If there is a child joint, visual should 'connect' to it
+      let ghost = null;
+      if (link.childJoints.length === 1) {
+        const childJoint = getJoint(link.childJoints[0]);
+        if (childJoint) {
+          const start = new THREE.Vector3(0, 0, 0);
+          const end = new THREE.Vector3(...childJoint.origin.xyz);
+          if (end.lengthSq() > 0.0001) {
+            const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+            const orientation = new THREE.Quaternion();
+            const up = new THREE.Vector3(0, 1, 0);
+            const direction = new THREE.Vector3().subVectors(end, start).normalize();
+            orientation.setFromUnitVectors(up, direction);
+            const length = start.distanceTo(end);
+
+            // Thin rectangular beam
+            ghost = (
+              <group position={midPoint} quaternion={orientation} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
+                <Box args={[0.05, length, 0.05]}>
+                  <meshBasicMaterial color={isSelected ? HIGHLIGHT_COLOR : 'gray'} transparent opacity={0.3} depthWrite={false} />
+                </Box>
+              </group>
+            );
+          }
+        }
+      }
+
+      // Fallback if no child joint or failed calc
+      if (!ghost) {
+        ghost = (
+          <Box args={[0.15, 0.15, 0.15]} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
+            <meshBasicMaterial color={isSelected ? HIGHLIGHT_COLOR : 'gray'} transparent opacity={0.2} depthWrite={false} />
+          </Box>
+        );
+      }
+      return ghost;
     }
     const { type, dimensions, color, meshUrl, meshScale, meshOrigin } = link.visual;
 
