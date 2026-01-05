@@ -539,13 +539,21 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
     loadProjectFromServer: async (filename: string) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/projects/${filename}`);
+            // Encode filename to handle spaces or special characters safely
+            const encodedFilename = encodeURIComponent(filename);
+            const response = await fetch(`${API_BASE_URL}/api/projects/${encodedFilename}`);
             if (!response.ok) {
-                throw new Error(`Failed to fetch project: ${response.status}`);
+                throw new Error(`Failed to fetch project: ${response.status} ${response.statusText}`);
             }
             const blob = await response.blob();
-            // Reuse existing load logic, but need to wrap blob in File
-            const file = new File([blob], filename, { type: 'application/zip' });
+
+            // Create a File object. Note: filename here should be the original readable one for display logic
+            // explicitly set lastModified to now to simulate fresh file
+            const file = new File([blob], filename, {
+                type: 'application/zip',
+                lastModified: new Date().getTime()
+            });
+
             await getState().loadRobot(file);
         } catch (error: any) {
             console.error("Failed to load project from server:", error);
@@ -559,7 +567,8 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
     deleteProjectFromServer: async (filename: string) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/api/projects/${filename}`, {
+            const encodedFilename = encodeURIComponent(filename);
+            const response = await fetch(`${API_BASE_URL}/api/projects/${encodedFilename}`, {
                 method: 'DELETE',
             });
 
