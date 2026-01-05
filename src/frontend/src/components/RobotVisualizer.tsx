@@ -180,17 +180,34 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
             orientation.setFromUnitVectors(up, direction);
             const length = start.distanceTo(end);
 
-            // Thin rectangular beam with gaps to avoid covering joints
-            const JOINT_GAP = 0.08; // Gap on each side
-            const renderLength = Math.max(0.01, length - (JOINT_GAP * 2));
+            // "Cylinder" ghost visual connecting joints
+            // Gap should be just enough to clear the default joint sphere (radius ~0.02)
+            const JOINT_GAP = 0.025;
+            const renderLength = Math.max(0.001, length - (JOINT_GAP * 2));
 
-            // Only render if there's enough space between joints
-            if (renderLength > 0.02) {
+            // Render even if short, as long as it's positive-ish
+            if (renderLength > 0.001) {
               ghost = (
                 <group position={midPoint} quaternion={orientation} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
-                  <Box args={[0.02, renderLength, 0.02]}>
+                  {/* Rotate cylinder to align with Y-axis orientation logic used above */}
+                  <div />
+                  <Cylinder args={[0.01, 0.01, renderLength, 8]} rotation={[Math.PI / 2, 0, 0]}>
                     <meshBasicMaterial color={isSelected ? HIGHLIGHT_COLOR : 'gray'} transparent opacity={0.3} depthWrite={false} />
-                  </Box>
+                  </Cylinder>
+                </group>
+              );
+              // Note: The orientation calc above sets Y as Up. Cylinder is Y-aligned by default.
+              // Wait, typical orientation lookAt makes Z forward.
+              // My previous Box code used `orientation.setFromUnitVectors(up, direction)`.
+              // `up` was (0,1,0). `direction` is the vector from start to end.
+              // So the Y-axis of the object will point along `direction`.
+              // ThreeJS Cylinder is Y-aligned by default. So NO extra rotation is needed inside the group.
+
+              ghost = (
+                <group position={midPoint} quaternion={orientation} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
+                  <Cylinder args={[0.01, 0.01, renderLength, 8]}>
+                    <meshBasicMaterial color={isSelected ? HIGHLIGHT_COLOR : 'gray'} transparent opacity={0.3} depthWrite={false} />
+                  </Cylinder>
                 </group>
               );
             }
