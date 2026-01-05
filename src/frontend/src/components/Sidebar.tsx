@@ -736,7 +736,7 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                         <option value="cylinder">Cylinder</option>
                         <option value="sphere">Sphere</option>
                         <option value="mesh">Mesh (STL)</option>
-                        <option value="none">None</option>
+                        <option value="none">None (Virtual)</option>
                     </select>
                 </div>
 
