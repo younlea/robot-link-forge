@@ -1170,36 +1170,38 @@ async def load_project(filename: str):
 
 def ensure_binary_stl(input_path: str, output_path: str):
     """
-    Checks if an STL file is ASCII and converts it to Binary if so.
-    If it's already binary, uses the input file.
+    Checks if an STL file is valid Binary.
+    If valid binary: just copy.
+    If not: Attempt to parse as ASCII and convert to Binary.
     """
     import struct
     import os
     
-    with open(input_path, 'rb') as f:
-        header = f.read(80)
-        is_ascii = False
-        try:
-            # Heuristic: Starts with 'solid' and contains 'facet'
-            content_start = header.decode('utf-8', errors='ignore')
-            if content_start.strip().startswith('solid'):
-                # Read a bit more to be sure
-                f.seek(0)
-                chunk = f.read(1024).decode('utf-8', errors='ignore')
-                if 'facet' in chunk and 'vertex' in chunk:
-                    is_ascii = True
-        except Exception:
-            is_ascii = False
+    file_size = os.path.getsize(input_path)
+    is_valid_binary = False
     
-    if not is_ascii:
-        # Already binary, just copy if needed
+    if file_size >= 84:
+        with open(input_path, 'rb') as f:
+            header = f.read(80)
+            num_faces_bytes = f.read(4)
+            try:
+                num_faces = struct.unpack('<I', num_faces_bytes)[0]
+                expected_size = 84 + (50 * num_faces)
+                if file_size == expected_size:
+                    is_valid_binary = True
+            except Exception:
+                pass
+    
+    if is_valid_binary:
+        # Already valid binary, just copy if needed
         if input_path != output_path:
             shutil.copy2(input_path, output_path)
         return
 
-    print(f"Converting ASCII STL {input_path} to Binary...")
+    print(f"Detected ASCII or Invalid Binary STL ({input_path}). Converting to Binary...")
     
     triangles = []
+    # ... (rest of parser)
     current_normal = [0.0, 0.0, 0.0]
     current_vertices = []
     
