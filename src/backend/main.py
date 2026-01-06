@@ -1415,7 +1415,8 @@ Or drag and drop `{urdf_filename}` into the standalone MuJoCo simulator.
             f.write(readme_content)
 
         # Zip it
-        shutil.make_archive(package_dir, 'zip', package_dir)
+        # Zip it
+        shutil.make_archive(package_dir, 'zip', root_dir=tmpdir, base_dir=sanitized_robot_name)
         return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_mujoco_urdf.zip")
 
     except Exception as e:
@@ -1529,7 +1530,8 @@ Or drag and drop `{mjcf_filename}` into the standalone MuJoCo simulator.
             f.write(readme_content)
 
         # Zip it
-        shutil.make_archive(package_dir, 'zip', package_dir)
+        # Zip it
+        shutil.make_archive(package_dir, 'zip', root_dir=tmpdir, base_dir=sanitized_robot_name)
         return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_mujoco_mjcf.zip")
 
     except Exception as e:
