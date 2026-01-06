@@ -545,6 +545,9 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
                         joints_xml += f'    <limit lower="{sub["limit"].lower}" upper="{sub["limit"].upper}" effort="10" velocity="1.0"/>\n'
                     else:
                         joints_xml += f'    <limit lower="-3.14" upper="3.14" effort="10" velocity="1.0"/>\n'
+                    joints_xml += f'    <dynamics damping="5.0" friction="1.0"/>\n'
+                else:
+                    joints_xml += f'    <limit lower="-3.14" upper="3.14" effort="10" velocity="1.0"/>\n'
                 
                 joints_xml += '  </joint>\n\n'
                 
@@ -1494,11 +1497,20 @@ except ImportError:
     print("Please install mujoco with 'pip install mujoco'")
     exit(1)
 import time
+import argparse
+
+parser = argparse.ArgumentParser(description='Visualize MuJoCo model.')
+parser.add_argument('--kinematic', action='store_true', help='Run in kinematic mode (gravity disabled)')
+args = parser.parse_args()
 
 model_path = "{urdf_filename}"
 print(f"Loading model from {{model_path}}...")
 model = mujoco.MjModel.from_xml_path(model_path)
 data = mujoco.MjData(model)
+
+if args.kinematic:
+    print("Kinematic mode enabled: Gravity disabled.")
+    model.opt.gravity = (0, 0, 0)
 
 print("Launching viewer...")
 with mujoco.viewer.launch_passive(model, data) as viewer:
@@ -1533,6 +1545,12 @@ pip install mujoco
 Run the visualization script:
 ```bash
 python visualize_urdf.py
+```
+
+### Kinematic Mode (No Gravity)
+To run without gravity (e.g., to check joint limits or move joints manually without them falling):
+```bash
+python visualize_urdf.py --kinematic
 ```
 
 Or drag and drop `{urdf_filename}` into the standalone MuJoCo simulator.
