@@ -1183,41 +1183,57 @@ async def load_project(filename: str):
 
 def ensure_binary_stl(input_path: str, output_path: str):
     """
-    Checks if an STL file is valid and converts to Binary using numpy-stl.
-    Also checks face count limits for MuJoCo (1 to 200,000).
+    Checks if an STL file is valid and converts to Binary using trimesh.
+    If face count > 150,000, it decimates the mesh to be safe for MuJoCo (limit ~200k).
     """
     import shutil
     import os
     
     try:
-        from stl import mesh, Mode
+        import trimesh
     except ImportError:
-        print("numpy-stl not installed. Please run 'pip install numpy-stl'. Falling back to raw copy.")
+        print("trimesh not installed. Falling back to simple copy.")
         if input_path != output_path:
             shutil.copy2(input_path, output_path)
         return
 
     try:
-        # numpy-stl handles both ASCII and Binary automatically
-        print(f"Processing STL: {input_path}")
-        stl_mesh = mesh.Mesh.from_file(input_path)
+        print(f"Processing STL with trimesh: {input_path}")
+        # Load mesh (trimesh handles ASCII/Binary automatically)
+        mesh = trimesh.load(input_path, file_type='stl')
         
-        num_faces = len(stl_mesh.data)
+        # If it loaded as a Scene (multiple meshes), flatten it
+        if isinstance(mesh, trimesh.Scene):
+             if len(mesh.geometry) == 0:
+                 print("  Warning: Empty scene.")
+                 return # Nothing to save
+             # Concatenate all geometries
+             mesh = trimesh.util.concatenate([g for g in mesh.geometry.values()])
+
+        num_faces = len(mesh.faces)
         print(f"  Faces: {num_faces}")
 
-        if num_faces == 0:
-            print(f"  WARNING: Mesh {input_path} has 0 faces. MuJoCo will fail.")
-        elif num_faces > 200000:
-            print(f"  WARNING: Mesh {input_path} has {num_faces} faces. MuJoCo limit is 200,000.")
-            # Optional: We could decimate here if we had numpy/scipy/trimesh logic, 
-            # but for now just Warn. numpy-stl doesn't do decimation easily.
-
-        # Save as BINARY
-        stl_mesh.save(output_path, mode=Mode.BINARY)
+        LIMIT = 150000 # Safety margin below 200,000
+        
+        if num_faces > LIMIT:
+            print(f"  Face count {num_faces} exceeds safety limit {LIMIT}. Decimating...")
+            # Decimate
+            # simplify_quadratic_decimation is robust in trimesh (requires scipy or open3d usually)
+            # fallback to simple vertex clustering if needed, but allow trimesh to try best method.
+            try:
+                mesh = mesh.simplify_quadratic_decimation(LIMIT)
+                print(f"  Decimated to: {len(mesh.faces)} faces")
+            except Exception as e:
+                print(f"  Decimation failed ({e}). Trying to export original.")
+        
+        if len(mesh.faces) == 0:
+             print("  Warning: Mesh has 0 faces after load/decimate.")
+        
+        # Save as Binary STL
+        mesh.export(output_path, file_type='stl')
         
     except Exception as e:
-        print(f"Error processing STL with numpy-stl: {e}. Falling back to original copy.")
-        # Fallback
+        print(f"Error processing STL with trimesh: {e}. Falling back to raw copy.")
         if input_path != output_path:
             shutil.copy2(input_path, output_path)
 
