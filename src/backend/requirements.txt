@@ -6,3 +6,4 @@ trimesh
 numpy-stl
 scipy
 numpy
+fast-simplification
