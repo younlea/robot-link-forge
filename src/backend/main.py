@@ -1166,6 +1166,94 @@ async def load_project(filename: str):
     return FileResponse(file_path, media_type='application/zip', filename=filename)
 
 
+# --- Mesh Processing Helper ---
+
+def ensure_binary_stl(input_path: str, output_path: str):
+    """
+    Checks if an STL file is ASCII and converts it to Binary if so.
+    If it's already binary, copies it to output_path.
+    This helps compatability with strict loaders like MuJoCo.
+    """
+    import struct
+    import re
+    
+    with open(input_path, 'rb') as f:
+        header = f.read(80)
+        # Check for ASCII 'solid' signature not followed by binary-like garbage
+        # A true ASCII file starts with 'solid'. A binary file might too, but rare.
+        # Robust check: try to read line by line if encoded.
+        is_ascii = False
+        try:
+            content = header.decode('utf-8')
+            if content.strip().startswith('solid'):
+                is_ascii = True
+        except UnicodeDecodeError:
+            is_ascii = False
+    
+    if not is_ascii:
+        # Already binary, just copy
+        if input_path != output_path:
+            shutil.copy2(input_path, output_path)
+        return
+
+    # Convert ASCII to Binary
+    print(f"Converting ASCII STL {input_path} to Binary...")
+    triangles = []
+    
+    # regex to find normal and 3 vertices
+    # Pattern looks for:
+    # facet normal ...
+    #   outer loop
+    #     vertex ...
+    #     vertex ...
+    #     vertex ...
+    #   endloop
+    # endfacet
+    
+    with open(input_path, 'r', encoding='utf-8', errors='replace') as f:
+        content = f.read()
+    
+    # Simple parsing logic
+    # Find all "facet normal ni nj nk ... endfacet" blocks could be regex
+    # But strictly, we just need the vertices and normals.
+    
+    # Regex for scientific notation floats
+    float_re = r"[-+]?[0-9]*\.?[0-9]+(?:[eE][-+]?[0-9]+)?"
+    
+    # Find block: facet normal nx ny nz ... endfacet
+    # Inside: vertex vx vy vz (x3)
+    
+    # We can use a single regex to capture a whole facet
+    facet_pattern = re.compile(
+        r"facet\s+normal\s+(" + float_re + r")\s+(" + float_re + r")\s+(" + float_re + r")" + 
+        r".*?" +
+        r"vertex\s+(" + float_re + r")\s+(" + float_re + r")\s+(" + float_re + r")" + 
+        r".*?" +
+        r"vertex\s+(" + float_re + r")\s+(" + float_re + r")\s+(" + float_re + r")" + 
+        r".*?" +
+        r"vertex\s+(" + float_re + r")\s+(" + float_re + r")\s+(" + float_re + r")", 
+        re.DOTALL | re.IGNORECASE
+    )
+    
+    matches = facet_pattern.findall(content)
+    
+    # Write Binary
+    with open(output_path, 'wb') as f_out:
+        # 1. Header (80 bytes)
+        f_out.write(b'\0' * 80)
+        
+        # 2. Number of triangles (4 bytes unsigned int)
+        f_out.write(struct.pack('<I', len(matches)))
+        
+        # 3. Triangles
+        for m in matches:
+            # m is tuple of 12 strings: nx, ny, nz, v1x, v1y...
+            floats = [float(x) for x in m]
+            # Binary STL triangle: Normal(3f), V1(3f), V2(3f), V3(3f), Attr(2b)
+            # Struct format: 12f for coords, H for attr
+            data = struct.pack('<12fH', *floats, 0)
+            f_out.write(data)
+
 # --- MuJoCo Export Helpers ---
 
 def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[str, str]):
@@ -1338,14 +1426,34 @@ async def export_mujoco_urdf(
                 if link_id in robot.links:
                     clean_name = unique_link_names[link_id]
                     safe_filename = f"{clean_name}.stl"
-                    with open(os.path.join(mesh_dir, safe_filename), "wb") as f:
-                        shutil.copyfileobj(file.file, f)
+                    dest_path = os.path.join(mesh_dir, safe_filename)
+                    # Save upload to temp file first to process it
+                    with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
+                         shutil.copyfileobj(file.file, tmp_upload)
+                         tmp_upload_path = tmp_upload.name
+                    
+                    try:
+                        ensure_binary_stl(tmp_upload_path, dest_path)
+                    finally:
+                         if os.path.exists(tmp_upload_path):
+                             os.remove(tmp_upload_path)
+
                     mesh_files_map[link_id] = safe_filename
                 elif link_id in robot.joints:
                      joint_name = to_snake_case(robot.joints[link_id].name)
                      safe_filename = f"{joint_name}_{link_id[:4]}.stl"
-                     with open(os.path.join(mesh_dir, safe_filename), "wb") as f:
-                        shutil.copyfileobj(file.file, f)
+                     dest_path = os.path.join(mesh_dir, safe_filename)
+                     
+                     with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
+                         shutil.copyfileobj(file.file, tmp_upload)
+                         tmp_upload_path = tmp_upload.name
+
+                     try:
+                        ensure_binary_stl(tmp_upload_path, dest_path)
+                     finally:
+                         if os.path.exists(tmp_upload_path):
+                             os.remove(tmp_upload_path)
+
                      mesh_files_map[link_id] = safe_filename
 
         # Generate URDF
@@ -1467,14 +1575,26 @@ async def export_mujoco_mjcf(
                 if link_id in robot.links:
                     clean_name = unique_link_names[link_id]
                     safe_filename = f"{clean_name}.stl"
-                    with open(os.path.join(mesh_dir, safe_filename), "wb") as f:
-                        shutil.copyfileobj(file.file, f)
+                    dest_path = os.path.join(mesh_dir, safe_filename)
+                    with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
+                         shutil.copyfileobj(file.file, tmp_upload)
+                         tmp_upload_path = tmp_upload.name
+                    try:
+                        ensure_binary_stl(tmp_upload_path, dest_path)
+                    finally:
+                        if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
                     mesh_files_map[link_id] = safe_filename
                 elif link_id in robot.joints:
                      joint_name = to_snake_case(robot.joints[link_id].name)
                      safe_filename = f"{joint_name}_{link_id[:4]}.stl"
-                     with open(os.path.join(mesh_dir, safe_filename), "wb") as f:
-                        shutil.copyfileobj(file.file, f)
+                     dest_path = os.path.join(mesh_dir, safe_filename)
+                     with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
+                         shutil.copyfileobj(file.file, tmp_upload)
+                         tmp_upload_path = tmp_upload.name
+                     try:
+                        ensure_binary_stl(tmp_upload_path, dest_path)
+                     finally:
+                        if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
                      mesh_files_map[link_id] = safe_filename
 
         # Generate MJCF XML
