@@ -1350,6 +1350,11 @@ async def export_mujoco_urdf(
 
         # Generate URDF
         urdf_content, _ = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
+        
+        # FIX for MuJoCo: Replace 'package://{robot_name}/' with relative path (None/empty)
+        # MuJoCo loader prefers relative paths like "meshes/foo.stl" over "package://..."
+        urdf_content = urdf_content.replace(f'package://{sanitized_robot_name}/', '')
+        
         urdf_filename = f"{sanitized_robot_name}.urdf"
         with open(os.path.join(package_dir, urdf_filename), "w") as f:
             f.write(urdf_content)
