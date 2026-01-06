@@ -1170,104 +1170,41 @@ async def load_project(filename: str):
 
 def ensure_binary_stl(input_path: str, output_path: str):
     """
-    Checks if an STL file is valid Binary.
-    If valid binary: just copy.
-    If not: Attempt to parse as ASCII and convert to Binary.
+    Checks if an STL file is valid and converts to Binary using numpy-stl.
+    Also checks face count limits for MuJoCo (1 to 200,000).
     """
-    import struct
+    import shutil
     import os
     
-    file_size = os.path.getsize(input_path)
-    is_valid_binary = False
-    
-    if file_size >= 84:
-        with open(input_path, 'rb') as f:
-            header = f.read(80)
-            num_faces_bytes = f.read(4)
-            try:
-                num_faces = struct.unpack('<I', num_faces_bytes)[0]
-                expected_size = 84 + (50 * num_faces)
-                if file_size == expected_size:
-                    is_valid_binary = True
-            except Exception:
-                pass
-    
-    if is_valid_binary:
-        # Already valid binary, just copy if needed
+    try:
+        from stl import mesh, Mode
+    except ImportError:
+        print("numpy-stl not installed. Please run 'pip install numpy-stl'. Falling back to raw copy.")
         if input_path != output_path:
             shutil.copy2(input_path, output_path)
         return
 
-    print(f"Detected ASCII or Invalid Binary STL ({input_path}). Converting to Binary...")
-    
-    triangles = []
-    # ... (rest of parser)
-    current_normal = [0.0, 0.0, 0.0]
-    current_vertices = []
-    
     try:
-        with open(input_path, 'r', encoding='utf-8', errors='replace') as f:
-            for line in f:
-                parts = line.split()
-                if not parts:
-                    continue
-                token = parts[0].lower()
-                
-                if token == 'facet':
-                    # facet normal ni nj nk
-                    if len(parts) >= 5 and parts[1] == 'normal':
-                        try:
-                            current_normal = [float(parts[2]), float(parts[3]), float(parts[4])]
-                        except ValueError:
-                            current_normal = [0.0, 0.0, 0.0]
-                    else:
-                        current_normal = [0.0, 0.0, 0.0]
-                    current_vertices = []
-                
-                elif token == 'vertex':
-                    if len(parts) >= 4:
-                        try:
-                            v = [float(parts[1]), float(parts[2]), float(parts[3])]
-                            current_vertices.append(v)
-                        except ValueError:
-                            pass
-                
-                elif token == 'endfacet':
-                    if len(current_vertices) == 3:
-                        # Append (normal, v1, v2, v3)
-                        triangles.append((current_normal, current_vertices))
-                    current_vertices = []
-                    
-        # Verify we actually found triangles
-        if len(triangles) == 0:
-            print(f"Warning: Parser found 0 triangles in {input_path}. Falling back to original.")
-            if input_path != output_path:
-                shutil.copy2(input_path, output_path)
-            return
+        # numpy-stl handles both ASCII and Binary automatically
+        print(f"Processing STL: {input_path}")
+        stl_mesh = mesh.Mesh.from_file(input_path)
+        
+        num_faces = len(stl_mesh.data)
+        print(f"  Faces: {num_faces}")
 
-        # Write Binary
-        with open(output_path, 'wb') as f_out:
-            # 1. Header (80 bytes)
-            f_out.write(b'\0' * 80)
-            
-            # 2. Number of triangles (4 bytes unsigned int)
-            f_out.write(struct.pack('<I', len(triangles)))
-            
-            # 3. Triangles
-            for normal, verts in triangles:
-                # Binary STL triangle: Normal(3f), V1(3f), V2(3f), V3(3f), Attr(2b)
-                # Struct format: 12f for coords, H for attr
-                # Flatten list
-                data = struct.pack('<3f3f3f3fH', 
-                                   normal[0], normal[1], normal[2],
-                                   verts[0][0], verts[0][1], verts[0][2],
-                                   verts[1][0], verts[1][1], verts[1][2],
-                                   verts[2][0], verts[2][1], verts[2][2],
-                                   0)
-                f_out.write(data)
-                
+        if num_faces == 0:
+            print(f"  WARNING: Mesh {input_path} has 0 faces. MuJoCo will fail.")
+        elif num_faces > 200000:
+            print(f"  WARNING: Mesh {input_path} has {num_faces} faces. MuJoCo limit is 200,000.")
+            # Optional: We could decimate here if we had numpy/scipy/trimesh logic, 
+            # but for now just Warn. numpy-stl doesn't do decimation easily.
+
+        # Save as BINARY
+        stl_mesh.save(output_path, mode=Mode.BINARY)
+        
     except Exception as e:
-        print(f"Error converting STL: {e}. Falling back to original.")
+        print(f"Error processing STL with numpy-stl: {e}. Falling back to original copy.")
+        # Fallback
         if input_path != output_path:
             shutil.copy2(input_path, output_path)
 
