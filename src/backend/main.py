@@ -1221,7 +1221,8 @@ def ensure_binary_stl(input_path: str, output_path: str):
             # simplify_quadratic_decimation is robust in trimesh (requires scipy or open3d usually)
             # fallback to simple vertex clustering if needed, but allow trimesh to try best method.
             try:
-                mesh = mesh.simplify_quadratic_decimation(LIMIT)
+                # Use quadric decimation (standard in trimesh)
+                mesh = mesh.simplify_quadric_decimation(LIMIT)
                 print(f"  Decimated to: {len(mesh.faces)} faces")
             except Exception as e:
                 print(f"  Decimation failed ({e}). Trying to export original.")
