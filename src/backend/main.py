@@ -290,16 +290,12 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
     visual_xml += '    </visual>\n'
     
     # COLLISION LOGIC
-    if for_mujoco and vis.type == 'mesh':
-        # Safe Collision for MuJoCo: Use plain Box to prevent "face count > 200k" errors on convex hull gen
-        # Ideally we'd match the Mesh AABB, but we fall back to a small box if we don't have it easily.
-        # User primarily wants Visualization anyway.
-        collision_xml = '    <collision>\n'
-        collision_xml += f'      <origin xyz="{origin_xyz_str}" rpy="{origin_rpy_str}" />\n'
-        collision_xml += '      <geometry>\n'
-        collision_xml += '        <box size="0.1 0.1 0.1" />\n' 
-        collision_xml += '      </geometry>\n'
-        collision_xml += '    </collision>\n'
+    if for_mujoco:
+        # MuJoCo Stability Fix:
+        # We disable collision entirely for the export to prevent "explosions" due to 
+        # overlapping default collision boxes at joints (since we use a default box if no mesh).
+        # Users mainly use this for visualization or can add custom collision meshes later.
+        collision_xml = ''
     else:
         # Standard: Duplicate Visual as Collision
         collision_xml = visual_xml.replace('<visual>', '<collision>', 1).replace('</visual>', '</collision>', 1)
@@ -545,7 +541,8 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
                         joints_xml += f'    <limit lower="{sub["limit"].lower}" upper="{sub["limit"].upper}" effort="10" velocity="1.0"/>\n'
                     else:
                         joints_xml += f'    <limit lower="-3.14" upper="3.14" effort="10" velocity="1.0"/>\n'
-                    joints_xml += f'    <dynamics damping="5.0" friction="1.0"/>\n'
+                    joints_xml += f'    <limit lower="-3.14" upper="3.14" effort="10" velocity="1.0"/>\n'
+                    joints_xml += f'    <dynamics damping="5.0" friction="1.0" armature="0.1"/>\n'
                 else:
                     joints_xml += f'    <limit lower="-3.14" upper="3.14" effort="10" velocity="1.0"/>\n'
                 
@@ -1525,6 +1522,31 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
 """
         with open(os.path.join(package_dir, "visualize_urdf.py"), "w") as f:
             f.write(script_content)
+
+        # Generate Launch Scripts
+        # 1. launch.sh
+        launch_sh = f"""#!/bin/bash
+python3 visualize_urdf.py "$@"
+"""
+        with open(os.path.join(package_dir, "launch.sh"), "w") as f:
+            f.write(launch_sh)
+        os.chmod(os.path.join(package_dir, "launch.sh"), 0o755)
+
+        # 2. launch_kinematic.sh
+        launch_kin_sh = f"""#!/bin/bash
+python3 visualize_urdf.py --kinematic "$@"
+"""
+        with open(os.path.join(package_dir, "launch_kinematic.sh"), "w") as f:
+            f.write(launch_kin_sh)
+        os.chmod(os.path.join(package_dir, "launch_kinematic.sh"), 0o755)
+
+        # 3. launch.bat (Windows)
+        launch_bat = f"""@echo off
+python visualize_urdf.py %*
+pause
+"""
+        with open(os.path.join(package_dir, "launch.bat"), "w") as f:
+            f.write(launch_bat)
 
         # Generate README
         readme_content = f"""
