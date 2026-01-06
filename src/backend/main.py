@@ -1222,7 +1222,8 @@ def ensure_binary_stl(input_path: str, output_path: str):
             # fallback to simple vertex clustering if needed, but allow trimesh to try best method.
             try:
                 # Use quadric decimation (standard in trimesh)
-                mesh = mesh.simplify_quadric_decimation(LIMIT)
+                # Must use keyword argument 'face_count' or it defaults to percent and fails
+                mesh = mesh.simplify_quadric_decimation(face_count=LIMIT)
                 print(f"  Decimated to: {len(mesh.faces)} faces")
             except Exception as e:
                 print(f"  Decimation failed ({e}). Trying to export original.")
