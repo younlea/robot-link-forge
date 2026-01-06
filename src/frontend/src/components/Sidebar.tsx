@@ -955,8 +955,8 @@ const Sidebar = () => {
 
     // State for the new export modal
     const [showExportModal, setShowExportModal] = useState(false);
-    const [exportFormat, setExportFormat] = useState<'urdf' | 'urdf_ros2' | null>(null);
-    const [robotName, setRobotName] = useState('');
+    const [exportFormat, setExportFormat] = useState<'urdf' | 'urdf_ros2' | 'mujoco_urdf' | 'mujoco_mjcf' | null>(null);
+    const [robotName, setRobotName] = useState('MyRobot');
 
     // State for Save/Load Modals
     const [showSaveModal, setShowSaveModal] = useState(false);
@@ -977,7 +977,7 @@ const Sidebar = () => {
         if (event.target) event.target.value = '';
     };
 
-    const openExportModal = (format: 'urdf' | 'urdf_ros2') => {
+    const openExportModal = (format: 'urdf' | 'urdf_ros2' | 'mujoco_urdf' | 'mujoco_mjcf') => {
         const { baseLinkId, links } = useRobotStore.getState();
         const defaultName = links[baseLinkId]?.name || 'my_robot';
         setRobotName(defaultName);
@@ -994,6 +994,10 @@ const Sidebar = () => {
             exportURDF(robotName);
         } else if (exportFormat === 'urdf_ros2') {
             exportURDF_ROS2(robotName);
+        } else if (exportFormat === 'mujoco_urdf') {
+            useRobotStore.getState().exportMujocoURDF(robotName);
+        } else if (exportFormat === 'mujoco_mjcf') {
+            useRobotStore.getState().exportMujocoMJCF(robotName);
         }
 
         // Close modal
@@ -1332,9 +1336,12 @@ const Sidebar = () => {
                                 <Upload className="mr-2 h-4 w-4" /> Export
                             </button>
                             {isExportMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-48 bg-gray-700 rounded-md shadow-lg z-10">
+                                <div className="absolute right-0 mt-2 w-56 bg-gray-700 rounded-md shadow-lg z-10">
                                     <a href="#" onClick={(e) => { e.preventDefault(); openExportModal('urdf'); }} className="block px-4 py-2 text-sm text-white hover:bg-gray-600">Export as URDF (ROS1)</a>
                                     <a href="#" onClick={(e) => { e.preventDefault(); openExportModal('urdf_ros2'); }} className="block px-4 py-2 text-sm text-white hover:bg-gray-600">Export as URDF (ROS2)</a>
+                                    <div className="border-t border-gray-600 my-1"></div>
+                                    <a href="#" onClick={(e) => { e.preventDefault(); openExportModal('mujoco_urdf'); }} className="block px-4 py-2 text-sm text-white hover:bg-gray-600">Export to URDF (MuJoCo)</a>
+                                    <a href="#" onClick={(e) => { e.preventDefault(); openExportModal('mujoco_mjcf'); }} className="block px-4 py-2 text-sm text-white hover:bg-gray-600">Export to MJCF (MuJoCo)</a>
                                 </div>
                             )}
                         </div>

@@ -1164,3 +1164,374 @@ async def load_project(filename: str):
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Project not found")
     return FileResponse(file_path, media_type='application/zip', filename=filename)
+
+
+# --- MuJoCo Export Helpers ---
+
+def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[str, str]):
+    """
+    Generates a native MuJoCo XML string (MJCF) for the robot.
+    Recursive function to build the body tree from base link.
+    """
+    xml = [f'<mujoco model="{robot_name}">']
+    xml.append('  <compiler angle="radian" meshdir="meshes"/>')
+    xml.append('  <option gravity="0 0 -9.81"/>')
+    xml.append('  <asset>')
+    # Add all meshes to asset section
+    for link_id, filename in mesh_files_map.items():
+        # Mesh name in MJCF usually needs to be unique. We use the filename (without ext) as the mesh name.
+        mesh_name = os.path.splitext(filename)[0]
+        xml.append(f'    <mesh name="{mesh_name}" file="{filename}"/>')
+    
+    # Add simple materials
+    xml.append('    <material name="gray" rgba="0.5 0.5 0.5 1"/>')
+    xml.append('    <material name="collision" rgba="1 0 0 0.5"/>')
+    xml.append('  </asset>')
+    
+    xml.append('  <worldbody>')
+    xml.append('    <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/>')
+    xml.append('    <geom type="plane" size="5 5 0.1" rgba=".9 .9 .9 1"/>')
+
+    # Recursive function to build body hierarchy
+    def build_body(link_id: str, parent_joint_id: Optional[str] = None, indent_level: int = 2):
+        indent = '  ' * indent_level
+        link = robot.links.get(link_id)
+        if not link:
+            return
+
+        body_name = link.name
+        
+        # Determine body position/orientation relative to parent
+        pos_str = "0 0 0"
+        euler_str = "0 0 0"
+
+        if parent_joint_id:
+            joint = robot.joints.get(parent_joint_id)
+            if joint:
+                pos_str = " ".join(map(str, joint.origin.xyz))
+                # For basic MJCF, we can try using Euler angles. 
+                # Ideally we'd use 'quat' if we had full quats, but rpy/euler is supported.
+                euler_str = " ".join(map(str, joint.origin.rpy))
+        else:
+            # Base link placement
+            pos_str = "0 0 0"
+            euler_str = "0 0 0"
+
+        xml.append(f'{indent}<body name="{body_name}" pos="{pos_str}" euler="{euler_str}">')
+
+        # 1. Add Joint (defined inside the child body in MJCF)
+        if parent_joint_id:
+            joint = robot.joints.get(parent_joint_id)
+            if joint and joint.type != 'fixed':
+                # Map joint types
+                j_type = "hinge" if joint.type == 'rotational' else "slide"
+                if joint.type == 'connected': j_type = "hinge" # fallback
+                
+                # Axis mapping
+                axis = "0 0 1" # default Z
+                if joint.axis == 'x': axis = "1 0 0"
+                elif joint.axis == 'y': axis = "0 1 0"
+                elif joint.axis == 'z': axis = "0 0 1"
+                
+                # Limits
+                range_str = ""
+                if j_type == "hinge":
+                    # For simplicty, use primary roll/pitch/yaw based on axis
+                    limit = joint.limits.roll 
+                    if joint.axis == 'x': limit = joint.limits.roll
+                    elif joint.axis == 'y': limit = joint.limits.pitch
+                    elif joint.axis == 'z': limit = joint.limits.yaw
+                    range_str = f'range="{limit.lower} {limit.upper}"'
+
+                elif j_type == "slide":
+                     limit = joint.limits.displacement
+                     range_str = f'range="{limit.lower} {limit.upper}"'
+
+                xml.append(f'{indent}  <joint name="{joint.name}" type="{j_type}" axis="{axis}" {range_str} />')
+
+        # 2. Add Visual Geom
+        if link.visual and link.visual.type != 'none':
+            v = link.visual
+            # Geom Position relative to body
+            v_pos = "0 0 0"
+            v_euler = "0 0 0"
+            if v.type == 'mesh':
+                if v.meshOrigin:
+                    v_pos = " ".join(map(str, v.meshOrigin.xyz))
+                    v_euler = " ".join(map(str, v.meshOrigin.rpy))
+            
+            geom_str = ""
+            if v.type == 'box':
+                # MJCF box size is half-extents
+                size = " ".join([str(d/2) for d in v.dimensions])
+                geom_str = f'type="box" size="{size}"'
+            elif v.type == 'cylinder':
+                 # MJCF cylinder size is radius half-height
+                 radius = v.dimensions[0]
+                 height = v.dimensions[1] / 2
+                 geom_str = f'type="cylinder" size="{radius} {height}"'
+            elif v.type == 'sphere':
+                 radius = v.dimensions[0]
+                 geom_str = f'type="sphere" size="{radius}"'
+            elif v.type == 'mesh' and link_id in mesh_files_map:
+                 mesh_name = os.path.splitext(mesh_files_map[link_id])[0]
+                 scale = "1 1 1"
+                 if v.meshScale:
+                     scale = " ".join(map(str, v.meshScale))
+                 geom_str = f'type="mesh" mesh="{mesh_name}" scale="{scale}"'
+            
+            if geom_str:
+                # Get color
+                rgba = "0.8 0.8 0.8 1"
+                if v.color:
+                    try:
+                        r = int(v.color[1:3], 16)/255.0
+                        g = int(v.color[3:5], 16)/255.0
+                        b = int(v.color[5:7], 16)/255.0
+                        rgba = f"{r:.2f} {g:.2f} {b:.2f} 1"
+                    except: pass
+                
+                xml.append(f'{indent}  <geom {geom_str} pos="{v_pos}" euler="{v_euler}" rgba="{rgba}" />')
+
+        # 3. Recurse for children
+        for child_joint_id in link.childJoints:
+            child_joint = robot.joints.get(child_joint_id)
+            if child_joint and child_joint.childLinkId:
+                build_body(child_joint.childLinkId, child_joint_id, indent_level + 1)
+        
+        xml.append(f'{indent}</body>')
+
+    # Start recursion
+    build_body(robot.baseLinkId, indent_level=2)
+
+    xml.append('  </worldbody>')
+    xml.append('</mujoco>')
+    return "\n".join(xml)
+
+
+@app.post("/api/export-mujoco-urdf")
+async def export_mujoco_urdf(
+    background_tasks: BackgroundTasks,
+    robot_data: str = Form(...),
+    robot_name: str = Form(...),
+    files: Optional[List[UploadFile]] = File(None)
+):
+    try:
+        try:
+            data_dict = json.loads(robot_data)
+            robot = RobotData.parse_obj(data_dict)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
+
+        sanitized_robot_name = to_snake_case(robot_name) or "my_robot"
+        tmpdir = tempfile.mkdtemp()
+        package_dir = os.path.join(tmpdir, sanitized_robot_name)
+        mesh_dir = os.path.join(package_dir, "meshes")
+        os.makedirs(mesh_dir, exist_ok=True)
+        
+        unique_link_names = generate_unique_names(robot)
+        mesh_files_map = {}
+        
+        if files:
+            for file in files:
+                link_id = file.filename[5:] if file.filename.startswith('mesh_') else file.filename
+                if link_id in robot.links:
+                    clean_name = unique_link_names[link_id]
+                    safe_filename = f"{clean_name}.stl"
+                    with open(os.path.join(mesh_dir, safe_filename), "wb") as f:
+                        shutil.copyfileobj(file.file, f)
+                    mesh_files_map[link_id] = safe_filename
+                elif link_id in robot.joints:
+                     joint_name = to_snake_case(robot.joints[link_id].name)
+                     safe_filename = f"{joint_name}_{link_id[:4]}.stl"
+                     with open(os.path.join(mesh_dir, safe_filename), "wb") as f:
+                        shutil.copyfileobj(file.file, f)
+                     mesh_files_map[link_id] = safe_filename
+
+        # Generate URDF
+        urdf_content, _ = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
+        urdf_filename = f"{sanitized_robot_name}.urdf"
+        with open(os.path.join(package_dir, urdf_filename), "w") as f:
+            f.write(urdf_content)
+
+        # Generate Python Script
+        script_content = f"""
+import mujoco
+try:
+    import mujoco.viewer
+except ImportError:
+    print("Please install mujoco with 'pip install mujoco'")
+    exit(1)
+import time
+
+model_path = "{urdf_filename}"
+print(f"Loading model from {{model_path}}...")
+model = mujoco.MjModel.from_xml_path(model_path)
+data = mujoco.MjData(model)
+
+print("Launching viewer...")
+with mujoco.viewer.launch_passive(model, data) as viewer:
+    start = time.time()
+    while viewer.is_running():
+        step_start = time.time()
+        mujoco.mj_step(model, data)
+        viewer.sync()
+        time_until_next_step = model.opt.timestep - (time.time() - step_start)
+        if time_until_next_step > 0:
+            time.sleep(time_until_next_step)
+"""
+        with open(os.path.join(package_dir, "visualize_urdf.py"), "w") as f:
+            f.write(script_content)
+
+        # Generate README
+        readme_content = f"""
+# MuJoCo Visualization (URDF)
+
+This package contains the URDF model of **{robot_name}** ready for MuJoCo.
+
+## Prerequisites
+- Python 3.8+
+- MuJoCo library
+
+## Installation
+```bash
+pip install mujoco
+```
+
+## Running the Simulation
+Run the visualization script:
+```bash
+python visualize_urdf.py
+```
+
+Or drag and drop `{urdf_filename}` into the standalone MuJoCo simulator.
+
+## Files
+- `{urdf_filename}`: The robot model description.
+- `meshes/`: STL files for links.
+- `visualize_urdf.py`: Simple python script to load and view the model.
+"""
+        with open(os.path.join(package_dir, "README_MUJOCO.md"), "w") as f:
+            f.write(readme_content)
+
+        # Zip it
+        shutil.make_archive(package_dir, 'zip', package_dir)
+        return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_mujoco_urdf.zip")
+
+    except Exception as e:
+        print(f"Export Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/export-mujoco-mjcf")
+async def export_mujoco_mjcf(
+    background_tasks: BackgroundTasks,
+    robot_data: str = Form(...),
+    robot_name: str = Form(...),
+    files: Optional[List[UploadFile]] = File(None)
+):
+    try:
+        try:
+            data_dict = json.loads(robot_data)
+            robot = RobotData.parse_obj(data_dict)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
+
+        sanitized_robot_name = to_snake_case(robot_name) or "my_robot"
+        tmpdir = tempfile.mkdtemp()
+        package_dir = os.path.join(tmpdir, sanitized_robot_name)
+        mesh_dir = os.path.join(package_dir, "meshes")
+        os.makedirs(mesh_dir, exist_ok=True)
+        
+        unique_link_names = generate_unique_names(robot)
+        mesh_files_map = {}
+        
+        if files:
+            for file in files:
+                link_id = file.filename[5:] if file.filename.startswith('mesh_') else file.filename
+                if link_id in robot.links:
+                    clean_name = unique_link_names[link_id]
+                    safe_filename = f"{clean_name}.stl"
+                    with open(os.path.join(mesh_dir, safe_filename), "wb") as f:
+                        shutil.copyfileobj(file.file, f)
+                    mesh_files_map[link_id] = safe_filename
+                elif link_id in robot.joints:
+                     joint_name = to_snake_case(robot.joints[link_id].name)
+                     safe_filename = f"{joint_name}_{link_id[:4]}.stl"
+                     with open(os.path.join(mesh_dir, safe_filename), "wb") as f:
+                        shutil.copyfileobj(file.file, f)
+                     mesh_files_map[link_id] = safe_filename
+
+        # Generate MJCF XML
+        mjcf_content = generate_mjcf_xml(robot, sanitized_robot_name, mesh_files_map)
+        mjcf_filename = f"{sanitized_robot_name}.xml"
+        with open(os.path.join(package_dir, mjcf_filename), "w") as f:
+            f.write(mjcf_content)
+
+        # Generate Python Script
+        script_content = f"""
+import mujoco
+try:
+    import mujoco.viewer
+except ImportError:
+    print("Please install mujoco with 'pip install mujoco'")
+    exit(1)
+import time
+
+model_path = "{mjcf_filename}"
+print(f"Loading model from {{model_path}}...")
+model = mujoco.MjModel.from_xml_path(model_path)
+data = mujoco.MjData(model)
+
+print("Launching viewer...")
+with mujoco.viewer.launch_passive(model, data) as viewer:
+    start = time.time()
+    while viewer.is_running():
+        step_start = time.time()
+        mujoco.mj_step(model, data)
+        viewer.sync()
+        time_until_next_step = model.opt.timestep - (time.time() - step_start)
+        if time_until_next_step > 0:
+            time.sleep(time_until_next_step)
+"""
+        with open(os.path.join(package_dir, "visualize_mjcf.py"), "w") as f:
+            f.write(script_content)
+
+        # Generate README
+        readme_content = f"""
+# MuJoCo Visualization (MJCF)
+
+This package contains the **Native MJCF XML** model of **{robot_name}**.
+
+## Prerequisites
+- Python 3.8+
+- MuJoCo library
+
+## Installation
+```bash
+pip install mujoco
+```
+
+## Running the Simulation
+Run the visualization script:
+```bash
+python visualize_mjcf.py
+```
+
+Or drag and drop `{mjcf_filename}` into the standalone MuJoCo simulator.
+
+## Files
+- `{mjcf_filename}`: The native MJCF robot description.
+- `meshes/`: STL files for geometries.
+- `visualize_mjcf.py`: Python script to load and view the model.
+"""
+        with open(os.path.join(package_dir, "README_MUJOCO.md"), "w") as f:
+            f.write(readme_content)
+
+        # Zip it
+        shutil.make_archive(package_dir, 'zip', package_dir)
+        return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_mujoco_mjcf.zip")
+
+    except Exception as e:
+        print(f"Export Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

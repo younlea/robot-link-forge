@@ -895,6 +895,152 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             alert(`Failed to export URDF ROS2 package. Check the console for details. Error: ${err.message}`);
         }
     },
+
+    exportMujocoURDF: async (robotName: string) => {
+        try {
+            const { links, joints, baseLinkId } = getState();
+            const robotData = JSON.parse(JSON.stringify({ links, joints, baseLinkId }));
+
+            // Helper to collect meshes
+            const collectMeshes = async (items: any[]) => {
+                const promises = items.map(async (item) => {
+                    if (item.visual.type === 'mesh' && item.visual.meshUrl && (item.visual.meshUrl.startsWith('http') || item.visual.meshUrl.startsWith('blob:') || item.visual.meshUrl.startsWith('/'))) {
+                        try {
+                            const response = await fetch(item.visual.meshUrl);
+                            if (!response.ok) throw new Error(`Failed to fetch ${item.visual.meshUrl}`);
+                            const blob = await response.blob();
+                            const urlParts = item.visual.meshUrl.split('/');
+                            const filename = urlParts[urlParts.length - 1] || `${item.id}.stl`;
+                            return { id: item.id, filename: filename, blob: blob };
+                        } catch (e) {
+                            console.error(`Error fetching mesh for ${item.name}:`, e);
+                            return null;
+                        }
+                    }
+                    return null;
+                });
+                return (await Promise.all(promises)).filter(m => m !== null);
+            };
+
+            const linkMeshes = await collectMeshes(Object.values(robotData.links));
+            const jointMeshes = await collectMeshes(Object.values(robotData.joints));
+            const meshDatas = [...linkMeshes, ...jointMeshes];
+
+            const formData = new FormData();
+            formData.append('robot_data', JSON.stringify(robotData));
+            formData.append('robot_name', robotName);
+
+            for (const meshData of meshDatas) {
+                if (meshData) {
+                    formData.append(`files`, meshData.blob, `mesh_${meshData.id}`);
+                }
+            }
+
+            const response = await fetch(`${API_BASE_URL}/api/export-mujoco-urdf`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Backend export failed: ${response.status} ${errorText}`);
+            }
+
+            const zipBlob = await response.blob();
+            const safeRobotName = robotName.replace(/[^a-zA-Z0-9]/g, '_');
+            const fileName = `${safeRobotName}_mujoco_urdf.zip`;
+
+            // Download
+            const url = window.URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            alert('MuJoCo (URDF) package exported successfully!');
+
+        } catch (err: any) {
+            console.error('Error exporting MuJoCo URDF:', err);
+            alert(`Failed to export MuJoCo package: ${err.message}`);
+        }
+    },
+
+    exportMujocoMJCF: async (robotName: string) => {
+        try {
+            const { links, joints, baseLinkId } = getState();
+            const robotData = JSON.parse(JSON.stringify({ links, joints, baseLinkId }));
+
+            // Helper to collect meshes (Same logic)
+            const collectMeshes = async (items: any[]) => {
+                const promises = items.map(async (item) => {
+                    if (item.visual.type === 'mesh' && item.visual.meshUrl && (item.visual.meshUrl.startsWith('http') || item.visual.meshUrl.startsWith('blob:') || item.visual.meshUrl.startsWith('/'))) {
+                        try {
+                            const response = await fetch(item.visual.meshUrl);
+                            if (!response.ok) throw new Error(`Failed to fetch ${item.visual.meshUrl}`);
+                            const blob = await response.blob();
+                            const urlParts = item.visual.meshUrl.split('/');
+                            const filename = urlParts[urlParts.length - 1] || `${item.id}.stl`;
+                            return { id: item.id, filename: filename, blob: blob };
+                        } catch (e) {
+                            console.error(`Error fetching mesh for ${item.name}:`, e);
+                            return null;
+                        }
+                    }
+                    return null;
+                });
+                return (await Promise.all(promises)).filter(m => m !== null);
+            };
+
+            const linkMeshes = await collectMeshes(Object.values(robotData.links));
+            const jointMeshes = await collectMeshes(Object.values(robotData.joints));
+            const meshDatas = [...linkMeshes, ...jointMeshes];
+
+            const formData = new FormData();
+            formData.append('robot_data', JSON.stringify(robotData));
+            formData.append('robot_name', robotName);
+
+            for (const meshData of meshDatas) {
+                if (meshData) {
+                    formData.append(`files`, meshData.blob, `mesh_${meshData.id}`);
+                }
+            }
+
+            const response = await fetch(`${API_BASE_URL}/api/export-mujoco-mjcf`, {
+                method: 'POST',
+                body: formData,
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Backend export failed: ${response.status} ${errorText}`);
+            }
+
+            const zipBlob = await response.blob();
+            const safeRobotName = robotName.replace(/[^a-zA-Z0-9]/g, '_');
+            const fileName = `${safeRobotName}_mujoco_mjcf.zip`;
+
+            // Download
+            const url = window.URL.createObjectURL(zipBlob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            alert('MuJoCo (MJCF) package exported successfully!');
+
+        } catch (err: any) {
+            console.error('Error exporting MuJoCo MJCF:', err);
+            alert(`Failed to export MuJoCo package: ${err.message}`);
+        }
+    },
     deleteItem: (id, type) => {
         setState(state => {
             // Prevent deleting the base link
