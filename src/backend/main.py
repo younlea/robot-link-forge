@@ -193,7 +193,7 @@ def convert_euler_xyz_to_zyx(rpy):
 
 
 
-def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str]) -> str:
+def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str], for_mujoco: bool = False) -> str:
     """Generates the XML content for a single link (visual, collision, etc.)."""
     
     link: RobotLink = robot_data.links[link_id]
@@ -289,7 +289,20 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
     
     visual_xml += '    </visual>\n'
     
-    collision_xml = visual_xml.replace('<visual>', '<collision>', 1).replace('</visual>', '</collision>', 1)
+    # COLLISION LOGIC
+    if for_mujoco and vis.type == 'mesh':
+        # Safe Collision for MuJoCo: Use plain Box to prevent "face count > 200k" errors on convex hull gen
+        # Ideally we'd match the Mesh AABB, but we fall back to a small box if we don't have it easily.
+        # User primarily wants Visualization anyway.
+        collision_xml = '    <collision>\n'
+        collision_xml += f'      <origin xyz="{origin_xyz_str}" rpy="{origin_rpy_str}" />\n'
+        collision_xml += '      <geometry>\n'
+        collision_xml += '        <box size="0.1 0.1 0.1" />\n' 
+        collision_xml += '      </geometry>\n'
+        collision_xml += '    </collision>\n'
+    else:
+        # Standard: Duplicate Visual as Collision
+        collision_xml = visual_xml.replace('<visual>', '<collision>', 1).replace('</visual>', '</collision>', 1)
 
     # --- Link XML ---
     link_xml = f'  <link name="{link_name}">\n'
@@ -393,7 +406,7 @@ def generate_unique_names(robot_data: RobotData) -> Dict[str, str]:
     
     return unique_link_names
 
-def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str], unique_link_names: Dict[str, str]) -> Tuple[str, str]:
+def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str], unique_link_names: Dict[str, str], for_mujoco: bool = False) -> Tuple[str, str]:
     """Generates the URDF XML content and returns (urdf_string, base_link_name)."""
 
     if robot_data.baseLinkId not in unique_link_names:
@@ -402,7 +415,7 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
     base_link_name = unique_link_names[robot_data.baseLinkId]
     
     # Generate XML for the base link
-    links_xml = _generate_link_xml(robot_data.baseLinkId, base_link_name, robot_data, robot_name, mesh_files)
+    links_xml = _generate_link_xml(robot_data.baseLinkId, base_link_name, robot_data, robot_name, mesh_files, for_mujoco=for_mujoco)
     
     joints_xml = ""
 
@@ -446,7 +459,7 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
             q.append(child_link_id)
 
             # --- Link XML for Child ---
-            links_xml += _generate_link_xml(child_link_id, child_link_name, robot_data, robot_name, mesh_files)
+            links_xml += _generate_link_xml(child_link_id, child_link_name, robot_data, robot_name, mesh_files, for_mujoco=for_mujoco)
 
             # Determine Active DOFs
             active_rotations = []
@@ -1302,38 +1315,62 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                     v_pos = " ".join(map(str, v.meshOrigin.xyz))
                     v_euler = " ".join(map(str, v.meshOrigin.rpy))
             
-            geom_str = ""
-            if v.type == 'box':
-                # MJCF box size is half-extents
-                size = " ".join([str(d/2) for d in v.dimensions])
-                geom_str = f'type="box" size="{size}"'
-            elif v.type == 'cylinder':
-                 # MJCF cylinder size is radius half-height
-                 radius = v.dimensions[0]
-                 height = v.dimensions[1] / 2
-                 geom_str = f'type="cylinder" size="{radius} {height}"'
-            elif v.type == 'sphere':
-                 radius = v.dimensions[0]
-                 geom_str = f'type="sphere" size="{radius}"'
-            elif v.type == 'mesh' and link_id in mesh_files_map:
+            if v.type == 'mesh' and link_id in mesh_files_map:
                  mesh_name = os.path.splitext(mesh_files_map[link_id])[0]
                  scale = "1 1 1"
                  if v.meshScale:
                      scale = " ".join(map(str, v.meshScale))
-                 geom_str = f'type="mesh" mesh="{mesh_name}" scale="{scale}"'
-            
-            if geom_str:
-                # Get color
-                rgba = "0.8 0.8 0.8 1"
-                if v.color:
-                    try:
-                        r = int(v.color[1:3], 16)/255.0
-                        g = int(v.color[3:5], 16)/255.0
-                        b = int(v.color[5:7], 16)/255.0
-                        rgba = f"{r:.2f} {g:.2f} {b:.2f} 1"
-                    except: pass
+                 
+                 # Split Visual and Collision for Mesh
+                 # Visual: group 1, no collision
+                 vis_geom = f'type="mesh" mesh="{mesh_name}" scale="{scale}" group="1" contype="0" conaffinity="0"'
+                 
+                 # Helper to get color attr
+                 color_attr = f'rgba="{v.color_rgba}"' if getattr(v, 'color', None) else 'rgba="0.5 0.5 0.5 1"'
+                 # Need to safely get color:
+                 rgb_str = "0.5 0.5 0.5 1"
+                 if v.color:
+                     try:
+                         r, g, b = int(v.color[1:3], 16)/255, int(v.color[3:5], 16)/255, int(v.color[5:7], 16)/255
+                         rgb_str = f"{r:.3f} {g:.3f} {b:.3f} 1.0"
+                     except: pass
+                 color_attr = f'rgba="{rgb_str}"'
+
+                 xml.append(f'{indent}  <geom {vis_geom} pos="{v_pos}" euler="{v_euler}" {color_attr} />')
+                 
+                 # Collision: group 0, simple box
+                 coll_geom = 'type="box" size="0.1 0.1 0.1" group="0" rgba="1 0 0 0"'
+                 xml.append(f'{indent}  <geom {coll_geom} pos="{v_pos}" euler="{v_euler}" />')
+
+            elif v.type != 'none' and v.type != 'mesh':
+                # Standard Primitives
+                geom_str = ""
+                if v.type == 'box':
+                    # MJCF box size is half-extents
+                    size = " ".join([str(d/2) for d in v.dimensions])
+                    geom_str = f'type="box" size="{size}"'
+                elif v.type == 'cylinder':
+                     # MJCF cylinder size is radius half-height
+                     radius = v.dimensions[0]
+                     height = v.dimensions[1] / 2
+                     geom_str = f'type="cylinder" size="{radius} {height}"'
+                elif v.type == 'sphere':
+                     radius = v.dimensions[0]
+                     geom_str = f'type="sphere" size="{radius}"'
                 
-                xml.append(f'{indent}  <geom {geom_str} pos="{v_pos}" euler="{v_euler}" rgba="{rgba}" />')
+                if geom_str:
+                     rgb_str = "0.5 0.5 0.5 1"
+                     if v.color:
+                         try:
+                             r, g, b = int(v.color[1:3], 16)/255, int(v.color[3:5], 16)/255, int(v.color[5:7], 16)/255
+                             rgb_str = f"{r:.3f} {g:.3f} {b:.3f} 1.0"
+                         except: pass
+                     
+                     xml.append(f'{indent}  <geom {geom_str} pos="{v_pos}" euler="{v_euler}" rgba="{rgb_str}" />')
+            
+
+                
+
 
         # 3. Recurse for children
         for child_joint_id in link.childJoints:
@@ -1411,7 +1448,7 @@ async def export_mujoco_urdf(
                      mesh_files_map[link_id] = safe_filename
 
         # Generate URDF
-        urdf_content, _ = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
+        urdf_content, _ = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names, for_mujoco=True)
         
         # FIX for MuJoCo: 
         # 1. Strip full package path to leave just filename: "package://robot/meshes/foo.stl" -> "foo.stl"
