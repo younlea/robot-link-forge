@@ -1241,13 +1241,16 @@ echo "Installing dependencies..."
 cd "$WORKSPACE_DIR"
 
 # Explicit check for Gazebo Classic packages (often missed if user installed Fortress)
-if ! dpkg -l | grep -q "ros-$ROS_DISTRO-gazebo-ros-pkgs"; then
+if ! dpkg -l | grep -q "ros-$ROS_DISTRO-gazebo-ros"; then
     echo "------------------------------------------------"
     echo "WARNING: Gazebo Classic packages not found!"
     echo "This export targets Gazebo Classic (gazebo_ros), not Gazebo Fortress/Ignition."
-    echo "Please run: sudo apt install ros-$ROS_DISTRO-gazebo-ros-pkgs"
+    echo "Please run the following commands:"
+    echo "  sudo apt update"
+    echo "  sudo apt install ros-$ROS_DISTRO-gazebo-ros-pkgs"
+    echo "If the meta-package is not found, try:"
+    echo "  sudo apt install ros-$ROS_DISTRO-gazebo-ros ros-$ROS_DISTRO-gazebo-plugins"
     echo "------------------------------------------------"
-    # We don't exit, we let rosdep try, but this message helps usage.
 fi
 
 # Check if rosdep is initialized
