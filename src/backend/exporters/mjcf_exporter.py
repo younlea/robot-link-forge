@@ -8,13 +8,52 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
     Generates a native MuJoCo XML string (MJCF) for the robot.
     Recursive function to build the body tree from base link.
     """
+    
+    # 1. Collect all used meshes and their scales to define unique assets
+    # Map: (filename, scale_str) -> asset_name
+    mesh_assets = {} # Dict[Tuple[str, str], str]
+    
+    def get_mesh_asset_name(link_or_joint_id, filename, scale_list):
+        scale_str = "1 1 1"
+        if scale_list:
+            scale_str = " ".join(map(str, scale_list))
+        
+        key = (filename, scale_str)
+        if key not in mesh_assets:
+            # Create a unique name. Using the ID helps readability but uniqueness is key.
+            # We can just append a counter or use the ID if unique.
+            # To stay simple: mesh_{id} might conflict if same ID used multiple times (unlikely for links)
+            # but joints might map to same file.
+            # Let's use the nice name from filename + index
+            base_name = os.path.splitext(filename)[0]
+            idx = len(mesh_assets)
+            asset_name = f"{base_name}_{idx}" 
+            mesh_assets[key] = asset_name
+            return asset_name
+        return mesh_assets[key]
+
+    # Pre-scan could be done, or we can build assets on the fly?
+    # Actually, XML requires assets to be defined BEFORE usage in worldbody (usually).
+    # So we should pre-scan.
+    
+    # Scan Links
+    for link_id, link in robot.links.items():
+        if link.visual and link.visual.type == 'mesh' and link_id in mesh_files_map:
+             get_mesh_asset_name(link_id, mesh_files_map[link_id], link.visual.meshScale)
+
+    # Scan Joints
+    for joint_id, joint in robot.joints.items():
+        if joint.visual and joint.visual.type == 'mesh' and joint_id in mesh_files_map:
+             get_mesh_asset_name(joint_id, mesh_files_map[joint_id], joint.visual.meshScale)
+
     xml = [f'<mujoco model="{robot_name}">']
     xml.append('  <compiler angle="radian" meshdir="meshes"/>')
     xml.append('  <option gravity="0 0 -9.81"/>')
+    
+    # 2. Write Assets
     xml.append('  <asset>')
-    for link_id, filename in mesh_files_map.items():
-        mesh_name = os.path.splitext(filename)[0]
-        xml.append(f'    <mesh name="{mesh_name}" file="{filename}"/>')
+    for (filename, scale_str), asset_name in mesh_assets.items():
+        xml.append(f'    <mesh name="{asset_name}" file="{filename}" scale="{scale_str}"/>')
     
     xml.append('    <material name="gray" rgba="0.5 0.5 0.5 1"/>')
     xml.append('    <material name="collision" rgba="1 0 0 0.5"/>')
@@ -62,15 +101,12 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                 range_str = ""
                 if j_type == "hinge":
                     # Determine which limit to use based on axis domination or type
-                    # Prefer using the limit corresponding to the dominant axis
                     curr_limit = None
                     
-                    # Simple check for primary axes
                     if axis_val == [1, 0, 0]: curr_limit = joint.limits.get('roll')
                     elif axis_val == [0, 1, 0]: curr_limit = joint.limits.get('pitch')
                     elif axis_val == [0, 0, 1]: curr_limit = joint.limits.get('yaw')
                     
-                    # Fallback: if generic axis, check available limits (roll > pitch > yaw)
                     if not curr_limit:
                         if joint.limits.get('roll'): curr_limit = joint.limits.get('roll')
                         elif joint.limits.get('pitch'): curr_limit = joint.limits.get('pitch')
@@ -80,15 +116,13 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                         range_str = f'range="{curr_limit.lower} {curr_limit.upper}"'
 
                 elif j_type == "slide":
-                     # For prismatic/slide, key is usually 'displacement' or 'prism'
-                     # 'prism' seems to be used in some contexts, checking 'displacement' from robot_models
                      curr_limit = joint.limits.get('displacement')
                      if curr_limit:
                         range_str = f'range="{curr_limit.lower} {curr_limit.upper}"'
 
                 xml.append(f'{indent}  <joint name="{joint.name}" type="{j_type}" axis="{axis_str}" {range_str} />')
 
-        # --- Joint Visuals (Attached to This Body = Child of Joint) ---
+        # --- Joint Visuals ---
         if parent_joint_id:
             p_joint = robot.joints.get(parent_joint_id)
             if p_joint and p_joint.visual and p_joint.visual.type != 'none':
@@ -103,9 +137,10 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                 
                 j_geom_str = ""
                 if jv.type == 'mesh' and parent_joint_id in mesh_files_map:
-                     j_mesh_name = os.path.splitext(mesh_files_map[parent_joint_id])[0]
-                     j_scale = " ".join(map(str, jv.meshScale)) if jv.meshScale else "1 1 1"
-                     j_geom_str = f'type="mesh" mesh="{j_mesh_name}" scale="{j_scale}"'
+                     # Lookup asset name
+                     j_asset_name = get_mesh_asset_name(parent_joint_id, mesh_files_map[parent_joint_id], jv.meshScale)
+                     # NO scale attribute here, it's in the asset
+                     j_geom_str = f'type="mesh" mesh="{j_asset_name}"'
                 elif jv.type == 'box':
                      size = " ".join([str(d/2) for d in jv.dimensions])
                      j_geom_str = f'type="box" size="{size}"'
@@ -124,26 +159,24 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                      xml.append(f'{indent}  <geom {j_geom_str} pos="{jv_pos}" euler="{jv_euler}" rgba="{rgb_str}" group="1" />')
                      xml.append(f'{indent}  <geom {j_geom_str} pos="{jv_pos}" euler="{jv_euler}" group="0" rgba="1 0 0 0" />')
 
+        # --- Link Visuals ---
         if link.visual and link.visual.type != 'none':
             v = link.visual
             v_pos = "0 0 0"
             v_euler = "0 0 0"
             
-            # --- FIX: Safe Dictionary Access for meshOrigin ---
             if v.type == 'mesh' and v.meshOrigin:
-                # v.meshOrigin is a Dict, so use keys 'xyz' and 'rpy'
                 xyz = v.meshOrigin.get('xyz', [0.0, 0.0, 0.0])
                 rpy = v.meshOrigin.get('rpy', [0.0, 0.0, 0.0])
                 v_pos = " ".join(map(str, xyz))
                 v_euler = " ".join(map(str, rpy))
             
             if v.type == 'mesh' and link_id in mesh_files_map:
-                 mesh_name = os.path.splitext(mesh_files_map[link_id])[0]
-                 scale = "1 1 1"
-                 if v.meshScale:
-                     scale = " ".join(map(str, v.meshScale))
+                 # Lookup asset name
+                 asset_name = get_mesh_asset_name(link_id, mesh_files_map[link_id], v.meshScale)
                  
-                 vis_geom = f'type="mesh" mesh="{mesh_name}" scale="{scale}" group="1" contype="0" conaffinity="0"'
+                 # NO scale attribute here
+                 vis_geom = f'type="mesh" mesh="{asset_name}" group="1" contype="0" conaffinity="0"'
                  
                  rgb_str = "0.5 0.5 0.5 1"
                  if v.color:
