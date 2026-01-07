@@ -1,8 +1,8 @@
-from typing import Dict, Tuple, Set
-from robot_models import RobotData, RobotLink
+from typing import Dict, Tuple, Set, Optional
+from robot_models import RobotData, RobotLink, RobotJoint
 from utils import to_snake_case, calculate_cylinder_transform, convert_euler_xyz_to_zyx
 
-def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str], for_mujoco: bool = False) -> str:
+def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str], parent_joint: Optional[RobotJoint] = None, for_mujoco: bool = False) -> str:
     """Generates the XML content for a single link (visual, collision, etc.)."""
     
     link: RobotLink = robot_data.links[link_id]
@@ -91,6 +91,62 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
     # Standard: Duplicate Visual as Collision
     collision_xml = visual_xml.replace('<visual>', '<collision>', 1).replace('</visual>', '</collision>', 1)
 
+    # --- Joint Visuals (Attached to CHILD Link, i.e., THIS link) ---
+    # If this link is the child of a joint, and that joint has a visual, we render it here.
+    if parent_joint and parent_joint.visual and parent_joint.visual.type != 'none':
+        j_vis = parent_joint.visual
+        
+        # Origin relative to Child Link (Joint Frame) is 0 0 0 unless visual has offset
+        j_xyz = "0 0 0"
+        j_rpy = "0 0 0"
+        
+        if j_vis.meshOrigin:
+            j_xyz = " ".join(map(str, j_vis.meshOrigin.get('xyz', [0,0,0])))
+            j_r_raw = j_vis.meshOrigin.get('rpy', [0,0,0])
+            j_r_zyx = convert_euler_xyz_to_zyx(j_r_raw)
+            j_rpy = " ".join(map(str, j_r_zyx))
+
+        j_geom = ""
+        if j_vis.type == 'mesh' and parent_joint.id in mesh_files:
+             j_scale = " ".join(map(str, j_vis.meshScale)) if j_vis.meshScale else "1 1 1"
+             j_geom = f'<mesh filename="package://{robot_name}/meshes/{mesh_files[parent_joint.id]}" scale="{j_scale}"/>'
+        elif j_vis.type == 'box' and j_vis.dimensions:
+             j_geom = f'<box size="{" ".join(map(str, j_vis.dimensions))}" />'
+        elif j_vis.type == 'cylinder' and j_vis.dimensions:
+             l_val = j_vis.dimensions[1] if len(j_vis.dimensions) > 1 else 1.0
+             j_geom = f'<cylinder radius="{j_vis.dimensions[0]}" length="{l_val}" />'
+        elif j_vis.type == 'sphere' and j_vis.dimensions:
+             j_geom = f'<sphere radius="{j_vis.dimensions[0]}" />'
+
+        if j_geom:
+             j_visual_xml = '    <visual>\n'
+             j_visual_xml += f'      <origin xyz="{j_xyz}" rpy="{j_rpy}" />\n'
+             j_visual_xml += f'      <geometry>\n        {j_geom}\n      </geometry>\n'
+             if j_vis.color:
+                try:
+                    r, g, b = int(j_vis.color[1:3], 16)/255, int(j_vis.color[3:5], 16)/255, int(j_vis.color[5:7], 16)/255
+                    j_visual_xml += f'      <material name="mat_{parent_joint.id}">\n'
+                    j_visual_xml += f'        <color rgba="{r:.2f} {g:.2f} {b:.2f} 1.0"/>\n'
+                    j_visual_xml += f'      </material>\n'
+                except: pass
+             j_visual_xml += '    </visual>\n'
+             
+             # Append to link xml
+             link_xml = f'  <link name="{link_name}">\n'
+             link_xml += inertial_xml
+             link_xml += visual_xml
+             link_xml += collision_xml
+             
+             # Add Joint Visual
+             link_xml += j_visual_xml
+             j_collision_xml = j_visual_xml.replace('<visual>', '<collision>').replace('</visual>', '</collision>')
+             link_xml += j_collision_xml
+             
+             link_xml += '  </link>\n\n'
+             return link_xml
+
+    # --- Link XML (Default return if no joint visual or processed above) ---
+
     # --- Link XML ---
     link_xml = f'  <link name="{link_name}">\n'
     link_xml += inertial_xml
@@ -108,7 +164,7 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
 
     base_link_name = unique_link_names[robot_data.baseLinkId]
     
-    links_xml = _generate_link_xml(robot_data.baseLinkId, base_link_name, robot_data, robot_name, mesh_files, for_mujoco=for_mujoco)
+    links_xml = _generate_link_xml(robot_data.baseLinkId, base_link_name, robot_data, robot_name, mesh_files, parent_joint=None, for_mujoco=for_mujoco)
     
     joints_xml = ""
 
@@ -147,7 +203,7 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
             processed_links.add(child_link_id)
             q.append(child_link_id)
 
-            links_xml += _generate_link_xml(child_link_id, child_link_name, robot_data, robot_name, mesh_files, for_mujoco=for_mujoco)
+            links_xml += _generate_link_xml(child_link_id, child_link_name, robot_data, robot_name, mesh_files, parent_joint=joint, for_mujoco=for_mujoco)
 
             active_rotations = []
             if joint.type == 'rotational':

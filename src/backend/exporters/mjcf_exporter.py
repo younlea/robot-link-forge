@@ -71,6 +71,42 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
 
                 xml.append(f'{indent}  <joint name="{joint.name}" type="{j_type}" axis="{axis}" {range_str} />')
 
+        # --- Joint Visuals (Attached to This Body = Child of Joint) ---
+        if parent_joint_id:
+            p_joint = robot.joints.get(parent_joint_id)
+            if p_joint and p_joint.visual and p_joint.visual.type != 'none':
+                jv = p_joint.visual
+                jv_pos = "0 0 0"
+                jv_euler = "0 0 0"
+                if jv.meshOrigin:
+                    xyz = jv.meshOrigin.get('xyz', [0.0, 0.0, 0.0])
+                    rpy = jv.meshOrigin.get('rpy', [0.0, 0.0, 0.0])
+                    jv_pos = " ".join(map(str, xyz))
+                    jv_euler = " ".join(map(str, rpy))
+                
+                j_geom_str = ""
+                if jv.type == 'mesh' and parent_joint_id in mesh_files_map:
+                     j_mesh_name = os.path.splitext(mesh_files_map[parent_joint_id])[0]
+                     j_scale = " ".join(map(str, jv.meshScale)) if jv.meshScale else "1 1 1"
+                     j_geom_str = f'type="mesh" mesh="{j_mesh_name}" scale="{j_scale}"'
+                elif jv.type == 'box':
+                     size = " ".join([str(d/2) for d in jv.dimensions])
+                     j_geom_str = f'type="box" size="{size}"'
+                elif jv.type == 'cylinder':
+                     radius = jv.dimensions[0]
+                     height = jv.dimensions[1] / 2
+                     j_geom_str = f'type="cylinder" size="{radius} {height}"'
+                
+                if j_geom_str:
+                     rgb_str = "0.5 0.5 0.5 1"
+                     if jv.color:
+                         try:
+                             r, g, b = int(jv.color[1:3], 16)/255, int(jv.color[3:5], 16)/255, int(jv.color[5:7], 16)/255
+                             rgb_str = f"{r:.3f} {g:.3f} {b:.3f} 1.0"
+                         except: pass
+                     xml.append(f'{indent}  <geom {j_geom_str} pos="{jv_pos}" euler="{jv_euler}" rgba="{rgb_str}" group="1" />')
+                     xml.append(f'{indent}  <geom {j_geom_str} pos="{jv_pos}" euler="{jv_euler}" group="0" rgba="1 0 0 0" />')
+
         if link.visual and link.visual.type != 'none':
             v = link.visual
             v_pos = "0 0 0"
