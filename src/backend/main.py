@@ -1534,6 +1534,7 @@ import argparse
 
 parser = argparse.ArgumentParser(description='Visualize MuJoCo model.')
 parser.add_argument('--kinematic', action='store_true', help='Run in kinematic mode (gravity disabled)')
+parser.add_argument('--set-joint', nargs=2, action='append', metavar=('JOINT_NAME', 'VALUE'), help='Set initial joint value. Example: --set-joint joint_1 1.57')
 args = parser.parse_args()
 
 model_path = "{urdf_filename}"
@@ -1545,16 +1546,35 @@ if args.kinematic:
     print("Kinematic mode enabled: Gravity disabled.")
     model.opt.gravity = (0, 0, 0)
 
+# Apply Set-Joint Arguments
+if args.set_joint:
+    print("Setting initial joint values:")
+    for j_name, j_val_str in args.set_joint:
+        try:
+            val = float(j_val_str)
+            # Find joint ID
+            j_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, j_name)
+            if j_id != -1:
+                # Find qpos address
+                q_addr = model.jnt_qposadr[j_id]
+                data.qpos[q_addr] = val
+                print(f"  - Joint '{{j_name}}' -> {{val}}")
+                
+                # Also set Actuator Control if exists (to prevent fighting)
+                # Our main.py generates actuators named "{{j_name}}_act"
+                act_name = j_name + "_act"
+                act_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, act_name)
+                if act_id != -1:
+                     data.ctrl[act_id] = val
+                     print(f"    (Set actuator '{{act_name}}' to {{val}})")
+            else:
+                print(f"  ! Warning: Joint '{{j_name}}' not found.")
+        except ValueError:
+            print(f"  ! Invalid value for joint {{j_name}}: {{j_val_str}}")
+
 print("Launching viewer...")
-with mujoco.viewer.launch_passive(model, data) as viewer:
-    start = time.time()
-    while viewer.is_running():
-        step_start = time.time()
-        mujoco.mj_step(model, data)
-        viewer.sync()
-        time_until_next_step = model.opt.timestep - (time.time() - step_start)
-        if time_until_next_step > 0:
-            time.sleep(time_until_next_step)
+# Use blocking viewer for better UI/Controls handling
+mujoco.viewer.launch(model, data)
 """
         with open(os.path.join(package_dir, "visualize_urdf.py"), "w") as f:
             f.write(script_content)
@@ -1609,6 +1629,12 @@ python visualize_urdf.py
 To run without gravity (e.g., to check joint limits or move joints manually without them falling):
 ```bash
 python visualize_urdf.py --kinematic
+```
+
+### Setting Joint Positions (CLI)
+You can set initial joint angles (and actuator targets) using `--set-joint`:
+```bash
+python visualize_urdf.py --set-joint joint_1 1.57 --set-joint joint_2 -0.5
 ```
 
 Or drag and drop `{urdf_filename}` into the standalone MuJoCo simulator.
