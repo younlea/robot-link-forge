@@ -299,15 +299,8 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
     visual_xml += '    </visual>\n'
     
     # COLLISION LOGIC
-    if for_mujoco:
-        # MuJoCo Stability Fix:
-        # We disable collision entirely for the export to prevent "explosions" due to 
-        # overlapping default collision boxes at joints (since we use a default box if no mesh).
-        # Users mainly use this for visualization or can add custom collision meshes later.
-        collision_xml = ''
-    else:
-        # Standard: Duplicate Visual as Collision
-        collision_xml = visual_xml.replace('<visual>', '<collision>', 1).replace('</visual>', '</collision>', 1)
+    # Standard: Duplicate Visual as Collision
+    collision_xml = visual_xml.replace('<visual>', '<collision>', 1).replace('</visual>', '</collision>', 1)
 
     # --- Link XML ---
     link_xml = f'  <link name="{link_name}">\n'
