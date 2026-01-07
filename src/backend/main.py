@@ -427,7 +427,10 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
 
     processed_links = {robot_data.baseLinkId}
     processed_joints = set()
+    processed_links = {robot_data.baseLinkId}
+    processed_joints = set()
     generated_joint_names = set()
+    generated_joints_info = [] # Store info for actuators
     
     # Traverse from base link
     q = [robot_data.baseLinkId]
@@ -547,6 +550,13 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
                 # Axis & Limit (if applicable)
                 if sub['type'] != 'fixed':
                     joints_xml += f'    <axis xyz="{sub["axis"]}"/>\n'
+                    # Store for actuator generation
+                    generated_joints_info.append({
+                        'name': final_joint_name,
+                        'type': sub['type'],
+                        'limit': sub['limit']
+                    })
+                    
                     if sub['limit']:
                         joints_xml += f'    <limit lower="{sub["limit"].lower}" upper="{sub["limit"].upper}" effort="10" velocity="1.0"/>\n'
                     else:
@@ -560,7 +570,7 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
                 # Advance parent
                 current_parent_link = current_child_link
  
-    return f'<robot name="{robot_name}">\n{links_xml}{joints_xml}</robot>', base_link_name
+    return f'<robot name="{robot_name}">\n{links_xml}{joints_xml}</robot>', base_link_name, generated_joints_info
 
 @app.post("/api/export-urdf")
 async def export_urdf_package(
@@ -634,7 +644,7 @@ async def export_urdf_package(
                 pass # print(f"DEBUG: ID {link_id} NOT FOUND ...")
 
     # Generate and save URDF file
-    urdf_content, base_link_name = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
+    urdf_content, base_link_name, _ = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
     with open(os.path.join(urdf_dir, f"{sanitized_robot_name}.urdf"), "w") as f:
         f.write(urdf_content)
 
@@ -1475,19 +1485,36 @@ async def export_mujoco_urdf(
                      mesh_files_map[link_id] = safe_filename
 
         # Generate URDF
-        urdf_content, _ = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names, for_mujoco=True)
+        urdf_content, _, joint_infos = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names, for_mujoco=True)
+
+        # Generate Actuators XML
+        actuators_xml = ""
+        for j_info in joint_infos:
+            j_name = j_info['name']
+            j_type = j_info['type']
+            # Add position actuator for moving joints
+            # Default kp=50 is decent for simple models.
+            # ctrlrange limits the slider.
+            if j_info.get('limit'):
+                lower = j_info['limit'].lower
+                upper = j_info['limit'].upper
+                ctrl_range = f'{lower} {upper}'
+            else:
+                ctrl_range = "-3.14 3.14"
+
+            actuators_xml += f'    <position name="{j_name}_act" joint="{j_name}" kp="50" ctrlrange="{ctrl_range}" />\n'
         
         # FIX for MuJoCo: 
         # 1. Strip full package path to leave just filename: "package://robot/meshes/foo.stl" -> "foo.stl"
         urdf_content = urdf_content.replace(f'package://{sanitized_robot_name}/meshes/', '')
         
-        # 2. Inject <mujoco> block with meshdir
+        # 2. Inject <mujoco> block with meshdir AND actuators
         # Find position after <robot ...>
         import re
         match = re.search(r'<robot\s+name="[^"]+">', urdf_content)
         if match:
             insert_pos = match.end()
-            mujoco_tag = '\n  <mujoco>\n    <compiler meshdir="meshes" balanceinertia="true" discardvisual="false"/>\n  </mujoco>'
+            mujoco_tag = f'\n  <mujoco>\n    <compiler meshdir="meshes" balanceinertia="true" discardvisual="false"/>\n    <option gravity="0 0 -9.81"/>\n    <actuator>\n{actuators_xml}    </actuator>\n  </mujoco>'
             urdf_content = urdf_content[:insert_pos] + mujoco_tag + urdf_content[insert_pos:]
         
         urdf_filename = f"{sanitized_robot_name}.urdf"
