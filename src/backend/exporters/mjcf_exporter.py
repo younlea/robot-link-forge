@@ -47,7 +47,7 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
              get_mesh_asset_name(joint_id, mesh_files_map[joint_id], joint.visual.meshScale)
 
     xml = [f'<mujoco model="{robot_name}">']
-    xml.append('  <compiler angle="radian" meshdir="meshes" eulerseq="zyx"/>')
+    xml.append('  <compiler angle="radian" meshdir="meshes"/>')
     xml.append('  <option gravity="0 0 -9.81"/>')
     
     # 2. Write Assets
@@ -100,6 +100,11 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                 axis_val = [0, 0, 1]
                 if joint.axis:
                     axis_val = joint.axis
+                else:
+                    # Check DOF flags if axis not explicitly set
+                    if joint.dof.roll: axis_val = [1, 0, 0]
+                    elif joint.dof.pitch: axis_val = [0, 1, 0]
+                    elif joint.dof.yaw: axis_val = [0, 0, 1]
                 
                 axis_str = f"{axis_val[0]} {axis_val[1]} {axis_val[2]}"
                 
