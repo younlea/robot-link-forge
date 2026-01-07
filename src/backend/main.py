@@ -17,6 +17,7 @@ from robot_models import RobotData, RobotLink, RobotJoint, Visual
 from utils import to_snake_case, generate_unique_names
 from exporters.urdf_exporter import generate_urdf_xml
 from exporters.mjcf_exporter import generate_mjcf_xml
+from exporters.gazebo_exporter import inject_gazebo_tags, generate_gazebo_launch
 from exporters.stl_utils import ensure_binary_stl
 
 app = FastAPI()
@@ -892,13 +893,158 @@ Or drag and drop `{urdf_filename}` into the standalone MuJoCo simulator.
             f.write(readme_content)
 
         # Zip it
-        # Zip it
         shutil.make_archive(package_dir, 'zip', root_dir=tmpdir, base_dir=sanitized_robot_name)
-        return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_mujoco_urdf.zip")
+        return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_mujoco_mjcf.zip")
 
     except Exception as e:
         print(f"Export Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/export-gazebo")
+async def export_gazebo(
+    background_tasks: BackgroundTasks,
+    robot_data: str = Form(...),
+    robot_name: str = Form(...),
+    files: Optional[List[UploadFile]] = File(None)
+):
+    try:
+        try:
+            data_dict = json.loads(robot_data)
+            robot = RobotData.parse_obj(data_dict)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
+
+        sanitized_robot_name = to_snake_case(robot_name) or "my_robot"
+        tmpdir = tempfile.mkdtemp()
+        package_dir = os.path.join(tmpdir, sanitized_robot_name)
+        urdf_dir = os.path.join(package_dir, "urdf")
+        mesh_dir = os.path.join(package_dir, "meshes")
+        launch_dir = os.path.join(package_dir, "launch")
+        
+        os.makedirs(urdf_dir, exist_ok=True)
+        os.makedirs(mesh_dir, exist_ok=True)
+        os.makedirs(launch_dir, exist_ok=True)
+        
+        unique_link_names = generate_unique_names(robot)
+        mesh_files_map = {}
+        
+        # Process Meshes
+        if files:
+            for file in files:
+                link_id = file.filename[5:] if file.filename.startswith('mesh_') else file.filename
+                if link_id in robot.links:
+                    clean_name = unique_link_names[link_id]
+                    safe_filename = f"{clean_name}.stl"
+                    dest_path = os.path.join(mesh_dir, safe_filename)
+                    with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
+                         shutil.copyfileobj(file.file, tmp_upload)
+                         tmp_upload_path = tmp_upload.name
+                    try: ensure_binary_stl(tmp_upload_path, dest_path)
+                    finally: 
+                        if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
+                    mesh_files_map[link_id] = safe_filename
+                elif link_id in robot.joints:
+                     joint_name = to_snake_case(robot.joints[link_id].name)
+                     safe_filename = f"{joint_name}_{link_id[:4]}.stl"
+                     dest_path = os.path.join(mesh_dir, safe_filename)
+                     with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
+                         shutil.copyfileobj(file.file, tmp_upload)
+                         tmp_upload_path = tmp_upload.name
+                     try: ensure_binary_stl(tmp_upload_path, dest_path)
+                     finally:
+                        if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
+                     mesh_files_map[link_id] = safe_filename
+
+        # Generate Base URDF
+        # Note: Gazebo works best with standard URDF, collisions enabled.
+        # We reuse the standard export and then inject tags.
+        urdf_content, _, _ = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names, for_mujoco=False)
+        
+        # Inject Gazebo Tags
+        urdf_content = inject_gazebo_tags(urdf_content, robot)
+        
+        urdf_filename = f"{sanitized_robot_name}.urdf"
+        with open(os.path.join(urdf_dir, urdf_filename), "w") as f:
+            f.write(urdf_content)
+            
+        # Generate Launch File
+        launch_content = generate_gazebo_launch(sanitized_robot_name)
+        with open(os.path.join(launch_dir, "gazebo.launch"), "w") as f:
+            f.write(launch_content)
+            
+        # CMakeLists and Package.xml for completeness (Minimal ROS package)
+        package_xml = f"""<package format="2">
+  <name>{sanitized_robot_name}</name>
+  <version>0.1.0</version>
+  <description>Gazebo package for {sanitized_robot_name}</description>
+  <maintainer email="user@example.com">User</maintainer>
+  <license>MIT</license>
+  <buildtool_depend>catkin</buildtool_depend>
+  <depend>gazebo_ros</depend>
+  <depend>robot_state_publisher</depend>
+</package>
+"""
+        with open(os.path.join(package_dir, "package.xml"), "w") as f:
+            f.write(package_xml)
+            
+        cmake_content = f"""cmake_minimum_required(VERSION 3.0.2)
+project({sanitized_robot_name})
+find_package(catkin REQUIRED COMPONENTS gazebo_ros)
+catkin_package()
+"""
+        with open(os.path.join(package_dir, "CMakeLists.txt"), "w") as f:
+            f.write(cmake_content)
+
+        # Generate README
+        readme_content = f"""
+# Gazebo Simulation Package
+
+This package contains the URDF and Launch files to simulate **{robot_name}** in Gazebo.
+
+## Prerequisites
+- ROS Noetic (or compatible)
+- Gazebo
+- `gazebo_ros_pkgs`
+- `gazebo_ros_control`
+
+## Installation
+1. Place this folder in your catkin workspace `src/` directory.
+   ```bash
+   cp -r {sanitized_robot_name} ~/catkin_ws/src/
+   ```
+2. Build the workspace:
+   ```bash
+   cd ~/catkin_ws
+   catkin_make
+   source devel/setup.bash
+   ```
+
+## Running
+Launch the simulation:
+```bash
+roslaunch {sanitized_robot_name} gazebo.launch
+```
+This will:
+1. Start Gazebo with an empty world.
+2. Spawn the robot model.
+3. Start the `robot_state_publisher`.
+
+## Notes
+- To control joints, you may need to add transmission tags and load controllers.
+- This export includes a basic `gazebo_ros_control` plugin hook.
+"""
+        with open(os.path.join(package_dir, "README_GAZEBO.md"), "w") as f:
+            f.write(readme_content)
+
+        # Zip it
+        shutil.make_archive(package_dir, 'zip', root_dir=tmpdir, base_dir=sanitized_robot_name)
+        return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_gazebo.zip")
+
+    except Exception as e:
+        print(f"Export Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @app.post("/api/export-mujoco-mjcf")
