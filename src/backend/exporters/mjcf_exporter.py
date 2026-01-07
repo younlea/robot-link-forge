@@ -98,13 +98,25 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                 
                 # Default Axis
                 axis_val = [0, 0, 1]
-                if joint.axis:
+                
+                # Logic: URDF exporter relies on DOF flags for rotational joints.
+                # We should do the same here to match the user's intent (Pitch vs Yaw).
+                # If joint.axis is present, it might be a collision/default artifact, so we prioritize explicit DOF flags.
+                
+                found_dof = False
+                if joint.type in ['rotational', 'connected']:
+                    if joint.dof.roll: 
+                        axis_val = [1, 0, 0]
+                        found_dof = True
+                    elif joint.dof.pitch: 
+                        axis_val = [0, 1, 0]
+                        found_dof = True
+                    elif joint.dof.yaw: 
+                        axis_val = [0, 0, 1]
+                        found_dof = True
+                
+                if not found_dof and joint.axis:
                     axis_val = joint.axis
-                else:
-                    # Check DOF flags if axis not explicitly set
-                    if joint.dof.roll: axis_val = [1, 0, 0]
-                    elif joint.dof.pitch: axis_val = [0, 1, 0]
-                    elif joint.dof.yaw: axis_val = [0, 0, 1]
                 
                 axis_str = f"{axis_val[0]} {axis_val[1]} {axis_val[2]}"
                 
