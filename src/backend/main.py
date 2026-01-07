@@ -1152,7 +1152,7 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 endif()
 
 find_package(ament_cmake REQUIRED)
-find_package(gazebo_ros_pkgs REQUIRED)
+find_package(gazebo_ros REQUIRED)
 
 # Install directories
 install(DIRECTORY launch
@@ -1234,9 +1234,20 @@ mkdir -p "$WORKSPACE_DIR/src/$PACKAGE_NAME"
 echo "Copying package files..."
 cp -r package.xml CMakeLists.txt urdf launch meshes "$WORKSPACE_DIR/src/$PACKAGE_NAME/"
 
-# 3. Build
-echo "Building package..."
+# 3. Resolve Dependencies
+echo "Installing dependencies..."
 cd "$WORKSPACE_DIR"
+# Check if rosdep is initialized
+if [ ! -d "/etc/ros/rosdep/sources.list.d" ] && [ ! -f "$HOME/.ros/rosdep/sources.list.d/20-default.list" ]; then
+    echo "Warning: rosdep not initialized. You might need to run 'sudo rosdep init && rosdep update'."
+fi
+
+# We use '|| true' to prevent script exit if rosdep fails (e.g., if user doesn't have sudo or it's a dry run)
+# But ideally, we should stop. However, 'rosdep install' might try to install system packages.
+rosdep install --from-paths src --ignore-src -r -y || echo "Warning: rosdep install returned non-zero. Continuing build..."
+
+# 4. Build
+echo "Building package..."
 colcon build --packages-select "$PACKAGE_NAME"
 
 # 4. Source and Launch
