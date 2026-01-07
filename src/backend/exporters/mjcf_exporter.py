@@ -1,7 +1,7 @@
 import os
 from typing import Dict, Optional
-from ..robot_models import RobotData
-from ..utils import to_snake_case
+from robot_models import RobotData
+from utils import to_snake_case
 
 def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[str, str]):
     """

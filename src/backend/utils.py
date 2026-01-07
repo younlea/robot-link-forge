@@ -1,7 +1,7 @@
 import re
 import math
 from typing import List, Tuple, Dict
-from .robot_models import RobotData
+from robot_models import RobotData
 
 def to_snake_case(name: str) -> str:
     """Converts a string to snake_case and ensures it's a valid identifier."""

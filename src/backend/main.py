@@ -13,11 +13,11 @@ import math
 from datetime import datetime
 
 # --- Refactored Modules ---
-from .robot_models import RobotData, RobotLink, RobotJoint, Visual
-from .utils import to_snake_case, generate_unique_names
-from .exporters.urdf_exporter import generate_urdf_xml
-from .exporters.mjcf_exporter import generate_mjcf_xml
-from .exporters.stl_utils import ensure_binary_stl
+from robot_models import RobotData, RobotLink, RobotJoint, Visual
+from utils import to_snake_case, generate_unique_names
+from exporters.urdf_exporter import generate_urdf_xml
+from exporters.mjcf_exporter import generate_mjcf_xml
+from exporters.stl_utils import ensure_binary_stl
 
 app = FastAPI()
 

@@ -1,6 +1,6 @@
 from typing import Dict, Tuple, Set
-from ..robot_models import RobotData, RobotLink
-from ..utils import to_snake_case, calculate_cylinder_transform, convert_euler_xyz_to_zyx
+from robot_models import RobotData, RobotLink
+from utils import to_snake_case, calculate_cylinder_transform, convert_euler_xyz_to_zyx
 
 def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str], for_mujoco: bool = False) -> str:
     """Generates the XML content for a single link (visual, collision, etc.)."""
