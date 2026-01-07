@@ -198,6 +198,15 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
     
     link: RobotLink = robot_data.links[link_id]
     
+    
+    # --- Inertial XML (Required for MuJoCo if collision is missing) ---
+    # We add a default inertial block to ensuring the body has mass.
+    inertial_xml = '    <inertial>\n'
+    inertial_xml += '      <origin xyz="0 0 0" rpy="0 0 0"/>\n'
+    inertial_xml += '      <mass value="1.0"/>\n'
+    inertial_xml += '      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>\n'
+    inertial_xml += '    </inertial>\n'
+
     # --- Visual and Collision XML ---
     visual_xml = '    <visual>\n'
     
@@ -302,6 +311,7 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
 
     # --- Link XML ---
     link_xml = f'  <link name="{link_name}">\n'
+    link_xml += inertial_xml
     link_xml += visual_xml
     link_xml += collision_xml
 
