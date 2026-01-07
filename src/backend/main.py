@@ -1205,6 +1205,55 @@ This will start Gazebo and spawn the robot.
         with open(os.path.join(package_dir, "README_GAZEBO_ROS2.md"), "w") as f:
             f.write(readme_content)
 
+        # Generate One-Click Launch Script
+        launch_script_content = f"""#!/bin/bash
+set -e
+
+# Check if ROS_DISTRO is set
+if [ -z "$ROS_DISTRO" ]; then
+    echo "Error: ROS_DISTRO is not set."
+    echo "Please source your ROS 2 installation first."
+    echo "Example: source /opt/ros/humble/setup.bash"
+    exit 1
+fi
+
+PACKAGE_NAME="{sanitized_robot_name}"
+CURRENT_DIR=$(pwd)
+WORKSPACE_DIR="$CURRENT_DIR/standalone_ws"
+
+echo "------------------------------------------------"
+echo "Setting up standalone workspace for $PACKAGE_NAME"
+echo "Location: $WORKSPACE_DIR"
+echo "------------------------------------------------"
+
+# 1. Create Workspace
+mkdir -p "$WORKSPACE_DIR/src/$PACKAGE_NAME"
+
+# 2. Copy Package Files
+# We explicitly copy only the package files to avoid recursion if we were to copy '.'
+echo "Copying package files..."
+cp -r package.xml CMakeLists.txt urdf launch meshes "$WORKSPACE_DIR/src/$PACKAGE_NAME/"
+
+# 3. Build
+echo "Building package..."
+cd "$WORKSPACE_DIR"
+colcon build --packages-select "$PACKAGE_NAME"
+
+# 4. Source and Launch
+echo "------------------------------------------------"
+echo "Build complete. Launching simulation..."
+echo "------------------------------------------------"
+
+source install/setup.bash
+ros2 launch "$PACKAGE_NAME" gazebo.launch.py
+"""
+        script_path = os.path.join(package_dir, "setup_and_launch.sh")
+        with open(script_path, "w") as f:
+            f.write(launch_script_content)
+        
+        # Make executable
+        os.chmod(script_path, 0o755)
+
         # Zip it
         shutil.make_archive(package_dir, 'zip', root_dir=tmpdir, base_dir=sanitized_robot_name)
         return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_gazebo_ros2.zip")
