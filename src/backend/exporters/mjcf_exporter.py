@@ -52,24 +52,41 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                 j_type = "hinge" if joint.type == 'rotational' else "slide"
                 if joint.type == 'connected': j_type = "hinge"
                 
-                axis = "0 0 1"
-                if joint.axis == 'x': axis = "1 0 0"
-                elif joint.axis == 'y': axis = "0 1 0"
-                elif joint.axis == 'z': axis = "0 0 1"
+                # Default Axis
+                axis_val = [0, 0, 1]
+                if joint.axis:
+                    axis_val = joint.axis
+                
+                axis_str = f"{axis_val[0]} {axis_val[1]} {axis_val[2]}"
                 
                 range_str = ""
                 if j_type == "hinge":
-                    limit = joint.limits.roll 
-                    if joint.axis == 'x': limit = joint.limits.roll
-                    elif joint.axis == 'y': limit = joint.limits.pitch
-                    elif joint.axis == 'z': limit = joint.limits.yaw
-                    range_str = f'range="{limit.lower} {limit.upper}"'
+                    # Determine which limit to use based on axis domination or type
+                    # Prefer using the limit corresponding to the dominant axis
+                    curr_limit = None
+                    
+                    # Simple check for primary axes
+                    if axis_val == [1, 0, 0]: curr_limit = joint.limits.get('roll')
+                    elif axis_val == [0, 1, 0]: curr_limit = joint.limits.get('pitch')
+                    elif axis_val == [0, 0, 1]: curr_limit = joint.limits.get('yaw')
+                    
+                    # Fallback: if generic axis, check available limits (roll > pitch > yaw)
+                    if not curr_limit:
+                        if joint.limits.get('roll'): curr_limit = joint.limits.get('roll')
+                        elif joint.limits.get('pitch'): curr_limit = joint.limits.get('pitch')
+                        elif joint.limits.get('yaw'): curr_limit = joint.limits.get('yaw')
+                    
+                    if curr_limit:
+                        range_str = f'range="{curr_limit.lower} {curr_limit.upper}"'
 
                 elif j_type == "slide":
-                     limit = joint.limits.displacement
-                     range_str = f'range="{limit.lower} {limit.upper}"'
+                     # For prismatic/slide, key is usually 'displacement' or 'prism'
+                     # 'prism' seems to be used in some contexts, checking 'displacement' from robot_models
+                     curr_limit = joint.limits.get('displacement')
+                     if curr_limit:
+                        range_str = f'range="{curr_limit.lower} {curr_limit.upper}"'
 
-                xml.append(f'{indent}  <joint name="{joint.name}" type="{j_type}" axis="{axis}" {range_str} />')
+                xml.append(f'{indent}  <joint name="{joint.name}" type="{j_type}" axis="{axis_str}" {range_str} />')
 
         # --- Joint Visuals (Attached to This Body = Child of Joint) ---
         if parent_joint_id:
