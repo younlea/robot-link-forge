@@ -1180,6 +1180,8 @@ This package contains the configuration to simulate **{robot_name}** in Gazebo w
 
 ## Prerequisites
 - ROS 2 (Humble recommended)
+- **Gazebo Classic** (ver 11). This package uses `gazebo_ros`, NOT `ros_gz` (Fortress/Harmonic).
+  - Install via: `sudo apt install ros-$ROS_DISTRO-gazebo-ros-pkgs`
 - `gazebo_ros_pkgs`
 - `ros2_control` & `gazebo_ros2_control` (optional but recommended for joint control)
 
@@ -1237,13 +1239,24 @@ cp -r package.xml CMakeLists.txt urdf launch meshes "$WORKSPACE_DIR/src/$PACKAGE
 # 3. Resolve Dependencies
 echo "Installing dependencies..."
 cd "$WORKSPACE_DIR"
+
+# Explicit check for Gazebo Classic packages (often missed if user installed Fortress)
+if ! dpkg -l | grep -q "ros-$ROS_DISTRO-gazebo-ros-pkgs"; then
+    echo "------------------------------------------------"
+    echo "WARNING: Gazebo Classic packages not found!"
+    echo "This export targets Gazebo Classic (gazebo_ros), not Gazebo Fortress/Ignition."
+    echo "Please run: sudo apt install ros-$ROS_DISTRO-gazebo-ros-pkgs"
+    echo "------------------------------------------------"
+    # We don't exit, we let rosdep try, but this message helps usage.
+fi
+
 # Check if rosdep is initialized
 if [ ! -d "/etc/ros/rosdep/sources.list.d" ] && [ ! -f "$HOME/.ros/rosdep/sources.list.d/20-default.list" ]; then
     echo "Warning: rosdep not initialized. You might need to run 'sudo rosdep init && rosdep update'."
 fi
 
-# We use '|| true' to prevent script exit if rosdep fails (e.g., if user doesn't have sudo or it's a dry run)
-# But ideally, we should stop. However, 'rosdep install' might try to install system packages.
+# 'rosdep install' attempt
+echo "Running rosdep install..."
 rosdep install --from-paths src --ignore-src -r -y || echo "Warning: rosdep install returned non-zero. Continuing build..."
 
 # 4. Build
