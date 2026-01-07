@@ -3,7 +3,7 @@ from typing import Dict, Optional
 from robot_models import RobotData
 from utils import to_snake_case
 
-def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[str, str]):
+def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[str, str], unique_link_names: Dict[str, str]):
     """
     Generates a native MuJoCo XML string (MJCF) for the robot.
     Recursive function to build the body tree from base link.
@@ -69,7 +69,10 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
         if not link:
             return
 
-        body_name = link.name
+        body_name = unique_link_names.get(link_id, link.name)
+        # Fallback to to_snake_case if not in map (should not happen if map is comprehensive)
+        if link_id not in unique_link_names:
+             body_name = to_snake_case(body_name)
         
         pos_str = "0 0 0"
         euler_str = "0 0 0"

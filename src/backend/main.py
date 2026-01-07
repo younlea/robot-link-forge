@@ -953,7 +953,7 @@ async def export_mujoco_mjcf(
                      mesh_files_map[link_id] = safe_filename
 
         # Generate MJCF XML
-        mjcf_content = generate_mjcf_xml(robot, sanitized_robot_name, mesh_files_map)
+        mjcf_content = generate_mjcf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
         mjcf_filename = f"{sanitized_robot_name}.xml"
         with open(os.path.join(package_dir, mjcf_filename), "w") as f:
             f.write(mjcf_content)
@@ -986,6 +986,21 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
 """
         with open(os.path.join(package_dir, "visualize_mjcf.py"), "w") as f:
             f.write(script_content)
+
+        # Generate Shell Scripts
+        launch_sh = f"""#!/bin/bash
+python3 visualize_mjcf.py "$@"
+"""
+        with open(os.path.join(package_dir, "launch.sh"), "w") as f:
+            f.write(launch_sh)
+        os.chmod(os.path.join(package_dir, "launch.sh"), 0o755)
+
+        launch_bat = f"""@echo off
+python visualize_mjcf.py %*
+pause
+"""
+        with open(os.path.join(package_dir, "launch.bat"), "w") as f:
+            f.write(launch_bat)
 
         # Generate README
         readme_content = f"""
