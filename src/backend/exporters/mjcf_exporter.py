@@ -96,58 +96,42 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                 j_type = "hinge" if joint.type == 'rotational' else "slide"
                 if joint.type == 'connected': j_type = "hinge"
                 
-                # Default Axis
-                axis_val = [0, 0, 1]
-                
-                # Logic: URDF exporter relies on DOF flags for rotational joints.
-                # We should do the same here to match the user's intent (Pitch vs Yaw).
-                # If joint.axis is present, it might be a collision/default artifact, so we prioritize explicit DOF flags.
-                
-                found_dof = False
                 if joint.type in ['rotational', 'connected']:
-                    if joint.dof.roll: 
-                        axis_val = [1, 0, 0]
-                        found_dof = True
-                    elif joint.dof.pitch: 
-                        axis_val = [0, 1, 0]
-                        found_dof = True
-                    elif joint.dof.yaw: 
-                        axis_val = [0, 0, 1]
-                        found_dof = True
-                
-                if not found_dof and joint.axis:
-                    axis_val = joint.axis
-                
-                axis_str = f"{axis_val[0]} {axis_val[1]} {axis_val[2]}"
-                
-                range_str = ""
-                if j_type == "hinge":
-                    # Determine which limit to use based on axis domination or type
-                    curr_limit = None
-                    
-                    if axis_val == [1, 0, 0]: curr_limit = joint.limits.get('roll')
-                    elif axis_val == [0, 1, 0]: curr_limit = joint.limits.get('pitch')
-                    elif axis_val == [0, 0, 1]: curr_limit = joint.limits.get('yaw')
-                    
-                    if not curr_limit:
-                        if joint.limits.get('roll'): curr_limit = joint.limits.get('roll')
-                        elif joint.limits.get('pitch'): curr_limit = joint.limits.get('pitch')
-                        elif joint.limits.get('yaw'): curr_limit = joint.limits.get('yaw')
-                    
+                    active_axes = []
+                    if joint.dof.roll: active_axes.append(('roll', '1 0 0'))
+                    if joint.dof.pitch: active_axes.append(('pitch', '0 1 0'))
+                    if joint.dof.yaw: active_axes.append(('yaw', '0 0 1'))
+
+                    if not active_axes and joint.axis:
+                        # Fallback for weird cases: try to guess or use default
+                        active_axes.append(('custom', f"{joint.axis[0]} {joint.axis[1]} {joint.axis[2]}"))
+
+                    for dof_name, axis_str in active_axes:
+                         suffix = f"_{dof_name}" if len(active_axes) > 1 else ""
+                         joint_xml_name = f"{joint.name}{suffix}"
+                         
+                         limit = joint.limits.get(dof_name)
+                         range_str = ""
+                         if limit:
+                             range_str = f'range="{limit.lower} {limit.upper}"'
+                         
+                         xml.append(f'{indent}  <joint name="{joint_xml_name}" type="hinge" axis="{axis_str}" {range_str} />')
+                         
+                         ctrl_range = range_str.replace("range=", "ctrlrange=") if range_str else 'ctrlrange="-3.14 3.14"'
+                         actuators.append(f'    <position name="{joint_xml_name}_act" joint="{joint_xml_name}" kp="50" {ctrl_range}/>')
+
+                elif joint.type == 'prismatic':
+                    axis_val = joint.axis if joint.axis else [1, 0, 0]
+                    axis_str = f"{axis_val[0]} {axis_val[1]} {axis_val[2]}"
+                    curr_limit = joint.limits.get('displacement')
+                    range_str = ""
                     if curr_limit:
                         range_str = f'range="{curr_limit.lower} {curr_limit.upper}"'
-
-                elif j_type == "slide":
-                     curr_limit = joint.limits.get('displacement')
-                     if curr_limit:
-                        range_str = f'range="{curr_limit.lower} {curr_limit.upper}"'
-
-                xml.append(f'{indent}  <joint name="{joint.name}" type="{j_type}" axis="{axis_str}" {range_str} />')
-                
-                # Add Actuator for this joint (position control)
-                if j_type != "fixed":
-                    ctrl_range = range_str.replace("range=", "ctrlrange=") if range_str else 'ctrlrange="-3.14 3.14"'
-                    actuators.append(f'    <position name="{joint.name}_act" joint="{joint.name}" kp="50" {ctrl_range}/>')
+                    
+                    xml.append(f'{indent}  <joint name="{joint.name}" type="slide" axis="{axis_str}" {range_str} />')
+                    
+                    ctrl_range = range_str.replace("range=", "ctrlrange=") if range_str else 'ctrlrange="-1 1"'
+                    actuators.append(f'    <position name="{joint.name}_act" joint="{joint.name}" kp="1000" {ctrl_range}/>')
 
         # --- Joint Visuals ---
         if parent_joint_id:
