@@ -955,7 +955,7 @@ const Sidebar = () => {
 
     // State for the new export modal
     const [showExportModal, setShowExportModal] = useState(false);
-    const [exportFormat, setExportFormat] = useState<'urdf' | 'urdf_ros2' | 'mujoco_urdf' | 'mujoco_mjcf' | 'gazebo' | null>(null);
+    const [exportFormat, setExportFormat] = useState<'urdf' | 'urdf_ros2' | 'mujoco_urdf' | 'mujoco_mjcf' | 'gazebo' | 'gazebo_ros2' | null>(null);
     const [robotName, setRobotName] = useState('MyRobot');
 
     // State for Save/Load Modals
@@ -977,7 +977,7 @@ const Sidebar = () => {
         if (event.target) event.target.value = '';
     };
 
-    const openExportModal = (format: 'urdf' | 'urdf_ros2' | 'mujoco_urdf' | 'mujoco_mjcf' | 'gazebo') => {
+    const openExportModal = (format: 'urdf' | 'urdf_ros2' | 'mujoco_urdf' | 'mujoco_mjcf' | 'gazebo' | 'gazebo_ros2') => {
         const { baseLinkId, links } = useRobotStore.getState();
         const defaultName = links[baseLinkId]?.name || 'my_robot';
         setRobotName(defaultName);
@@ -1000,6 +1000,8 @@ const Sidebar = () => {
             useRobotStore.getState().exportMujocoMJCF(robotName);
         } else if (exportFormat === 'gazebo') {
             useRobotStore.getState().exportGazebo(robotName);
+        } else if (exportFormat === 'gazebo_ros2') {
+            useRobotStore.getState().exportGazeboROS2(robotName);
         }
 
         // Close modal
@@ -1345,6 +1347,7 @@ const Sidebar = () => {
                                     <a href="#" onClick={(e) => { e.preventDefault(); openExportModal('mujoco_urdf'); }} className="block px-4 py-2 text-sm text-white hover:bg-gray-600">Export to URDF (MuJoCo)</a>
                                     <a href="#" onClick={(e) => { e.preventDefault(); openExportModal('mujoco_mjcf'); }} className="block px-4 py-2 text-sm text-white hover:bg-gray-600">Export to MJCF (MuJoCo)</a>
                                     <a href="#" onClick={(e) => { e.preventDefault(); openExportModal('gazebo'); }} className="block px-4 py-2 text-sm text-white hover:bg-gray-600">Export to Gazebo (ROS 1)</a>
+                                    <a href="#" onClick={(e) => { e.preventDefault(); openExportModal('gazebo_ros2'); }} className="block px-4 py-2 text-sm text-white hover:bg-gray-600">Export to Gazebo (ROS 2)</a>
                                 </div>
                             )}
                         </div>

@@ -17,7 +17,7 @@ from robot_models import RobotData, RobotLink, RobotJoint, Visual
 from utils import to_snake_case, generate_unique_names
 from exporters.urdf_exporter import generate_urdf_xml
 from exporters.mjcf_exporter import generate_mjcf_xml
-from exporters.gazebo_exporter import inject_gazebo_tags, generate_gazebo_launch
+from exporters.gazebo_exporter import inject_gazebo_tags, generate_gazebo_launch, inject_gazebo_ros2_tags, generate_gazebo_ros2_launch
 from exporters.stl_utils import ensure_binary_stl
 
 app = FastAPI()
@@ -1044,6 +1044,175 @@ This will:
     except Exception as e:
         print(f"Export Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/export-gazebo-ros2")
+async def export_gazebo_ros2(
+    background_tasks: BackgroundTasks,
+    robot_data: str = Form(...),
+    robot_name: str = Form(...),
+    files: Optional[List[UploadFile]] = File(None)
+):
+    try:
+        try:
+            data_dict = json.loads(robot_data)
+            robot = RobotData.parse_obj(data_dict)
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
+
+        sanitized_robot_name = to_snake_case(robot_name) or "my_robot"
+        tmpdir = tempfile.mkdtemp()
+        package_dir = os.path.join(tmpdir, sanitized_robot_name)
+        urdf_dir = os.path.join(package_dir, "urdf")
+        mesh_dir = os.path.join(package_dir, "meshes")
+        launch_dir = os.path.join(package_dir, "launch")
+        
+        os.makedirs(urdf_dir, exist_ok=True)
+        os.makedirs(mesh_dir, exist_ok=True)
+        os.makedirs(launch_dir, exist_ok=True)
+        
+        unique_link_names = generate_unique_names(robot)
+        mesh_files_map = {}
+        
+        # Process Meshes
+        if files:
+            for file in files:
+                link_id = file.filename[5:] if file.filename.startswith('mesh_') else file.filename
+                if link_id in robot.links:
+                    clean_name = unique_link_names[link_id]
+                    safe_filename = f"{clean_name}.stl"
+                    dest_path = os.path.join(mesh_dir, safe_filename)
+                    with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
+                         shutil.copyfileobj(file.file, tmp_upload)
+                         tmp_upload_path = tmp_upload.name
+                    try: ensure_binary_stl(tmp_upload_path, dest_path)
+                    finally: 
+                        if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
+                    mesh_files_map[link_id] = safe_filename
+                elif link_id in robot.joints:
+                     joint_name = to_snake_case(robot.joints[link_id].name)
+                     safe_filename = f"{joint_name}_{link_id[:4]}.stl"
+                     dest_path = os.path.join(mesh_dir, safe_filename)
+                     with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
+                         shutil.copyfileobj(file.file, tmp_upload)
+                         tmp_upload_path = tmp_upload.name
+                     try: ensure_binary_stl(tmp_upload_path, dest_path)
+                     finally:
+                        if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
+                     mesh_files_map[link_id] = safe_filename
+
+        # Generate Base URDF (Collision enabled)
+        urdf_content, _, _ = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names, for_mujoco=False)
+        
+        # Inject ROS 2 Gazebo Tags
+        urdf_content = inject_gazebo_ros2_tags(urdf_content, robot)
+        
+        urdf_filename = f"{sanitized_robot_name}.urdf"
+        with open(os.path.join(urdf_dir, urdf_filename), "w") as f:
+            f.write(urdf_content)
+            
+        # Generate Launch File (Python)
+        launch_content = generate_gazebo_ros2_launch(sanitized_robot_name)
+        with open(os.path.join(launch_dir, "gazebo.launch.py"), "w") as f:
+            f.write(launch_content)
+            
+        # package.xml (ament_cmake)
+        package_xml = f"""<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>{sanitized_robot_name}</name>
+  <version>0.0.0</version>
+  <description>Gazebo ROS 2 package for {sanitized_robot_name}</description>
+  <maintainer email="user@todo.todo">User</maintainer>
+  <license>TODO: License declaration</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>gazebo_ros_pkgs</depend>
+  <depend>geometry_msgs</depend>
+  <depend>nav_msgs</depend>
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>tf2</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
+"""
+        with open(os.path.join(package_dir, "package.xml"), "w") as f:
+            f.write(package_xml)
+            
+        # CMakeLists.txt (ament_cmake)
+        cmake_content = f"""cmake_minimum_required(VERSION 3.8)
+project({sanitized_robot_name})
+
+if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  add_compile_options(-Wall -Wextra -Wpedantic)
+endif()
+
+find_package(ament_cmake REQUIRED)
+find_package(gazebo_ros_pkgs REQUIRED)
+
+# Install directories
+install(DIRECTORY launch
+  DESTINATION share/${{PROJECT_NAME}}
+)
+
+install(DIRECTORY urdf
+  DESTINATION share/${{PROJECT_NAME}}
+)
+
+install(DIRECTORY meshes
+  DESTINATION share/${{PROJECT_NAME}}
+)
+
+ament_package()
+"""
+        with open(os.path.join(package_dir, "CMakeLists.txt"), "w") as f:
+            f.write(cmake_content)
+
+        # Generate README
+        readme_content = f"""
+# Gazebo ROS 2 Package
+
+This package contains the configuration to simulate **{robot_name}** in Gazebo with ROS 2 (Humble/Jazzy/Rolling).
+
+## Prerequisites
+- ROS 2 (Humble recommended)
+- `gazebo_ros_pkgs`
+- `ros2_control` & `gazebo_ros2_control` (optional but recommended for joint control)
+
+## Installation
+1. Place this folder in your colcon workspace `src/` directory.
+   ```bash
+   cp -r {sanitized_robot_name} ~/ros2_ws/src/
+   ```
+2. Build the workspace:
+   ```bash
+   cd ~/ros2_ws
+   colcon build --packages-select {sanitized_robot_name}
+   source install/setup.bash
+   ```
+
+## Running
+Launch the simulation:
+```bash
+ros2 launch {sanitized_robot_name} gazebo.launch.py
+```
+This will start Gazebo and spawn the robot.
+"""
+        with open(os.path.join(package_dir, "README_GAZEBO_ROS2.md"), "w") as f:
+            f.write(readme_content)
+
+        # Zip it
+        shutil.make_archive(package_dir, 'zip', root_dir=tmpdir, base_dir=sanitized_robot_name)
+        return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_gazebo_ros2.zip")
+
+    except Exception as e:
+        print(f"Export Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 

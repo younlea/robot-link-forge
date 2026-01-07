@@ -82,3 +82,125 @@ def generate_gazebo_launch(robot_name: str) -> str:
 </launch>
 """
     return launch_xml
+
+def inject_gazebo_ros2_tags(urdf_content: str, robot: RobotData) -> str:
+    """
+    Injects Gazebo-specific tags for ROS 2.
+    - Adds <gazebo> materials (same as ROS 1 usually).
+    - Adds <gazebo> plugin for ros2_control.
+    """
+    
+    # 1. Add generic Gazebo tags (materials) - mostly same as ROS 1
+    # For now we skip specific link materials unless we parse names.
+    
+    # 2. Add gazebo_ros2_control plugin
+    # Note: filename is usually libgazebo_ros2_control.so
+    gazebo_plugin = """
+  <!-- Gazebo ROS 2 Control Plugin -->
+  <gazebo>
+    <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
+      <parameters>$(find {robot_name})/config/ros2_controllers.yaml</parameters>
+    </plugin>
+  </gazebo>
+"""
+    # Note: We need {robot_name} to be valid, but here we don't have it easily injected in this string.
+    # actually we usually put the yaml path.
+    # However, without a controller yaml generated, the plugin might complain or default.
+    # A safer minimal plugin for just "visualizing" in Gazebo without complex controllers:
+    # Actually, standard DiffDrive or just JointStatePublisher is easier for a start.
+    
+    # Let's use a generic configuration that doesn't hard-crash if config is missing, 
+    # or just omit the parameters tag to let it use defaults/parameters server.
+    
+    minimal_plugin = """
+  <gazebo>
+    <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
+      <robot_param>robot_description</robot_param>
+      <robot_param_node>robot_state_publisher</robot_param_node>
+      <parameters>$(find {robot_name})/config/ros2_controllers.yaml</parameters>
+    </plugin>
+  </gazebo>
+"""
+    # To keep it simple for the user who hasn't defined controllers in our UI:
+    # We will just inject the plugin definition. The user will have to create the config
+    # if they want to actually move it, OR we generate a dummy config.
+    # For now, let's just stick to the basic plugin injection.
+    
+    gazebo_plugin_formatted = """
+  <!-- Gazebo ROS 2 Control Plugin -->
+  <gazebo>
+    <plugin filename="libgazebo_ros2_control.so" name="gazebo_ros2_control">
+      <!-- <parameters>$(find pkg_name)/config/controllers.yaml</parameters> -->
+    </plugin>
+  </gazebo>
+"""
+
+    if "</robot>" in urdf_content:
+        urdf_content = urdf_content.replace("</robot>", f"{gazebo_plugin_formatted}\n</robot>")
+        
+    return urdf_content
+
+def generate_gazebo_ros2_launch(robot_name: str) -> str:
+    """Generates a Python launch file for ROS 2 Gazebo."""
+    
+    # We need to find the package share directory.
+    # We launch gazebo_ros -> gazebo.launch.py
+    # We spawn_entity.py
+    # We robot_state_publisher
+    
+    launch_py = f"""
+import os
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import ExecuteProcess, IncludeLaunchDescription, RegisterEventHandler
+from launch.event_handlers import OnProcessExit
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
+from launch_ros.actions import Node
+
+def generate_launch_description():
+    pkg_name = '{robot_name}'
+    pkg_share = get_package_share_directory(pkg_name)
+    
+    # Gazebo Launch
+    gazebo = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            os.path.join(get_package_share_directory('gazebo_ros'), 'launch', 'gazebo.launch.py')
+        ),
+    )
+
+    # Robot State Publisher
+    # We assume urdf is in urdf/ directory
+    urdf_file = os.path.join(pkg_share, 'urdf', '{robot_name}.urdf')
+    
+    # Make sure we read the URDF content for the parameter
+    # Note: In ROS 2, it is often preferred to use 'Command' with xacro, even for pure URDF, 
+    # but reading text is fine for plain URDF.
+    
+    with open(urdf_file, 'r') as infp:
+        robot_desc = infp.read()
+
+    node_robot_state_publisher = Node(
+        package='robot_state_publisher',
+        executable='robot_state_publisher',
+        output='screen',
+        parameters=[{{'robot_description': robot_desc}}],
+    )
+
+    # Spawn Entity
+    spawn_entity = Node(
+        package='gazebo_ros',
+        executable='spawn_entity.py',
+        arguments=['-topic', 'robot_description',
+                   '-entity', '{robot_name}'],
+        output='screen'
+    )
+
+    return LaunchDescription([
+        gazebo,
+        node_robot_state_publisher,
+        spawn_entity,
+    ])
+"""
+    return launch_py
+

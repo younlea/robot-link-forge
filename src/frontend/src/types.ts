@@ -141,6 +141,7 @@ export interface RobotActions {
   exportMujocoURDF: (robotName: string) => Promise<void>;
   exportMujocoMJCF: (robotName: string) => Promise<void>;
   exportGazebo: (robotName: string) => Promise<void>;
+  exportGazeboROS2: (robotName: string) => Promise<void>;
 
   // App State Management
   saveRobot: () => Promise<void>; // Local Download
