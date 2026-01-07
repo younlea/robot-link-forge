@@ -1236,35 +1236,52 @@ mkdir -p "$WORKSPACE_DIR/src/$PACKAGE_NAME"
 echo "Copying package files..."
 cp -r package.xml CMakeLists.txt urdf launch meshes "$WORKSPACE_DIR/src/$PACKAGE_NAME/"
 
+
 # 3. Resolve Dependencies
-echo "Installing dependencies..."
-cd "$WORKSPACE_DIR"
+if [ "$SKIP_DEPENDENCIES" = "1" ]; then
+    echo "Skipping dependency check (SKIP_DEPENDENCIES=1)..."
+else
+    echo "Installing dependencies..."
+    cd "$WORKSPACE_DIR"
 
-# Explicit check for Gazebo Classic packages (often missed if user installed Fortress)
-if ! dpkg -l | grep -q "ros-$ROS_DISTRO-gazebo-ros"; then
-    echo "------------------------------------------------"
-    echo "WARNING: Gazebo Classic packages not found!"
-    echo "This export targets Gazebo Classic (gazebo_ros), not Gazebo Fortress/Ignition."
-    echo "Please run the following commands:"
-    echo "  sudo apt update"
-    echo "  sudo apt install ros-$ROS_DISTRO-gazebo-ros-pkgs"
-    echo "If the meta-package is not found, try:"
-    echo "  sudo apt install ros-$ROS_DISTRO-gazebo-ros ros-$ROS_DISTRO-gazebo-plugins"
-    echo "------------------------------------------------"
+    # Explicit check for Gazebo Classic packages
+    if ! dpkg -l | grep -q "ros-$ROS_DISTRO-gazebo-ros"; then
+        echo "------------------------------------------------"
+        echo "WARNING: Gazebo Classic packages not found!"
+        echo "This export targets Gazebo Classic (gazebo_ros)."
+        echo "Please ensure you have installed: ros-$ROS_DISTRO-gazebo-ros-pkgs"
+        echo "------------------------------------------------"
+    fi
+
+    echo "Running rosdep install..."
+    # We capture the exit code to give better advice
+    set +e # Temporarily disable strict exit
+    rosdep install --from-paths src --ignore-src -r -y
+    ROSDEP_EXIT=$?
+    set -e # Re-enable strict exit
+
+    if [ $ROSDEP_EXIT -ne 0 ]; then
+        echo "------------------------------------------------"
+        echo "WARNING: 'rosdep install' failed."
+        echo "If you are behind a corporate firewall/proxy:"
+        echo "1. Export proxy variables:"
+        echo "   export http_proxy=http://your-proxy:port"
+        echo "   export https_proxy=http://your-proxy:port"
+        echo "2. Configure apt proxy in /etc/apt/apt.conf"
+        echo ""
+        echo "If you believe you have all dependencies installed,"
+        echo "you can bypass this check by running:"
+        echo "   export SKIP_DEPENDENCIES=1; ./setup_and_launch.sh"
+        echo "------------------------------------------------"
+        echo "Attempting to continue build..."
+    fi
 fi
-
-# Check if rosdep is initialized
-if [ ! -d "/etc/ros/rosdep/sources.list.d" ] && [ ! -f "$HOME/.ros/rosdep/sources.list.d/20-default.list" ]; then
-    echo "Warning: rosdep not initialized. You might need to run 'sudo rosdep init && rosdep update'."
-fi
-
-# 'rosdep install' attempt
-echo "Running rosdep install..."
-rosdep install --from-paths src --ignore-src -r -y || echo "Warning: rosdep install returned non-zero. Continuing build..."
 
 # 4. Build
 echo "Building package..."
+cd "$WORKSPACE_DIR"
 colcon build --packages-select "$PACKAGE_NAME"
+
 
 # 4. Source and Launch
 echo "------------------------------------------------"
