@@ -47,7 +47,7 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
              get_mesh_asset_name(joint_id, mesh_files_map[joint_id], joint.visual.meshScale)
 
     xml = [f'<mujoco model="{robot_name}">']
-    xml.append('  <compiler angle="radian" meshdir="meshes"/>')
+    xml.append('  <compiler angle="radian" meshdir="meshes" eulerseq="zyx"/>')
     xml.append('  <option gravity="0 0 -9.81"/>')
     
     # 2. Write Assets
@@ -62,6 +62,8 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
     xml.append('  <worldbody>')
     xml.append('    <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/>')
     xml.append('    <geom type="plane" size="5 5 0.1" rgba=".9 .9 .9 1"/>')
+
+    actuators = []
 
     def build_body(link_id: str, parent_joint_id: Optional[str] = None, indent_level: int = 2):
         indent = '  ' * indent_level
@@ -124,6 +126,11 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                         range_str = f'range="{curr_limit.lower} {curr_limit.upper}"'
 
                 xml.append(f'{indent}  <joint name="{joint.name}" type="{j_type}" axis="{axis_str}" {range_str} />')
+                
+                # Add Actuator for this joint (position control)
+                if j_type != "fixed":
+                    ctrl_range = range_str.replace("range=", "ctrlrange=") if range_str else 'ctrlrange="-3.14 3.14"'
+                    actuators.append(f'    <position name="{joint.name}_act" joint="{joint.name}" kp="50" {ctrl_range}/>')
 
         # --- Joint Visuals ---
         if parent_joint_id:
@@ -227,5 +234,12 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
     build_body(robot.baseLinkId, indent_level=2)
 
     xml.append('  </worldbody>')
+    
+    if actuators:
+        xml.append('  <actuator>')
+        for act in actuators:
+            xml.append(act)
+        xml.append('  </actuator>')
+        
     xml.append('</mujoco>')
     return "\n".join(xml)
