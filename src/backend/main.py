@@ -1633,8 +1633,8 @@ if not sensor_names:
 
 # Store history for plotting
 history_len = 100
-sensor_data_history = {name: deque([0]*history_len, maxlen=history_len) for name in sensor_names}
-lines = {}
+sensor_data_history = {{name: deque([0]*history_len, maxlen=history_len) for name in sensor_names}}
+lines = {{}}
 for name in sensor_names:
     line, = ax.plot(range(history_len), sensor_data_history[name], label=name)
     lines[name] = line
@@ -1716,6 +1716,12 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         # Efficient plot update (blit if possible, here simple draw)
         fig.canvas.draw_idle()
         fig.canvas.flush_events()
+        
+        # Periodic Logging (Every ~1 second)
+        if frame_count % 30 == 0:
+             print(f"[Frame {{frame_count}}] Curl Signal: {{curl_val:.2f}} | Actuating {{len(curl_actuators)}} joints")
+             if active_sensors:
+                 print(f"  >>> SENSOR HIT: {{', '.join(active_sensors)}}")
 
         # Keep real-time
         time_until_next_step = model.opt.timestep - (time.time() - start_time)
