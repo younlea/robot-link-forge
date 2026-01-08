@@ -1408,6 +1408,35 @@ pause
         with open(os.path.join(package_dir, "requirements.txt"), "w") as f:
             f.write(req_content)
 
+        # Generate Setup Venv Script (Linux/Mac)
+        setup_sh = f"""#!/bin/bash
+echo "Creating virtual environment..."
+python3 -m venv venv
+echo "Activating virtual environment..."
+source venv/bin/activate
+echo "Installing dependencies..."
+pip install --upgrade pip
+pip install -r requirements.txt
+echo "Done! You can now run ./run_demo.sh"
+"""
+        with open(os.path.join(package_dir, "setup_venv.sh"), "w") as f:
+            f.write(setup_sh)
+        os.chmod(os.path.join(package_dir, "setup_venv.sh"), 0o755)
+
+        # Generate Run Demo Script (Linux/Mac)
+        run_demo_sh = f"""#!/bin/bash
+if [ ! -d "venv" ]; then
+    echo "Virtual environment not found. Please run ./setup_venv.sh first."
+    exit 1
+fi
+source venv/bin/activate
+python demo_hand_control.py
+"""
+        with open(os.path.join(package_dir, "run_demo.sh"), "w") as f:
+            f.write(run_demo_sh)
+        os.chmod(os.path.join(package_dir, "run_demo.sh"), 0o755)
+
+
         # Generate Demo Hand Control Script
         demo_script = f"""
 import mujoco
@@ -1427,18 +1456,29 @@ MODEL_PATH = "{mjcf_filename}"
 ACTUATOR_SCALING = 1.0 
 
 # --- MediaPipe Setup ---
-mp_hands = mp.solutions.hands
-hands = mp_hands.Hands(
-    model_complexity=0,
-    min_detection_confidence=0.5,
-    min_tracking_confidence=0.5)
+try:
+    print("Initializing MediaPipe...")
+    mp_hands = mp.solutions.hands
+    hands = mp_hands.Hands(
+        model_complexity=0,
+        min_detection_confidence=0.5,
+        min_tracking_confidence=0.5)
+except Exception as e:
+    print(f"Error initializing MediaPipe: {{e}}")
+    print("Ensure you are running in the virtual environment where mediapipe is installed.")
+    exit(1)
 
 # --- MuJoCo Setup ---
 print(f"Loading model from {{MODEL_PATH}}...")
-model = mujoco.MjModel.from_xml_path(MODEL_PATH)
-data = mujoco.MjData(model)
+try:
+    model = mujoco.MjModel.from_xml_path(MODEL_PATH)
+    data = mujoco.MjData(model)
+except Exception as e:
+    print(f"Error loading MuJoCo model: {{e}}")
+    exit(1)
 
 # --- Matplotlib Setup (Live Graph) ---
+print("Initializing Matplotlib...")
 plt.ion()
 fig, ax = plt.subplots()
 sensor_names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SENSOR, i) for i in range(model.nsensor)]
@@ -1457,8 +1497,14 @@ ax.legend(loc='upper left')
 plt.title("Sensor Force")
 
 # --- Main Loop ---
+print("Opening Webcam...")
 cap = cv2.VideoCapture(0)
 
+if not cap.isOpened():
+    print("Error: Could not open webcam.")
+    exit(1)
+
+print("Starting Simulation Loop...")
 with mujoco.viewer.launch_passive(model, data) as viewer:
     while viewer.is_running() and cap.isOpened():
         start_time = time.time()
@@ -1539,9 +1585,25 @@ This package contains the **Native MJCF XML** model of **{robot_name}**.
 
 ## Prerequisites
 - Python 3.8+
-- MuJoCo library
+- Webcam (for hand control)
 
-## Installation
+## Quick Start (Recommended)
+
+1. **Setup Environment**:
+   Run the setup script to create a virtual environment and install dependencies (prevents conflicts):
+   ```bash
+   ./setup_venv.sh
+   ```
+
+2. **Run Demo**:
+   Start the hand tracking and simulation:
+   ```bash
+   ./run_demo.sh
+   ```
+
+## Manual Installation
+
+If you prefer to install manually:
 ```bash
 pip install -r requirements.txt
 ```
@@ -1552,21 +1614,21 @@ Run the visualization script:
 python visualize_mjcf.py
 ```
 
-### Hand Control Demo (MediaPipe + Sensors)
-This package includes a demo script to control the robot with your webcam and view sensor data.
+### Hand Control Demo
 1. Ensure your webcam is connected.
 2. Run:
    ```bash
    python demo_hand_control.py
    ```
-3. Pinch your thumb and index finger to control the robot (mapped to the first actuator).
-4. See the Force Sensor graph update in real-time.
+3. Pinch your thumb and index finger to control the robot.
 
 ## Files
 - `{mjcf_filename}`: The native MJCF robot description.
 - `meshes/`: STL files for geometries.
 - `visualize_mjcf.py`: Python script to load and view the model.
 - `demo_hand_control.py`: Webcam control and sensor graph demo.
+- `setup_venv.sh`: Helper to create venv.
+- `run_demo.sh`: Helper to run demo in venv.
 """
         with open(os.path.join(package_dir, "README_MUJOCO.md"), "w") as f:
             f.write(readme_content)
