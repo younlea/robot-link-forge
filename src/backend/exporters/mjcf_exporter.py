@@ -226,11 +226,28 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                      
                      xml.append(f'{indent}  <geom {geom_str} pos="{v_pos}" euler="{v_euler}" rgba="{rgb_str}" />')
 
-        # Check if leaf node (no child joints) to add sensor site
-        if not link.childJoints:
+        # Determine if we should add a sensor
+        # It is a leaf if it has no child joints, OR if its child joints don't lead to valid bodies
+        is_leaf = True
+        if link.childJoints:
+            for child_joint_id in link.childJoints:
+                cj = robot.joints.get(child_joint_id)
+                if cj and cj.childLinkId:
+                    # Found a valid child link, so this is NOT a leaf
+                    is_leaf = False
+                    break
+        
+        # Heuristic: User might name things "finger_tip" etc.
+        name_lower = body_name.lower()
+        is_target_name = "tip" in name_lower or "finger" in name_lower or "hand" in name_lower
+        
+        # Add sensor if leaf or specifically named, AND it has some visual (otherwise it's a dummy frame)
+        # Actually, dummy frames are fine for sites.
+        if is_leaf or is_target_name:
             # Add site for sensor
             site_name = f"site_{body_name}"
-            xml.append(f'{indent}  <site name="{site_name}" pos="0 0 0" size="0.01" rgba="1 0 0 1" />')
+            # Make site slightly visible but unobtrusive (small red sphere)
+            xml.append(f'{indent}  <site name="{site_name}" pos="0 0 0" size="0.015" rgba="1 0.2 0.2 0.5" />')
             
             # Add sensor definition
             sensor_name = f"sensor_{body_name}"
