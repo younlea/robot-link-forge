@@ -1472,20 +1472,42 @@ print("Initializing MediaPipe...")
 try:
     import mediapipe as mp
     print(f"MediaPipe Version: {{mp.__version__}}")
-    print(f"MediaPipe Path: {{mp.__file__}}")
+    print(f"MediaPipe File: {{mp.__file__}}")
     
+    # Explicitly check for solutions
+    if not hasattr(mp, 'solutions'):
+        print("Warning: mp.solutions not found via standard attribute access.")
+        print("Attempting explicit import...")
+        try:
+            import mediapipe.python.solutions as solutions
+            mp.solutions = solutions
+            print("Explicit import succeeded!")
+        except ImportError as ie:
+            print(f"Explicit import failed: {{ie}}")
+            print(f"Available attributes in mp: {{dir(mp)}}")
+            print(f"Sys Path: {{sys.path}}")
+            raise AttributeError("Could not load solutions")
+
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(
         model_complexity=0,
         min_detection_confidence=0.5,
         min_tracking_confidence=0.5)
+    print("MediaPipe Initialized Successfully.")
+
 except ImportError:
     print("Error: MediaPipe not found!")
     print("Please run setup_venv.sh to install dependencies.")
     sys.exit(1)
 except AttributeError as e:
-    print(f"Error: MediaPipe installation seems broken: {{e}}")
-    print("Try running: pip install --force-reinstall mediapipe")
+    print("="*60)
+    print(f"CRITICAL ERROR: {{e}}")
+    print("This is a known issue with some python environments.")
+    print("Possible specific causes:")
+    print("1. Circular Import: Do you have a file named 'mediapipe.py'?")
+    print("2. Corrupt Install: Try running 'pip uninstall mediapipe' and reinstalling.")
+    print("3. OpenCV Conflict: Try 'pip uninstall opencv-python opencv-contrib-python' and install only 'opencv-python'.")
+    print("="*60)
     sys.exit(1)
 except Exception as e:
     print(f"Error initializing MediaPipe: {{e}}")
