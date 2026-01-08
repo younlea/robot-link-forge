@@ -1411,19 +1411,26 @@ pause
 
         # Generate Setup Venv Script (Linux/Mac)
         setup_sh = f"""#!/bin/bash
-echo "Creating virtual environment..."
-python3 -m venv venv
+set -e  # Exit immediately if a command exits with a non-zero status.
+
+echo "Creating clean virtual environment..."
+# --clear ensures we start fresh even if venv exists
+python3 -m venv --clear venv
+
 echo "Activating virtual environment..."
 source venv/bin/activate
-echo "Installing dependencies..."
-pip install --upgrade pip
+
+echo "Upgrading pip and installing wheel..."
+pip install --upgrade pip wheel
+
+echo "Installing dependencies from requirements.txt..."
 # Force re-install without cache to fix any broken downloads
 pip install --no-cache-dir -r requirements.txt
 
 echo "--- DEBUG INFO ---"
+echo "Python location: $(which python)"
 pip list
-pip show mediapipe
-pip check
+pip show mujoco
 echo "------------------"
 
 echo "Done! You can now run ./run_demo.sh"
@@ -1443,7 +1450,10 @@ if [ ! -f "$VENV_PYTHON" ]; then
     exit 1
 fi
 
-echo "Running with: $VENV_PYTHON"
+echo "Running with Python: $VENV_PYTHON"
+# Debug: Print sys.path to confirm we are in the venv
+"$VENV_PYTHON" -c "import sys; print('DEBUG: sys.path is', sys.path)"
+
 "$VENV_PYTHON" "$SCRIPT_DIR/demo_hand_control.py"
 """
         with open(os.path.join(package_dir, "run_demo.sh"), "w") as f:
