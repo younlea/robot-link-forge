@@ -1404,8 +1404,11 @@ pause
             f.write(launch_bat)
 
         # Generate requirements.txt
-        # Pinning MediaPipe to 0.10.14 which is known to be stable with protobuf < 4
-        req_content = "mujoco\nmediapipe==0.10.14\nprotobuf>=3.11, <4\nopencv-python\nmatplotlib\nnumpy\n"
+        # Simplified requirements:
+        # 1. mediapipe installs its own opencv-contrib-python. 
+        #    Installing 'opencv-python' alongside it causes conflicts.
+        # 2. Letting mediapipe pick its own protobuf version (likely 3.19+ or 4.x)
+        req_content = "mujoco\nmediapipe==0.10.14\nmatplotlib\nnumpy\n"
         with open(os.path.join(package_dir, "requirements.txt"), "w") as f:
             f.write(req_content)
 
