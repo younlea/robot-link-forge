@@ -1657,8 +1657,10 @@ print("       Touch the robot to objects/ground to see sensor values.")
 
 with mujoco.viewer.launch_passive(model, data) as viewer:
     # Enable visibility of Sites (Sensors) and Contact Points
-    viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_SITE] = 1
-    viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 1
+    # Values: mjVIS_SITE=1, mjVIS_CONTACTPOINT=9
+    # Using integers to prevent AttributeErrors across versions
+    viewer.opt.flags[1] = 1
+    viewer.opt.flags[9] = 1
     
     while viewer.is_running() and cap.isOpened():
         start_time = time.time()
