@@ -1404,7 +1404,8 @@ pause
             f.write(launch_bat)
 
         # Generate requirements.txt
-        req_content = "mujoco\nmediapipe>=0.10.0\nprotobuf>=3.20\nopencv-python\nmatplotlib\nnumpy\n"
+        # Protobuf 4.x is known to cause issues with some MediaPipe versions. Pinning < 4.
+        req_content = "mujoco\nmediapipe>=0.10.0\nprotobuf>=3.11, <4\nopencv-python\nmatplotlib\nnumpy\n"
         with open(os.path.join(package_dir, "requirements.txt"), "w") as f:
             f.write(req_content)
 
@@ -1473,6 +1474,12 @@ try:
     import mediapipe as mp
     print(f"MediaPipe Version: {{mp.__version__}}")
     print(f"MediaPipe File: {{mp.__file__}}")
+    if hasattr(mp, '__path__'):
+        print(f"MediaPipe Path: {{mp.__path__}}")
+        # Inspect directory
+        try:
+            print(f"Contents of MediaPipe dir: {{os.listdir(mp.__path__[0])}}")
+        except: pass
     
     # Explicitly check for solutions
     if not hasattr(mp, 'solutions'):
@@ -1485,8 +1492,13 @@ try:
         except ImportError as ie:
             print(f"Explicit import failed: {{ie}}")
             print(f"Available attributes in mp: {{dir(mp)}}")
-            print(f"Sys Path: {{sys.path}}")
-            raise AttributeError("Could not load solutions")
+            # Try one more path that sometimes exists in weird installs
+            try:
+                import mediapipe.solutions as solutions
+                mp.solutions = solutions
+                print("Direct solutions import succeeded!")
+            except:
+                raise AttributeError("Could not load solutions")
 
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(
