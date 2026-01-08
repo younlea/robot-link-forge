@@ -1556,22 +1556,24 @@ print("="*60)
 print(f"Auto-Mapping Actuators (Total: {model.nu}):")
 for i in range(model.nu):
     name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
-    if not name: name = f"actuator_{i}"
+    if not name: name = f"actuator_{{i}}"
     
+    # Heuristic: 'pitch' implies curling in many humanoid hands
+    # Simple hinges often denote the main joint (curl)
     lower_name = name.lower()
-    
-    # BROADENED HEURISTIC:
-    # Unless it EXPLICITLY says 'roll', 'yaw', or 'spread', we assume it's a primary curl/flexion joint.
-    # This captures "joint1", "knuckle", "mp_joint" etc. which are usually curl.
-    if 'roll' in lower_name or 'yaw' in lower_name or 'spread' in lower_name:
-        spread_actuators.append(i)
-        print(f"  [ID {i}] {name} -> SPREAD (Held Fixed)")
-    else:
+    if 'pitch' in lower_name:
         curl_actuators.append(i)
-        print(f"  [ID {i}] {name} -> CURL (Mapped to Hand Close)")
+        print(f"  [ID {{i}}] {{name}} -> CURL (Matched 'pitch')")
+    elif 'roll' in lower_name or 'yaw' in lower_name:
+        spread_actuators.append(i)
+        print(f"  [ID {{i}}] {{name}} -> SPREAD (Matched 'roll'/'yaw')")
+    else:
+        # Default fallback for unspecified joints: assume Curl
+        curl_actuators.append(i)
+        print(f"  [ID {{i}}] {{name}} -> CURL (Default)")
 
-print(f"Mapped {len(curl_actuators)} actuators to CURL control.")
-print(f"Mapped {len(spread_actuators)} actuators to SPREAD/Other.")
+print(f"Mapped {{len(curl_actuators)}} actuators to CURL control.")
+print(f"Mapped {{len(spread_actuators)}} actuators to SPREAD/Other.")
 print("="*60)
 
 # --- Helper: Calculate Hand Curl ---
