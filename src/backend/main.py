@@ -1547,14 +1547,79 @@ except Exception as e:
     print(f"Error loading MuJoCo model: {{e}}")
     exit(1)
 
-# --- Actuator Info ---
+# --- Smart Actuator Mapping ---
+# We try to guess which actuators control "Curl" (Pitch) vs "Spread" (Roll/Yaw)
+curl_actuators = []
+spread_actuators = []
+
 print("="*60)
-print(f"Number of Actuators: {{model.nu}}")
-actuator_names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i) for i in range(model.nu)]
-print(f"Actuator Names: {{actuator_names}}")
-print("NOTE: By default, this demo controls ALL actuators with the pinch gesture.")
-print("      Edit 'demo_hand_control.py' to map specific fingers to specific IDs.")
+print(f"Auto-Mapping Actuators (Total: {{model.nu}}):")
+for i in range(model.nu):
+    name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
+    if not name: name = f"actuator_{{i}}"
+    
+    # Heuristic: 'pitch' implies curling in many humanoid hands
+    # Simple hinges often denote the main joint (curl)
+    lower_name = name.lower()
+    if 'pitch' in lower_name:
+        curl_actuators.append(i)
+        print(f"  [ID {{i}}] {{name}} -> CURL (Matched 'pitch')")
+    elif 'roll' in lower_name or 'yaw' in lower_name:
+        spread_actuators.append(i)
+        print(f"  [ID {{i}}] {{name}} -> SPREAD (Matched 'roll'/'yaw')")
+    else:
+        # Default fallback for unspecified joints: assume Curl
+        curl_actuators.append(i)
+        print(f"  [ID {{i}}] {{name}} -> CURL (Default)")
+
+print(f"Mapped {{len(curl_actuators)}} actuators to CURL control.")
+print(f"Mapped {{len(spread_actuators)}} actuators to SPREAD/Other.")
 print("="*60)
+
+# --- Helper: Calculate Hand Curl ---
+def calculate_hand_curl(landmarks):
+    # Average distance of fingertips to wrist
+    # Simple heuristic: 1.0 = Open, 0.0 = Closed
+    
+    wrist = landmarks.landmark[mp_hands.HandLandmark.WRIST]
+    tips = [
+        mp_hands.HandLandmark.INDEX_FINGER_TIP,
+        mp_hands.HandLandmark.MIDDLE_FINGER_TIP,
+        mp_hands.HandLandmark.RING_FINGER_TIP,
+        mp_hands.HandLandmark.PINKY_TIP
+    ]
+    mcps = [
+        mp_hands.HandLandmark.INDEX_FINGER_MCP,
+        mp_hands.HandLandmark.MIDDLE_FINGER_MCP,
+        mp_hands.HandLandmark.RING_FINGER_MCP,
+        mp_hands.HandLandmark.PINKY_MCP
+    ]
+    
+    total_ratio = 0
+    for tip_idx, mcp_idx in zip(tips, mcps):
+        tip = landmarks.landmark[tip_idx]
+        mcp = landmarks.landmark[mcp_idx]
+        
+        # Dist Tip to Wrist
+        dist_tip = np.sqrt((tip.x - wrist.x)**2 + (tip.y - wrist.y)**2)
+        # Dist MCP to Wrist (Reference length)
+        dist_mcp = np.sqrt((mcp.x - wrist.x)**2 + (mcp.y - wrist.y)**2)
+        
+        # If tip is closer to wrist than MCP, it's curled.
+        # Ratio > 1.5 ~= Open
+        # Ratio < 0.8 ~= Closed
+        ratio = dist_tip / (dist_mcp + 1e-6)
+        total_ratio += ratio
+
+    avg_ratio = total_ratio / 4.0
+    
+    # Map raw ratio to 0.0 (Open) - 1.0 (Closed)
+    # Open ~ 1.8, Closed ~ 0.5
+    # Let's Normalize:
+    # 1.8 -> 0
+    # 0.5 -> 1
+    curl = np.clip((1.8 - avg_ratio) / 1.3, 0.0, 1.0)
+    return curl
 
 # --- Matplotlib Setup (Live Graph) ---
 print("Initializing Matplotlib...")
@@ -1587,46 +1652,43 @@ if not cap.isOpened():
     exit(1)
 
 print("Starting Simulation Loop...")
-print("Usage: Pinch thumb and index finger to close ALL actuators.")
+print("Usage: Close your hand (Make a Fist) to close ALL actuators.")
 print("       Touch the robot to objects/ground to see sensor values.")
 
 with mujoco.viewer.launch_passive(model, data) as viewer:
+    # Enable visibility of Sites (Sensors) and Contact Points
+    viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_SITE] = 1
+    viewer.opt.flags[mujoco.mjtVisFlag.mjVIS_CONTACTPOINT] = 1
+    
     while viewer.is_running() and cap.isOpened():
         start_time = time.time()
         
-        # 1. Vision Processing
         ret, frame = cap.read()
         if not ret: break
         
-        frame = cv2.flip(frame, 1) # Mirror view
+        frame = cv2.flip(frame, 1)
         results = hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         
-        target_ctrl = 0.0
+        curl_val = 0.0
         
         if results.multi_hand_landmarks:
             for hand_landmarks in results.multi_hand_landmarks:
-                # Visualize landmarks
                 mp.solutions.drawing_utils.draw_landmarks(
                     frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
                 
-                # --- Simple Control Logic ---
-                # Calculate simple "Pinch" distance (Thumb Tip vs Index Tip)
-                thumb_tip = hand_landmarks.landmark[mp_hands.HandLandmark.THUMB_TIP]
-                index_tip = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
-                
-                # Euclidean distance in screen coordinates (approx)
-                dist = np.sqrt((thumb_tip.x - index_tip.x)**2 + (thumb_tip.y - index_tip.y)**2)
-                
-                # Map 0 (touching) - 0.5 (open) to Actuator Control
-                # Invert: Small distance = High Force/Closed
-                # This is a heuristic.
-                pinch_strength = max(0, 1.0 - (dist * 4.0)) # Scaling factor
-                
-                # Apply to ALL actuators for demo purposes
-                # Usually you want to map specific actuators to specific fingers
-                if model.nu > 0:
-                     for i in range(model.nu):
-                         data.ctrl[i] = pinch_strength * 2.0 # Simple gain
+                curl_val = calculate_hand_curl(hand_landmarks)
+        
+        # Apply Control
+        # Curl Actuators: 0.0 -> Open, 1.0 -> Closed
+        # Assuming Positive = Flexion (Curling) for standard MuJoCo hands
+        ctrl_signal = curl_val * 2.0 # Gain
+        
+        for idx in curl_actuators:
+            data.ctrl[idx] = ctrl_signal
+            
+        # Optional: Keep Roll/Spread steady (0.0)
+        for idx in spread_actuators:
+            data.ctrl[idx] = 0.0
                          
         cv2.imshow('MediaPipe Hand Tracking', frame)
         if cv2.waitKey(1) & 0xFF == 27: break
