@@ -1547,6 +1547,11 @@ for i in range(model.nu):
         print(f"  [ID {{i}}] {{name}} -> IGNORED (Spread/Roll) | Range: {{range_str}}")
         continue
 
+    # STRICT 1st Joint Filter: Only allow PITCH for the first joint (Proximal).
+    if '1st' in lower and 'pitch' not in lower:
+        print(f"  [ID {{i}}] {{name}} -> IGNORED (1st Joint Non-Pitch) | Range: {{range_str}}")
+        continue
+
     # Assign to finger bucket
     assigned = False
     for fname in finger_names:
