@@ -1466,6 +1466,7 @@ echo "Running with Python: $VENV_PYTHON"
 
         # Generate Demo Hand Control Script
         demo_script = f"""
+
 import mujoco
 import mujoco.viewer
 import cv2
@@ -1478,109 +1479,84 @@ import os
 
 # --- Configuration ---
 MODEL_PATH = "{mjcf_filename}"
-ACTUATOR_SCALING = 1.0 
 
-# --- Pre-Check ---
-print(f"Python Executable: {{sys.executable}}")
-if os.path.exists("mediapipe.py"):
-    print("CRITICAL ERROR: A file named 'mediapipe.py' was found in this folder.")
-    print("This file shadows the actual mediapipe library.")
-    print("Please RENAME or DELETE 'mediapipe.py' and try again.")
-    sys.exit(1)
-
-# --- MediaPipe Setup ---
-print("Initializing MediaPipe...")
+# --- MediaPipe Imports with Robustness ---
 try:
     import mediapipe as mp
-    print(f"MediaPipe Version: {{mp.__version__}}")
-    print(f"MediaPipe File: {{mp.__file__}}")
-    
-    mp_path = os.path.dirname(mp.__file__)
-    print(f"MediaPipe Dir: {{mp_path}}")
-
-    # Explicitly check for solutions
-    if not hasattr(mp, 'solutions'):
-        print("Warning: mp.solutions not found via standard attribute access.")
-        print("Attempting explicit import strategies...")
-        
-        # Strategy 1: Direct Import (Some installs flatten it)
-        try:
-            import mediapipe.solutions as solutions
-            mp.solutions = solutions
-            print("SUCCESS: Imported 'mediapipe.solutions' directly.")
-        except ImportError:
-            print("Strategy 1 failed: 'mediapipe.solutions' not found.")
-            
-            raise AttributeError("Could not load solutions")
-
-    mp_hands = mp.solutions.hands
-    hands = mp_hands.Hands(
-        model_complexity=0,
-        min_detection_confidence=0.5,
-        min_tracking_confidence=0.5)
-    print("MediaPipe Initialized Successfully.")
-
+    from mediapipe.tasks import python
+    from mediapipe.tasks.python import vision
 except ImportError:
-    print("Error: MediaPipe not found!")
-    print("Please run setup_venv.sh to install dependencies.")
-    sys.exit(1)
-except AttributeError as e:
-    print("="*60)
-    print(f"CRITICAL ERROR: {{e}}")
-    print("This is a known issue with some python environments.")
-    print("Possible specific causes:")
-    print("1. Circular Import: Do you have a file named 'mediapipe.py'?")
-    print("2. Corrupt Install: Try running 'pip uninstall mediapipe' and reinstalling.")
-    print("3. OpenCV Conflict: Try 'pip uninstall opencv-python opencv-contrib-python' and install only 'opencv-python'.")
-    print("="*60)
-    sys.exit(1)
+    print("Standard import failed, trying fallback...")
+    try:
+        import mediapipe as mp
+    except ImportError as e:
+        print(f"CRITICAL ERROR: {e}")
+        print("MediaPipe not found.")
+        sys.exit(1)
+
+# Initialize MediaPipe Hands
+try:
+    if hasattr(mp.solutions, 'hands'):
+        mp_hands = mp.solutions.hands
+        hands = mp_hands.Hands(
+            max_num_hands=2,
+            min_detection_confidence=0.7,
+            min_tracking_confidence=0.5
+        )
+    else:
+        # Fallback for some versions
+        import mediapipe.python.solutions.hands as mp_hands
+        hands = mp_hands.Hands(max_num_hands=2)
 except Exception as e:
-    print(f"Error initializing MediaPipe: {{e}}")
+    print(f"Error initializing MediaPipe: {e}")
     sys.exit(1)
 
 # --- MuJoCo Setup ---
-print(f"Loading model from {{MODEL_PATH}}...")
+if not os.path.exists(MODEL_PATH):
+    print(f"Error: Model file '{MODEL_PATH}' not found!")
+    sys.exit(1)
+
+print(f"Loading model from {MODEL_PATH}...")
 try:
     model = mujoco.MjModel.from_xml_path(MODEL_PATH)
     data = mujoco.MjData(model)
 except Exception as e:
-    print(f"Error loading MuJoCo model: {{e}}")
-    exit(1)
+    print(f"Error loading MuJoCo model: {e}")
+    sys.exit(1)
 
-# --- Smart Actuator Mapping ---
-# We try to guess which actuators control "Curl" (Pitch) vs "Spread" (Roll/Yaw)
-curl_actuators = []
-spread_actuators = []
+# --- Smart Actuator Mapping (Per-Finger) ---
+finger_names = ['thumb', 'index', 'middle', 'ring', 'pinky']
+actuator_map = {{name: [] for name in finger_names}}
+# Fallback for actuators that don't match a specific finger name
+actuator_map['general'] = [] 
 
 print("="*60)
 print(f"Auto-Mapping Actuators (Total: {{model.nu}}):")
+
 for i in range(model.nu):
     name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
     if not name: name = f"actuator_{{i}}"
+    lower = name.lower()
     
-    # Heuristic: 'pitch' implies curling in many humanoid hands
-    # Simple hinges often denote the main joint (curl)
-    lower_name = name.lower()
-    if 'pitch' in lower_name:
-        curl_actuators.append(i)
-        print(f"  [ID {{i}}] {{name}} -> CURL (Matched 'pitch')")
-    elif 'roll' in lower_name or 'yaw' in lower_name:
-        spread_actuators.append(i)
-        print(f"  [ID {{i}}] {{name}} -> SPREAD (Matched 'roll'/'yaw')")
-    else:
-        # Default fallback for unspecified joints: assume Curl
-        curl_actuators.append(i)
-        print(f"  [ID {{i}}] {{name}} -> CURL (Default)")
+    # Skip Roll/Yaw/Spread joints (hold them steady)
+    if 'roll' in lower or 'yaw' in lower or 'spread' in lower:
+        print(f"  [ID {{i}}] {{name}} -> IGNORED (Spread/Roll)")
+        continue
 
-print(f"Mapped {{len(curl_actuators)}} actuators to CURL control.")
-print(f"Mapped {{len(spread_actuators)}} actuators to SPREAD/Other.")
-print(f"CURL IDs: {{curl_actuators}}")
-# Get names for debugging
-curl_names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i) for i in curl_actuators]
-print(f"CURL NAMES: {{curl_names}}")
+    # Assign to finger bucket
+    assigned = False
+    for fname in finger_names:
+        if fname in lower:
+            actuator_map[fname].append(i)
+            print(f"  [ID {{i}}] {{name}} -> {{fname.upper()}}")
+            assigned = True
+            break
+    
+    if not assigned:
+        actuator_map['general'].append(i)
+        print(f"  [ID {{i}}] {{name}} -> GENERAL (Index/Middle)")
+
 print("="*60)
-
-# --- Helper: Calculate Hand Curl ---
 
 # --- Helper: Calculate Per-Finger Curl ---
 def calculate_finger_curl(landmarks, finger_name):
@@ -1632,11 +1608,7 @@ plt.ion()
 fig, ax = plt.subplots()
 sensor_names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SENSOR, i) for i in range(model.nsensor)]
 print(f"Found Sensors: {{sensor_names}}")
-if not sensor_names:
-    print("WARNING: No sensors found! Force graph will be empty.")
-    print("         Sensors only appear on 'leaf' links (fingertips).")
 
-# Store history for plotting
 history_len = 100
 sensor_data_history = {{name: deque([0]*history_len, maxlen=history_len) for name in sensor_names}}
 lines = {{}}
@@ -1644,26 +1616,23 @@ for name in sensor_names:
     line, = ax.plot(range(history_len), sensor_data_history[name], label=name)
     lines[name] = line
 
-ax.set_ylim(-1, 50) # Adjust force range as needed
+ax.set_ylim(-1, 50) 
 ax.legend(loc='upper left')
-plt.title("Sensor Force (Touch to Activate)")
+plt.title("Sensor Force")
 
 # --- Main Loop ---
-print("Opening Webcam...")
 cap = cv2.VideoCapture(0)
-
 if not cap.isOpened():
     print("Error: Could not open webcam.")
     exit(1)
 
-print("Starting Loop. SITE/SENSOR VISIBILITY ENABLED.")
+print("Starting Loop.")
 frame_count = 0
 
 with mujoco.viewer.launch_passive(model, data) as viewer:
     # Enable visibility of Sites (Sensors) and Contact Points
-    # Values: mjVIS_SITE=1, mjVIS_CONTACTPOINT=9
-    viewer.opt.flags[1] = 1
-    viewer.opt.flags[9] = 1
+    viewer.opt.flags[1] = 1 # mjVIS_SITE
+    viewer.opt.flags[9] = 1 # mjVIS_CONTACTPOINT
     
     while viewer.is_running() and cap.isOpened():
         start_time = time.time()
@@ -1675,91 +1644,84 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         frame = cv2.flip(frame, 1)
         results = hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
         
-        curl_val = 0.0
+        curls = {{f: 0.0 for f in finger_names}}
+        curls['general'] = 0.0
         
         if results.multi_hand_landmarks:
             for hand_landmarks, handedness in zip(results.multi_hand_landmarks, results.multi_handedness):
-                # Handedness label: "Left" or "Right"
-                # MediaPipe mirrors by default? If flipped, "Right" is "Right".
-                # Let's trust the label after flip.
                 label = handedness.classification[0].label
-                
-                # Filter for Right Hand only as requested
-                if label != 'Right':
-                    continue
+                if label != 'Right': continue # Right hand only
 
-                mp.solutions.drawing_utils.draw_landmarks(
-                    frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+                mp.solutions.drawing_utils.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
                 
-                curl_val = calculate_hand_curl(hand_landmarks)
+                # Calculate Curl for each finger
+                for fname in finger_names:
+                    curls[fname] = calculate_finger_curl(hand_landmarks, fname)
                 
-                # We only process the FIRST valid right hand we find
+                # General curl = average of others (for fallback joints)
+                curls['general'] = (curls['index'] + curls['middle']) / 2.0
                 break
         
         # Apply Control
-        # Assuming Positive = Flexion (Curling)
-        # Scaling gain by 2.0 to ensure full closure
-        ctrl_signal = curl_val * 2.0
-        
-        for idx in curl_actuators:
-            data.ctrl[idx] = ctrl_signal
-            
-        # Optional: Keep Roll/Spread steady
-        for idx in spread_actuators:
-            data.ctrl[idx] = 0.0 
-                         
-        cv2.imshow('Hand Control (Right Hand Only)', frame)
+        for fname, act_indices in actuator_map.items():
+            cmd = curls[fname] * 2.0 # Gain
+            if fname == 'general':
+                cmd = curls['general'] * 2.0
+                
+            for idx in act_indices:
+                data.ctrl[idx] = cmd
+                
+        cv2.imshow('Hand Control (Right Hand)', frame)
         if cv2.waitKey(1) & 0xFF == 27: break
 
-        # 2. Step Simulation
         mujoco.mj_step(model, data)
         viewer.sync()
-
-        # 3. Update Plots & Logging
+        
+        # Update Plots & Logging
         active_sensors = []
         for name in sensor_names:
-            # Read sensor data
-            # Sensordata array is flat, we need address
-            sensor_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SENSOR, name)
-            if sensor_id != -1:
-                # Scalar sensor assumed (like touch)
-                # Note: sensors return 0 unless there is PHYSICAL contact in simulation
-                val = data.sensor(name).data[0] 
-                sensor_data_history[name].append(val)
-                lines[name].set_ydata(sensor_data_history[name])
-                if val > 0.001: # Threshold for "active" sensor
-                    active_sensors.append(f"{{name}}={{val:.2f}}")
+            val = data.sensor(name).data[0] 
+            sensor_data_history[name].append(val)
+            lines[name].set_ydata(sensor_data_history[name])
+            if val > 0.001:
+                active_sensors.append(f"{{name}}={{val:.2f}}")
         
-        # Efficient plot update (blit if possible, here simple draw)
+        # Plot update
         fig.canvas.draw_idle()
         fig.canvas.flush_events()
         
-        
-        # Periodic Logging (Every ~1 second)
+        # Detailed Logging (Every ~1 sec)
         if frame_count % 30 == 0:
-             print("-" * 50)
-             print(f"[Frame {{frame_count}}] Curl Signal: {{curl_val:.2f}} (Cmd: {{ctrl_signal:.2f}})")
-             print("  Detailed Joint Status:")
-             for idx in curl_actuators:
-                 # Get actuator name
-                 name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, idx)
-                 # Get associated joint position (angle)
-                 # trnid[idx, 0] is the joint ID for hinge actuators
-                 joint_id = model.actuator_trnid[idx, 0]
-                 qpos_adr = model.jnt_qposadr[joint_id]
-                 angle = data.qpos[qpos_adr]
+             print("-" * 60)
+             print(f"[Frame {{frame_count}}] MP Status:")
+             for fname in finger_names:
+                 print(f"  {{fname.upper():<8}} | MP: {{curls[fname]:.2f}} | Cmd: {{curls[fname]*2.0:.2f}}")
                  
-                 print(f"  > Actuator: {{name:<15}} | Angle: {{angle:.2f}} rad")
-                 
+             print("  Robot Joints:")
+             # Link known fingers
+             any_act = False
+             for fname, indices in actuator_map.items():
+                 if not indices: continue
+                 for idx in indices:
+                     any_act = True
+                     name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, idx)
+                     # Angle
+                     joint_id = model.actuator_trnid[idx, 0]
+                     qpos_adr = model.jnt_qposadr[joint_id]
+                     angle = data.qpos[qpos_adr]
+                     print(f"    > {{name:<20}} | Ang: {{angle:.2f}}")
+                     
+             if not any_act:
+                 print("    (No actuators mapped!)")
+
              if active_sensors:
                  print(f"  >>> SENSOR HIT: {{', '.join(active_sensors)}}")
-             print("-" * 50)
+             print("-" * 60)
 
-        # Keep real-time
         time_until_next_step = model.opt.timestep - (time.time() - start_time)
         if time_until_next_step > 0:
             time.sleep(time_until_next_step)
-
+            
 cap.release()
 cv2.destroyAllWindows()
 plt.close()
