@@ -1419,6 +1419,12 @@ echo "Installing dependencies..."
 pip install --upgrade pip
 # Force re-install without cache to fix any broken downloads
 pip install --no-cache-dir -r requirements.txt
+
+echo "--- DEBUG INFO ---"
+pip show mediapipe
+pip check
+echo "------------------"
+
 echo "Done! You can now run ./run_demo.sh"
 """
         with open(os.path.join(package_dir, "setup_venv.sh"), "w") as f:
@@ -1474,13 +1480,10 @@ try:
     import mediapipe as mp
     print(f"MediaPipe Version: {{mp.__version__}}")
     print(f"MediaPipe File: {{mp.__file__}}")
-    if hasattr(mp, '__path__'):
-        print(f"MediaPipe Path: {{mp.__path__}}")
-        # Inspect directory
-        try:
-            print(f"Contents of MediaPipe dir: {{os.listdir(mp.__path__[0])}}")
-        except: pass
     
+    mp_path = os.path.dirname(mp.__file__)
+    print(f"MediaPipe Dir: {{mp_path}}")
+
     # Explicitly check for solutions
     if not hasattr(mp, 'solutions'):
         print("Warning: mp.solutions not found via standard attribute access.")
@@ -1491,14 +1494,19 @@ try:
             print("Explicit import succeeded!")
         except ImportError as ie:
             print(f"Explicit import failed: {{ie}}")
-            print(f"Available attributes in mp: {{dir(mp)}}")
-            # Try one more path that sometimes exists in weird installs
+            print("Listing contents of MediaPipe directory to debug:")
             try:
-                import mediapipe.solutions as solutions
-                mp.solutions = solutions
-                print("Direct solutions import succeeded!")
-            except:
-                raise AttributeError("Could not load solutions")
+                for root, dirs, files in os.walk(mp_path):
+                    level = root.replace(mp_path, '').count(os.sep)
+                    indent = ' ' * 4 * (level)
+                    print(f"{{indent}}{{os.path.basename(root)}}/")
+                    subindent = ' ' * 4 * (level + 1)
+                    for f in files:
+                        print(f"{{subindent}}{{f}}")
+            except Exception as e:
+                print(f"Could not list directory: {{e}}")
+            
+            raise AttributeError("Could not load solutions")
 
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(
