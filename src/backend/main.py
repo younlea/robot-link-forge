@@ -1659,9 +1659,18 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         
         # Apply Control
         for fname, act_indices in actuator_map.items():
-            cmd = curls[fname] * 2.0 # Gain
+            # Direction Logic:
+            # Thumb: 0 to +90 (Positive)
+            # Others: 0 to -90 (Negative)
+            if fname == 'thumb':
+                gain = 2.0
+            else:
+                gain = -2.0 # Invert for fingers
+                
+            cmd = curls[fname] * gain
+            
             if fname == 'general':
-                cmd = curls['general'] * 2.0
+                cmd = curls['general'] * -2.0 # General also negative? Assume fingers.
                 
             for idx in act_indices:
                 data.ctrl[idx] = cmd
@@ -1689,7 +1698,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
              print("-" * 60)
              print(f"[Frame {{frame_count}}] MP Status:")
              for fname in finger_names:
-                 print(f"  {{fname.upper():<8}} | MP: {{curls[fname]:.2f}} | Cmd: {{curls[fname]*2.0:.2f}}")
+                 print(f"  {{fname.upper():<8}} | MP: {{curls[fname]:.2f}} | Cmd: {{curls[fname]* (2.0 if fname=='thumb' else -2.0):.2f}}")
                  
              print("  Robot Joints:")
              any_act = False
@@ -1702,8 +1711,6 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                      joint_id = model.actuator_trnid[idx, 0]
                      qpos_adr = model.jnt_qposadr[joint_id]
                      angle = data.qpos[qpos_adr]
-                     
-                     # Check commanded value in data.ctrl?
                      cmd_val = data.ctrl[idx]
                      
                      print(f"    > {{name:<20}} | Cmd: {{cmd_val:.2f}} | Ang: {{angle:.2f}}")
