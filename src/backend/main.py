@@ -1709,7 +1709,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                 sensor_data_history[name].append(val)
                 lines[name].set_ydata(sensor_data_history[name])
                 if val > 0.001: # Threshold for "active" sensor
-                    active_sensors.append(f"{name}={val:.2f}")
+                    active_sensors.append(f"{{name}}={{val:.2f}}")
         
         # Efficient plot update (blit if possible, here simple draw)
         fig.canvas.draw_idle()
