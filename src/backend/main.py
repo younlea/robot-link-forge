@@ -1426,12 +1426,17 @@ echo "Done! You can now run ./run_demo.sh"
 
         # Generate Run Demo Script (Linux/Mac)
         run_demo_sh = f"""#!/bin/bash
-if [ ! -d "venv" ]; then
-    echo "Virtual environment not found. Please run ./setup_venv.sh first."
+SCRIPT_DIR="$( cd "$( dirname "${{BASH_SOURCE[0]}}" )" &> /dev/null && pwd )"
+VENV_PYTHON="$SCRIPT_DIR/venv/bin/python"
+
+if [ ! -f "$VENV_PYTHON" ]; then
+    echo "Virtual environment python not found at $VENV_PYTHON"
+    echo "Please run ./setup_venv.sh first."
     exit 1
 fi
-source venv/bin/activate
-python demo_hand_control.py
+
+echo "Running with: $VENV_PYTHON"
+"$VENV_PYTHON" "$SCRIPT_DIR/demo_hand_control.py"
 """
         with open(os.path.join(package_dir, "run_demo.sh"), "w") as f:
             f.write(run_demo_sh)
@@ -1448,10 +1453,19 @@ import matplotlib.pyplot as plt
 from collections import deque
 import time
 import sys
+import os
 
 # --- Configuration ---
 MODEL_PATH = "{mjcf_filename}"
 ACTUATOR_SCALING = 1.0 
+
+# --- Pre-Check ---
+print(f"Python Executable: {{sys.executable}}")
+if os.path.exists("mediapipe.py"):
+    print("CRITICAL ERROR: A file named 'mediapipe.py' was found in this folder.")
+    print("This file shadows the actual mediapipe library.")
+    print("Please RENAME or DELETE 'mediapipe.py' and try again.")
+    sys.exit(1)
 
 # --- MediaPipe Setup ---
 print("Initializing MediaPipe...")
