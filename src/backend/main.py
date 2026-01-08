@@ -1404,7 +1404,7 @@ pause
             f.write(launch_bat)
 
         # Generate requirements.txt
-        req_content = "mujoco\nmediapipe\nopencv-python\nmatplotlib\nnumpy\n"
+        req_content = "mujoco\nmediapipe>=0.10.0\nprotobuf>=3.20\nopencv-python\nmatplotlib\nnumpy\n"
         with open(os.path.join(package_dir, "requirements.txt"), "w") as f:
             f.write(req_content)
 
@@ -1416,7 +1416,8 @@ echo "Activating virtual environment..."
 source venv/bin/activate
 echo "Installing dependencies..."
 pip install --upgrade pip
-pip install -r requirements.txt
+# Force re-install without cache to fix any broken downloads
+pip install --no-cache-dir -r requirements.txt
 echo "Done! You can now run ./run_demo.sh"
 """
         with open(os.path.join(package_dir, "setup_venv.sh"), "w") as f:
@@ -1441,32 +1442,40 @@ python demo_hand_control.py
         demo_script = f"""
 import mujoco
 import mujoco.viewer
-import mediapipe as mp
 import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import deque
 import time
+import sys
 
 # --- Configuration ---
 MODEL_PATH = "{mjcf_filename}"
-# Adjust these based on your specific robot:
-# Map specific hand landmarks to specific actuators
-# Example: Map Index Finger Y-coordinate to Actuator 0
 ACTUATOR_SCALING = 1.0 
 
 # --- MediaPipe Setup ---
+print("Initializing MediaPipe...")
 try:
-    print("Initializing MediaPipe...")
+    import mediapipe as mp
+    print(f"MediaPipe Version: {{mp.__version__}}")
+    print(f"MediaPipe Path: {{mp.__file__}}")
+    
     mp_hands = mp.solutions.hands
     hands = mp_hands.Hands(
         model_complexity=0,
         min_detection_confidence=0.5,
         min_tracking_confidence=0.5)
+except ImportError:
+    print("Error: MediaPipe not found!")
+    print("Please run setup_venv.sh to install dependencies.")
+    sys.exit(1)
+except AttributeError as e:
+    print(f"Error: MediaPipe installation seems broken: {{e}}")
+    print("Try running: pip install --force-reinstall mediapipe")
+    sys.exit(1)
 except Exception as e:
     print(f"Error initializing MediaPipe: {{e}}")
-    print("Ensure you are running in the virtual environment where mediapipe is installed.")
-    exit(1)
+    sys.exit(1)
 
 # --- MuJoCo Setup ---
 print(f"Loading model from {{MODEL_PATH}}...")
