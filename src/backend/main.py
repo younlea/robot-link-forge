@@ -1581,49 +1581,50 @@ print(f"CURL NAMES: {{curl_names}}")
 print("="*60)
 
 # --- Helper: Calculate Hand Curl ---
-def calculate_hand_curl(landmarks):
-    # Average distance of fingertips to wrist
-    # Simple heuristic: 1.0 = Open, 0.0 = Closed
-    
+
+# --- Helper: Calculate Per-Finger Curl ---
+def calculate_finger_curl(landmarks, finger_name):
+    # 0.0 (Open) to 1.0 (Closed)
     wrist = landmarks.landmark[mp_hands.HandLandmark.WRIST]
-    tips = [
-        mp_hands.HandLandmark.INDEX_FINGER_TIP,
-        mp_hands.HandLandmark.MIDDLE_FINGER_TIP,
-        mp_hands.HandLandmark.RING_FINGER_TIP,
-        mp_hands.HandLandmark.PINKY_TIP
-    ]
-    mcps = [
-        mp_hands.HandLandmark.INDEX_FINGER_MCP,
-        mp_hands.HandLandmark.MIDDLE_FINGER_MCP,
-        mp_hands.HandLandmark.RING_FINGER_MCP,
-        mp_hands.HandLandmark.PINKY_MCP
-    ]
     
-    total_ratio = 0
-    for tip_idx, mcp_idx in zip(tips, mcps):
-        tip = landmarks.landmark[tip_idx]
-        mcp = landmarks.landmark[mcp_idx]
+    if finger_name == 'thumb':
+        # Thumb: Tip to Index MCP distance
+        tip = landmarks.landmark[mp_hands.HandLandmark.THUMB_TIP]
+        mcp = landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_MCP] # Reference
         
-        # Dist Tip to Wrist
+        # Simple heuristic
+        dist = np.sqrt((tip.x - mcp.x)**2 + (tip.y - mcp.y)**2)
+        # Open ~0.2+, Closed ~0.05
+        curl = np.clip((0.2 - dist) / 0.15, 0.0, 1.0)
+        return curl
+        
+    else:
+        # Standard fingers
+        if finger_name == 'index':
+            tip_id = mp_hands.HandLandmark.INDEX_FINGER_TIP
+            mcp_id = mp_hands.HandLandmark.INDEX_FINGER_MCP
+        elif finger_name == 'middle':
+            tip_id = mp_hands.HandLandmark.MIDDLE_FINGER_TIP
+            mcp_id = mp_hands.HandLandmark.MIDDLE_FINGER_MCP
+        elif finger_name == 'ring':
+            tip_id = mp_hands.HandLandmark.RING_FINGER_TIP
+            mcp_id = mp_hands.HandLandmark.RING_FINGER_MCP
+        elif finger_name == 'pinky':
+            tip_id = mp_hands.HandLandmark.PINKY_TIP
+            mcp_id = mp_hands.HandLandmark.PINKY_MCP
+        else:
+            return 0.0
+
+        tip = landmarks.landmark[tip_id]
+        mcp = landmarks.landmark[mcp_id]
+        
         dist_tip = np.sqrt((tip.x - wrist.x)**2 + (tip.y - wrist.y)**2)
-        # Dist MCP to Wrist (Reference length)
         dist_mcp = np.sqrt((mcp.x - wrist.x)**2 + (mcp.y - wrist.y)**2)
         
-        # If tip is closer to wrist than MCP, it's curled.
-        # Ratio > 1.5 ~= Open
-        # Ratio < 0.8 ~= Closed
+        # Ratio: Open > 1.5, Closed < 1.0 (Relative to MCP dist)
         ratio = dist_tip / (dist_mcp + 1e-6)
-        total_ratio += ratio
-
-    avg_ratio = total_ratio / 4.0
-    
-    # Map raw ratio to 0.0 (Open) - 1.0 (Closed)
-    # Open ~ 1.8, Closed ~ 0.5
-    # Let's Normalize:
-    # 1.8 -> 0
-    # 0.5 -> 1
-    curl = np.clip((1.8 - avg_ratio) / 1.3, 0.0, 1.0)
-    return curl
+        curl = np.clip((1.8 - ratio) / 1.0, 0.0, 1.0)
+        return curl
 
 # --- Matplotlib Setup (Live Graph) ---
 print("Initializing Matplotlib...")
