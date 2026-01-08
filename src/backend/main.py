@@ -1490,7 +1490,7 @@ except ImportError:
     try:
         import mediapipe as mp
     except ImportError as e:
-        print(f"CRITICAL ERROR: {e}")
+        print(f"CRITICAL ERROR: {{e}}")
         print("MediaPipe not found.")
         sys.exit(1)
 
@@ -1508,20 +1508,20 @@ try:
         import mediapipe.python.solutions.hands as mp_hands
         hands = mp_hands.Hands(max_num_hands=2)
 except Exception as e:
-    print(f"Error initializing MediaPipe: {e}")
+    print(f"Error initializing MediaPipe: {{e}}")
     sys.exit(1)
 
 # --- MuJoCo Setup ---
 if not os.path.exists(MODEL_PATH):
-    print(f"Error: Model file '{MODEL_PATH}' not found!")
+    print(f"Error: Model file '{{MODEL_PATH}}' not found!")
     sys.exit(1)
 
-print(f"Loading model from {MODEL_PATH}...")
+print(f"Loading model from {{MODEL_PATH}}...")
 try:
     model = mujoco.MjModel.from_xml_path(MODEL_PATH)
     data = mujoco.MjData(model)
 except Exception as e:
-    print(f"Error loading MuJoCo model: {e}")
+    print(f"Error loading MuJoCo model: {{e}}")
     sys.exit(1)
 
 # --- Smart Actuator Mapping (Per-Finger) ---
