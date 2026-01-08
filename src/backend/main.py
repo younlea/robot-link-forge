@@ -1399,6 +1399,7 @@ python3 visualize_mjcf.py "$@"
         launch_bat = f"""@echo off
 python visualize_mjcf.py %*
 pause
+"""
         with open(os.path.join(package_dir, "launch.bat"), "w") as f:
             f.write(launch_bat)
 
