@@ -1538,9 +1538,13 @@ for i in range(model.nu):
     if not name: name = f"actuator_{{i}}"
     lower = name.lower()
     
+    # Get Control Range for Debugging
+    ctrl_range = model.actuator_ctrlrange[i]
+    range_str = f"[{{ctrl_range[0]:.2f}}, {{ctrl_range[1]:.2f}}]"
+    
     # Skip Roll/Yaw/Spread joints (hold them steady)
     if 'roll' in lower or 'yaw' in lower or 'spread' in lower:
-        print(f"  [ID {{i}}] {{name}} -> IGNORED (Spread/Roll)")
+        print(f"  [ID {{i}}] {{name}} -> IGNORED (Spread/Roll) | Range: {{range_str}}")
         continue
 
     # Assign to finger bucket
@@ -1548,32 +1552,27 @@ for i in range(model.nu):
     for fname in finger_names:
         if fname in lower:
             actuator_map[fname].append(i)
-            print(f"  [ID {{i}}] {{name}} -> {{fname.upper()}}")
+            print(f"  [ID {{i}}] {{name}} -> {{fname.upper()}} | Range: {{range_str}}")
             assigned = True
             break
     
     if not assigned:
         actuator_map['general'].append(i)
-        print(f"  [ID {{i}}] {{name}} -> GENERAL (Index/Middle)")
+        print(f"  [ID {{i}}] {{name}} -> GENERAL | Range: {{range_str}}")
 
 print("="*60)
 
 # --- Helper: Calculate Per-Finger Curl ---
 def calculate_finger_curl(landmarks, finger_name):
-    # 0.0 (Open) to 1.0 (Closed)
     wrist = landmarks.landmark[mp_hands.HandLandmark.WRIST]
     
     if finger_name == 'thumb':
-        # Thumb: Tip to Index MCP distance
+        # Thumb heuristic
         tip = landmarks.landmark[mp_hands.HandLandmark.THUMB_TIP]
-        mcp = landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_MCP] # Reference
-        
-        # Simple heuristic
+        mcp = landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_MCP]
         dist = np.sqrt((tip.x - mcp.x)**2 + (tip.y - mcp.y)**2)
-        # Open ~0.2+, Closed ~0.05
         curl = np.clip((0.2 - dist) / 0.15, 0.0, 1.0)
         return curl
-        
     else:
         # Standard fingers
         if finger_name == 'index':
@@ -1597,12 +1596,11 @@ def calculate_finger_curl(landmarks, finger_name):
         dist_tip = np.sqrt((tip.x - wrist.x)**2 + (tip.y - wrist.y)**2)
         dist_mcp = np.sqrt((mcp.x - wrist.x)**2 + (mcp.y - wrist.y)**2)
         
-        # Ratio: Open > 1.5, Closed < 1.0 (Relative to MCP dist)
         ratio = dist_tip / (dist_mcp + 1e-6)
         curl = np.clip((1.8 - ratio) / 1.0, 0.0, 1.0)
         return curl
 
-# --- Matplotlib Setup (Live Graph) ---
+# --- Matplotlib Setup ---
 print("Initializing Matplotlib...")
 plt.ion()
 fig, ax = plt.subplots()
@@ -1630,7 +1628,6 @@ print("Starting Loop.")
 frame_count = 0
 
 with mujoco.viewer.launch_passive(model, data) as viewer:
-    # Enable visibility of Sites (Sensors) and Contact Points
     viewer.opt.flags[1] = 1 # mjVIS_SITE
     viewer.opt.flags[9] = 1 # mjVIS_CONTACTPOINT
     
@@ -1650,15 +1647,13 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         if results.multi_hand_landmarks:
             for hand_landmarks, handedness in zip(results.multi_hand_landmarks, results.multi_handedness):
                 label = handedness.classification[0].label
-                if label != 'Right': continue # Right hand only
+                if label != 'Right': continue 
 
                 mp.solutions.drawing_utils.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
                 
-                # Calculate Curl for each finger
                 for fname in finger_names:
                     curls[fname] = calculate_finger_curl(hand_landmarks, fname)
                 
-                # General curl = average of others (for fallback joints)
                 curls['general'] = (curls['index'] + curls['middle']) / 2.0
                 break
         
@@ -1677,7 +1672,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         mujoco.mj_step(model, data)
         viewer.sync()
         
-        # Update Plots & Logging
+        # Update Plots
         active_sensors = []
         for name in sensor_names:
             val = data.sensor(name).data[0] 
@@ -1686,11 +1681,10 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             if val > 0.001:
                 active_sensors.append(f"{{name}}={{val:.2f}}")
         
-        # Plot update
         fig.canvas.draw_idle()
         fig.canvas.flush_events()
         
-        # Detailed Logging (Every ~1 sec)
+        # Detailed Logging
         if frame_count % 30 == 0:
              print("-" * 60)
              print(f"[Frame {{frame_count}}] MP Status:")
@@ -1698,7 +1692,6 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                  print(f"  {{fname.upper():<8}} | MP: {{curls[fname]:.2f}} | Cmd: {{curls[fname]*2.0:.2f}}")
                  
              print("  Robot Joints:")
-             # Link known fingers
              any_act = False
              for fname, indices in actuator_map.items():
                  if not indices: continue
@@ -1709,7 +1702,11 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                      joint_id = model.actuator_trnid[idx, 0]
                      qpos_adr = model.jnt_qposadr[joint_id]
                      angle = data.qpos[qpos_adr]
-                     print(f"    > {{name:<20}} | Ang: {{angle:.2f}}")
+                     
+                     # Check commanded value in data.ctrl?
+                     cmd_val = data.ctrl[idx]
+                     
+                     print(f"    > {{name:<20}} | Cmd: {{cmd_val:.2f}} | Ang: {{angle:.2f}}")
                      
              if not any_act:
                  print("    (No actuators mapped!)")
