@@ -1547,12 +1547,24 @@ except Exception as e:
     print(f"Error loading MuJoCo model: {{e}}")
     exit(1)
 
+# --- Actuator Info ---
+print("="*60)
+print(f"Number of Actuators: {{model.nu}}")
+actuator_names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i) for i in range(model.nu)]
+print(f"Actuator Names: {{actuator_names}}")
+print("NOTE: By default, this demo controls ALL actuators with the pinch gesture.")
+print("      Edit 'demo_hand_control.py' to map specific fingers to specific IDs.")
+print("="*60)
+
 # --- Matplotlib Setup (Live Graph) ---
 print("Initializing Matplotlib...")
 plt.ion()
 fig, ax = plt.subplots()
 sensor_names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SENSOR, i) for i in range(model.nsensor)]
 print(f"Found Sensors: {{sensor_names}}")
+if not sensor_names:
+    print("WARNING: No sensors found! Force graph will be empty.")
+    print("         Sensors only appear on 'leaf' links (fingertips).")
 
 # Store history for plotting
 history_len = 100
@@ -1564,7 +1576,7 @@ for name in sensor_names:
 
 ax.set_ylim(-1, 10) # Adjust force range as needed
 ax.legend(loc='upper left')
-plt.title("Sensor Force")
+plt.title("Sensor Force (Touch to Activate)")
 
 # --- Main Loop ---
 print("Opening Webcam...")
@@ -1575,6 +1587,9 @@ if not cap.isOpened():
     exit(1)
 
 print("Starting Simulation Loop...")
+print("Usage: Pinch thumb and index finger to close ALL actuators.")
+print("       Touch the robot to objects/ground to see sensor values.")
+
 with mujoco.viewer.launch_passive(model, data) as viewer:
     while viewer.is_running() and cap.isOpened():
         start_time = time.time()
@@ -1604,15 +1619,15 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                 
                 # Map 0 (touching) - 0.5 (open) to Actuator Control
                 # Invert: Small distance = High Force/Closed
-                # This is a heuristic. You might need to change this logic!
+                # This is a heuristic.
                 pinch_strength = max(0, 1.0 - (dist * 4.0)) # Scaling factor
                 
-                # Apply to first few actuators (assuming they are fingers)
+                # Apply to ALL actuators for demo purposes
+                # Usually you want to map specific actuators to specific fingers
                 if model.nu > 0:
-                     data.ctrl[0] = pinch_strength * 2.0 # Simple gain
-                     # If you have multiple fingers, map them here:
-                     # data.ctrl[1] = ...
-        
+                     for i in range(model.nu):
+                         data.ctrl[i] = pinch_strength * 2.0 # Simple gain
+                         
         cv2.imshow('MediaPipe Hand Tracking', frame)
         if cv2.waitKey(1) & 0xFF == 27: break
 
@@ -1627,6 +1642,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             sensor_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SENSOR, name)
             if sensor_id != -1:
                 # Scalar sensor assumed (like touch)
+                # Note: sensors return 0 unless there is PHYSICAL contact in simulation
                 val = data.sensor(name).data[0] 
                 sensor_data_history[name].append(val)
                 lines[name].set_ydata(sensor_data_history[name])
