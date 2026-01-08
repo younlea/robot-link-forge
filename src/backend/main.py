@@ -1553,7 +1553,7 @@ curl_actuators = []
 spread_actuators = []
 
 print("="*60)
-print(f"Auto-Mapping Actuators (Total: {model.nu}):")
+print(f"Auto-Mapping Actuators (Total: {{model.nu}}):")
 for i in range(model.nu):
     name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
     if not name: name = f"actuator_{{i}}"
@@ -1626,7 +1626,7 @@ print("Initializing Matplotlib...")
 plt.ion()
 fig, ax = plt.subplots()
 sensor_names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SENSOR, i) for i in range(model.nsensor)]
-print(f"Found Sensors: {sensor_names}")
+print(f"Found Sensors: {{sensor_names}}")
 if not sensor_names:
     print("WARNING: No sensors found! Force graph will be empty.")
     print("         Sensors only appear on 'leaf' links (fingertips).")
