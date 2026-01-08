@@ -1403,6 +1403,134 @@ pause
         with open(os.path.join(package_dir, "launch.bat"), "w") as f:
             f.write(launch_bat)
 
+        # Generate requirements.txt
+        req_content = "mujoco\nmediapipe\nopencv-python\nmatplotlib\nnumpy\n"
+        with open(os.path.join(package_dir, "requirements.txt"), "w") as f:
+            f.write(req_content)
+
+        # Generate Demo Hand Control Script
+        demo_script = f"""
+import mujoco
+import mujoco.viewer
+import mediapipe as mp
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+from collections import deque
+import time
+
+# --- Configuration ---
+MODEL_PATH = "{mjcf_filename}"
+# Adjust these based on your specific robot:
+# Map specific hand landmarks to specific actuators
+# Example: Map Index Finger Y-coordinate to Actuator 0
+ACTUATOR_SCALING = 1.0 
+
+# --- MediaPipe Setup ---
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands(
+    model_complexity=0,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5)
+
+# --- MuJoCo Setup ---
+print(f"Loading model from {{MODEL_PATH}}...")
+model = mujoco.MjModel.from_xml_path(MODEL_PATH)
+data = mujoco.MjData(model)
+
+# --- Matplotlib Setup (Live Graph) ---
+plt.ion()
+fig, ax = plt.subplots()
+sensor_names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SENSOR, i) for i in range(model.nsensor)]
+print(f"Found Sensors: {{sensor_names}}")
+
+# Store history for plotting
+history_len = 100
+sensor_data_history = {{name: deque([0]*history_len, maxlen=history_len) for name in sensor_names}}
+lines = {{}}
+for name in sensor_names:
+    line, = ax.plot(range(history_len), sensor_data_history[name], label=name)
+    lines[name] = line
+
+ax.set_ylim(-1, 10) # Adjust force range as needed
+ax.legend(loc='upper left')
+plt.title("Sensor Force")
+
+# --- Main Loop ---
+cap = cv2.VideoCapture(0)
+
+with mujoco.viewer.launch_passive(model, data) as viewer:
+    while viewer.is_running() and cap.isOpened():
+        start_time = time.time()
+        
+        # 1. Vision Processing
+        ret, frame = cap.read()
+        if not ret: break
+        
+        frame = cv2.flip(frame, 1) # Mirror view
+        results = hands.process(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        
+        target_ctrl = 0.0
+        
+        if results.multi_hand_landmarks:
+            for hand_landmarks in results.multi_hand_landmarks:
+                # Visualize landmarks
+                mp.solutions.drawing_utils.draw_landmarks(
+                    frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+                
+                # --- Simple Control Logic ---
+                # Calculate simple "Pinch" distance (Thumb Tip vs Index Tip)
+                thumb_tip = hand_landmarks.landmark[mp_hands.HandLandmark.THUMB_TIP]
+                index_tip = hand_landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_TIP]
+                
+                # Euclidean distance in screen coordinates (approx)
+                dist = np.sqrt((thumb_tip.x - index_tip.x)**2 + (thumb_tip.y - index_tip.y)**2)
+                
+                # Map 0 (touching) - 0.5 (open) to Actuator Control
+                # Invert: Small distance = High Force/Closed
+                # This is a heuristic. You might need to change this logic!
+                pinch_strength = max(0, 1.0 - (dist * 4.0)) # Scaling factor
+                
+                # Apply to first few actuators (assuming they are fingers)
+                if model.nu > 0:
+                     data.ctrl[0] = pinch_strength * 2.0 # Simple gain
+                     # If you have multiple fingers, map them here:
+                     # data.ctrl[1] = ...
+        
+        cv2.imshow('MediaPipe Hand Tracking', frame)
+        if cv2.waitKey(1) & 0xFF == 27: break
+
+        # 2. Step Simulation
+        mujoco.mj_step(model, data)
+        viewer.sync()
+
+        # 3. Update Plots
+        for name in sensor_names:
+            # Read sensor data
+            # Sensordata array is flat, we need address
+            sensor_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_SENSOR, name)
+            if sensor_id != -1:
+                # Scalar sensor assumed (like touch)
+                val = data.sensor(name).data[0] 
+                sensor_data_history[name].append(val)
+                lines[name].set_ydata(sensor_data_history[name])
+        
+        # Efficient plot update (blit if possible, here simple draw)
+        fig.canvas.draw_idle()
+        fig.canvas.flush_events()
+
+        # Keep real-time
+        time_until_next_step = model.opt.timestep - (time.time() - start_time)
+        if time_until_next_step > 0:
+            time.sleep(time_until_next_step)
+
+cap.release()
+cv2.destroyAllWindows()
+plt.close()
+"""
+        with open(os.path.join(package_dir, "demo_hand_control.py"), "w") as f:
+            f.write(demo_script)
+
         # Generate README
         readme_content = f"""
 # MuJoCo Visualization (MJCF)
@@ -1415,7 +1543,7 @@ This package contains the **Native MJCF XML** model of **{robot_name}**.
 
 ## Installation
 ```bash
-pip install mujoco
+pip install -r requirements.txt
 ```
 
 ## Running the Simulation
@@ -1424,12 +1552,21 @@ Run the visualization script:
 python visualize_mjcf.py
 ```
 
-Or drag and drop `{mjcf_filename}` into the standalone MuJoCo simulator.
+### Hand Control Demo (MediaPipe + Sensors)
+This package includes a demo script to control the robot with your webcam and view sensor data.
+1. Ensure your webcam is connected.
+2. Run:
+   ```bash
+   python demo_hand_control.py
+   ```
+3. Pinch your thumb and index finger to control the robot (mapped to the first actuator).
+4. See the Force Sensor graph update in real-time.
 
 ## Files
 - `{mjcf_filename}`: The native MJCF robot description.
 - `meshes/`: STL files for geometries.
 - `visualize_mjcf.py`: Python script to load and view the model.
+- `demo_hand_control.py`: Webcam control and sensor graph demo.
 """
         with open(os.path.join(package_dir, "README_MUJOCO.md"), "w") as f:
             f.write(readme_content)

@@ -64,6 +64,7 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
     xml.append('    <geom type="plane" size="5 5 0.1" rgba=".9 .9 .9 1"/>')
 
     actuators = []
+    sensors = []
 
     def build_body(link_id: str, parent_joint_id: Optional[str] = None, indent_level: int = 2):
         indent = '  ' * indent_level
@@ -225,6 +226,16 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                      
                      xml.append(f'{indent}  <geom {geom_str} pos="{v_pos}" euler="{v_euler}" rgba="{rgb_str}" />')
 
+        # Check if leaf node (no child joints) to add sensor site
+        if not link.childJoints:
+            # Add site for sensor
+            site_name = f"site_{body_name}"
+            xml.append(f'{indent}  <site name="{site_name}" pos="0 0 0" size="0.01" rgba="1 0 0 1" />')
+            
+            # Add sensor definition
+            sensor_name = f"sensor_{body_name}"
+            sensors.append(f'    <touch name="{sensor_name}" site="{site_name}" />')
+
         for child_joint_id in link.childJoints:
             child_joint = robot.joints.get(child_joint_id)
             if child_joint and child_joint.childLinkId:
@@ -241,6 +252,12 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
         for act in actuators:
             xml.append(act)
         xml.append('  </actuator>')
+
+    if sensors:
+        xml.append('  <sensor>')
+        for sens in sensors:
+            xml.append(sens)
+        xml.append('  </sensor>')
         
     xml.append('</mujoco>')
     return "\n".join(xml)
