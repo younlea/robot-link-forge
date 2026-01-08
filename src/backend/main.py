@@ -1553,27 +1553,25 @@ curl_actuators = []
 spread_actuators = []
 
 print("="*60)
-print(f"Auto-Mapping Actuators (Total: {{model.nu}}):")
+print(f"Auto-Mapping Actuators (Total: {model.nu}):")
 for i in range(model.nu):
     name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
-    if not name: name = f"actuator_{{i}}"
+    if not name: name = f"actuator_{i}"
     
-    # Heuristic: 'pitch' implies curling in many humanoid hands
-    # Simple hinges often denote the main joint (curl)
     lower_name = name.lower()
-    if 'pitch' in lower_name:
-        curl_actuators.append(i)
-        print(f"  [ID {{i}}] {{name}} -> CURL (Matched 'pitch')")
-    elif 'roll' in lower_name or 'yaw' in lower_name:
+    
+    # BROADENED HEURISTIC:
+    # Unless it EXPLICITLY says 'roll', 'yaw', or 'spread', we assume it's a primary curl/flexion joint.
+    # This captures "joint1", "knuckle", "mp_joint" etc. which are usually curl.
+    if 'roll' in lower_name or 'yaw' in lower_name or 'spread' in lower_name:
         spread_actuators.append(i)
-        print(f"  [ID {{i}}] {{name}} -> SPREAD (Matched 'roll'/'yaw')")
+        print(f"  [ID {i}] {name} -> SPREAD (Held Fixed)")
     else:
-        # Default fallback for unspecified joints: assume Curl
         curl_actuators.append(i)
-        print(f"  [ID {{i}}] {{name}} -> CURL (Default)")
+        print(f"  [ID {i}] {name} -> CURL (Mapped to Hand Close)")
 
-print(f"Mapped {{len(curl_actuators)}} actuators to CURL control.")
-print(f"Mapped {{len(spread_actuators)}} actuators to SPREAD/Other.")
+print(f"Mapped {len(curl_actuators)} actuators to CURL control.")
+print(f"Mapped {len(spread_actuators)} actuators to SPREAD/Other.")
 print("="*60)
 
 # --- Helper: Calculate Hand Curl ---
@@ -1626,20 +1624,20 @@ print("Initializing Matplotlib...")
 plt.ion()
 fig, ax = plt.subplots()
 sensor_names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SENSOR, i) for i in range(model.nsensor)]
-print(f"Found Sensors: {{sensor_names}}")
+print(f"Found Sensors: {sensor_names}")
 if not sensor_names:
     print("WARNING: No sensors found! Force graph will be empty.")
     print("         Sensors only appear on 'leaf' links (fingertips).")
 
 # Store history for plotting
 history_len = 100
-sensor_data_history = {{name: deque([0]*history_len, maxlen=history_len) for name in sensor_names}}
-lines = {{}}
+sensor_data_history = {name: deque([0]*history_len, maxlen=history_len) for name in sensor_names}
+lines = {}
 for name in sensor_names:
     line, = ax.plot(range(history_len), sensor_data_history[name], label=name)
     lines[name] = line
 
-ax.set_ylim(-1, 10) # Adjust force range as needed
+ax.set_ylim(-1, 50) # Adjust force range as needed
 ax.legend(loc='upper left')
 plt.title("Sensor Force (Touch to Activate)")
 
@@ -1651,19 +1649,18 @@ if not cap.isOpened():
     print("Error: Could not open webcam.")
     exit(1)
 
-print("Starting Simulation Loop...")
-print("Usage: Close your hand (Make a Fist) to close ALL actuators.")
-print("       Touch the robot to objects/ground to see sensor values.")
+print("Starting Loop. SITE/SENSOR VISIBILITY ENABLED.")
+frame_count = 0
 
 with mujoco.viewer.launch_passive(model, data) as viewer:
     # Enable visibility of Sites (Sensors) and Contact Points
     # Values: mjVIS_SITE=1, mjVIS_CONTACTPOINT=9
-    # Using integers to prevent AttributeErrors across versions
     viewer.opt.flags[1] = 1
     viewer.opt.flags[9] = 1
     
     while viewer.is_running() and cap.isOpened():
         start_time = time.time()
+        frame_count += 1
         
         ret, frame = cap.read()
         if not ret: break
@@ -1681,25 +1678,26 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                 curl_val = calculate_hand_curl(hand_landmarks)
         
         # Apply Control
-        # Curl Actuators: 0.0 -> Open, 1.0 -> Closed
-        # Assuming Positive = Flexion (Curling) for standard MuJoCo hands
-        ctrl_signal = curl_val * 2.0 # Gain
+        # Assuming Positive = Flexion (Curling)
+        # Scaling gain by 2.0 to ensure full closure
+        ctrl_signal = curl_val * 2.0
         
         for idx in curl_actuators:
             data.ctrl[idx] = ctrl_signal
             
-        # Optional: Keep Roll/Spread steady (0.0)
+        # Optional: Keep Roll/Spread steady
         for idx in spread_actuators:
-            data.ctrl[idx] = 0.0
+            data.ctrl[idx] = 0.0 
                          
-        cv2.imshow('MediaPipe Hand Tracking', frame)
+        cv2.imshow('Hand Control', frame)
         if cv2.waitKey(1) & 0xFF == 27: break
 
         # 2. Step Simulation
         mujoco.mj_step(model, data)
         viewer.sync()
 
-        # 3. Update Plots
+        # 3. Update Plots & Logging
+        active_sensors = []
         for name in sensor_names:
             # Read sensor data
             # Sensordata array is flat, we need address
@@ -1710,6 +1708,8 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                 val = data.sensor(name).data[0] 
                 sensor_data_history[name].append(val)
                 lines[name].set_ydata(sensor_data_history[name])
+                if val > 0.001: # Threshold for "active" sensor
+                    active_sensors.append(f"{name}={val:.2f}")
         
         # Efficient plot update (blit if possible, here simple draw)
         fig.canvas.draw_idle()
