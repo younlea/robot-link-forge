@@ -200,9 +200,17 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
 
                  xml.append(f'{indent}  <geom {vis_geom} pos="{v_pos}" euler="{v_euler}" {color_attr} />')
                  
-                 # Use the SAME mesh for collision, but in group 0 (physics)
-                 coll_geom = f'type="mesh" mesh="{asset_name}" group="0" rgba="1 0 0 0"'
-                 xml.append(f'{indent}  <geom {coll_geom} pos="{v_pos}" euler="{v_euler}" />')
+                 # Filter Collision: Skip "1st" joints (Internal collision risk), keep Base and 2nd/3rd
+                 should_collide = True
+                 if parent_joint_id:
+                     p_joint = robot.joints.get(parent_joint_id)
+                     if p_joint and "1st" in p_joint.name.lower():
+                         should_collide = False
+                 
+                 if should_collide:
+                     # Use the SAME mesh for collision, but in group 0 (physics)
+                     coll_geom = f'type="mesh" mesh="{asset_name}" group="0" rgba="1 0 0 0"'
+                     xml.append(f'{indent}  <geom {coll_geom} pos="{v_pos}" euler="{v_euler}" />')
 
             elif v.type != 'none' and v.type != 'mesh':
                 geom_str = ""
