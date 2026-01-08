@@ -1733,11 +1733,26 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         fig.canvas.draw_idle()
         fig.canvas.flush_events()
         
+        
         # Periodic Logging (Every ~1 second)
         if frame_count % 30 == 0:
-             print(f"[Frame {{frame_count}}] Curl Signal: {{curl_val:.2f}} | Actuating {{len(curl_actuators)}} joints")
+             print("-" * 50)
+             print(f"[Frame {{frame_count}}] Curl Signal: {{curl_val:.2f}} (Cmd: {{ctrl_signal:.2f}})")
+             print("  Detailed Joint Status:")
+             for idx in curl_actuators:
+                 # Get actuator name
+                 name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, idx)
+                 # Get associated joint position (angle)
+                 # trnid[idx, 0] is the joint ID for hinge actuators
+                 joint_id = model.actuator_trnid[idx, 0]
+                 qpos_adr = model.jnt_qposadr[joint_id]
+                 angle = data.qpos[qpos_adr]
+                 
+                 print(f"  > Actuator: {{name:<15}} | Angle: {{angle:.2f}} rad")
+                 
              if active_sensors:
                  print(f"  >>> SENSOR HIT: {{', '.join(active_sensors)}}")
+             print("-" * 50)
 
         # Keep real-time
         time_until_next_step = model.opt.timestep - (time.time() - start_time)

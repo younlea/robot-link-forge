@@ -246,9 +246,11 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
         if is_leaf or is_target_name:
             # Add site for sensor
             site_name = f"site_{body_name}"
-            # Make site visible (larger red sphere for user to see)
-            # Size 0.04 = 4cm radius (big enough to see clearly)
-            xml.append(f'{indent}  <site name="{site_name}" pos="0 0 0" size="0.04" rgba="1 0 0 0.8" />')
+            # Make site visible as a "pad" sensor on the surface
+            # Heuristic: Thin box, slightly offset from joint (center of body) to emulate a fingertip pad
+            # Size: ~1.6cm wide, ~3cm long, ~4mm thick (half-sizes)
+            # Pos: Offset 1.5cm "forward" (assuming X axis) to move away from joint
+            xml.append(f'{indent}  <site name="{site_name}" type="box" pos="0.015 0 0" size="0.008 0.015 0.002" rgba="0 1 0 0.5" />')
             
             # Add sensor definition
             sensor_name = f"sensor_{body_name}"
