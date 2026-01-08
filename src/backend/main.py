@@ -1399,13 +1399,12 @@ python3 visualize_mjcf.py "$@"
         launch_bat = f"""@echo off
 python visualize_mjcf.py %*
 pause
-"""
         with open(os.path.join(package_dir, "launch.bat"), "w") as f:
             f.write(launch_bat)
 
         # Generate requirements.txt
-        # Protobuf 4.x is known to cause issues with some MediaPipe versions. Pinning < 4.
-        req_content = "mujoco\nmediapipe>=0.10.0\nprotobuf>=3.11, <4\nopencv-python\nmatplotlib\nnumpy\n"
+        # Pinning MediaPipe to 0.10.14 which is known to be stable with protobuf < 4
+        req_content = "mujoco\nmediapipe==0.10.14\nprotobuf>=3.11, <4\nopencv-python\nmatplotlib\nnumpy\n"
         with open(os.path.join(package_dir, "requirements.txt"), "w") as f:
             f.write(req_content)
 
@@ -1421,6 +1420,7 @@ pip install --upgrade pip
 pip install --no-cache-dir -r requirements.txt
 
 echo "--- DEBUG INFO ---"
+pip list
 pip show mediapipe
 pip check
 echo "------------------"
@@ -1487,24 +1487,15 @@ try:
     # Explicitly check for solutions
     if not hasattr(mp, 'solutions'):
         print("Warning: mp.solutions not found via standard attribute access.")
-        print("Attempting explicit import...")
+        print("Attempting explicit import strategies...")
+        
+        # Strategy 1: Direct Import (Some installs flatten it)
         try:
-            import mediapipe.python.solutions as solutions
+            import mediapipe.solutions as solutions
             mp.solutions = solutions
-            print("Explicit import succeeded!")
-        except ImportError as ie:
-            print(f"Explicit import failed: {{ie}}")
-            print("Listing contents of MediaPipe directory to debug:")
-            try:
-                for root, dirs, files in os.walk(mp_path):
-                    level = root.replace(mp_path, '').count(os.sep)
-                    indent = ' ' * 4 * (level)
-                    print(f"{{indent}}{{os.path.basename(root)}}/")
-                    subindent = ' ' * 4 * (level + 1)
-                    for f in files:
-                        print(f"{{subindent}}{{f}}")
-            except Exception as e:
-                print(f"Could not list directory: {{e}}")
+            print("SUCCESS: Imported 'mediapipe.solutions' directly.")
+        except ImportError:
+            print("Strategy 1 failed: 'mediapipe.solutions' not found.")
             
             raise AttributeError("Could not load solutions")
 
