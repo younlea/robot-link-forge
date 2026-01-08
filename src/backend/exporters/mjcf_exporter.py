@@ -246,8 +246,9 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
         if is_leaf or is_target_name:
             # Add site for sensor
             site_name = f"site_{body_name}"
-            # Make site slightly visible but unobtrusive (small red sphere)
-            xml.append(f'{indent}  <site name="{site_name}" pos="0 0 0" size="0.015" rgba="1 0.2 0.2 0.5" />')
+            # Make site visible (larger red sphere for user to see)
+            # Size 0.04 = 4cm radius (big enough to see clearly)
+            xml.append(f'{indent}  <site name="{site_name}" pos="0 0 0" size="0.04" rgba="1 0 0 0.8" />')
             
             # Add sensor definition
             sensor_name = f"sensor_{body_name}"

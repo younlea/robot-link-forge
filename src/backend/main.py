@@ -1574,6 +1574,10 @@ for i in range(model.nu):
 
 print(f"Mapped {{len(curl_actuators)}} actuators to CURL control.")
 print(f"Mapped {{len(spread_actuators)}} actuators to SPREAD/Other.")
+print(f"CURL IDs: {{curl_actuators}}")
+# Get names for debugging
+curl_names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i) for i in curl_actuators]
+print(f"CURL NAMES: {{curl_names}}")
 print("="*60)
 
 # --- Helper: Calculate Hand Curl ---
@@ -1673,11 +1677,23 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         curl_val = 0.0
         
         if results.multi_hand_landmarks:
-            for hand_landmarks in results.multi_hand_landmarks:
+            for hand_landmarks, handedness in zip(results.multi_hand_landmarks, results.multi_handedness):
+                # Handedness label: "Left" or "Right"
+                # MediaPipe mirrors by default? If flipped, "Right" is "Right".
+                # Let's trust the label after flip.
+                label = handedness.classification[0].label
+                
+                # Filter for Right Hand only as requested
+                if label != 'Right':
+                    continue
+
                 mp.solutions.drawing_utils.draw_landmarks(
                     frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
                 
                 curl_val = calculate_hand_curl(hand_landmarks)
+                
+                # We only process the FIRST valid right hand we find
+                break
         
         # Apply Control
         # Assuming Positive = Flexion (Curling)
@@ -1691,7 +1707,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         for idx in spread_actuators:
             data.ctrl[idx] = 0.0 
                          
-        cv2.imshow('Hand Control', frame)
+        cv2.imshow('Hand Control (Right Hand Only)', frame)
         if cv2.waitKey(1) & 0xFF == 27: break
 
         # 2. Step Simulation
