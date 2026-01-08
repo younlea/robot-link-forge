@@ -119,7 +119,7 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                          xml.append(f'{indent}  <joint name="{joint_xml_name}" type="hinge" axis="{axis_str}" {range_str} />')
                          
                          ctrl_range = range_str.replace("range=", "ctrlrange=") if range_str else 'ctrlrange="-3.14 3.14"'
-                         actuators.append(f'{indent}    <position name="{joint_xml_name}_act" joint="{joint_xml_name}" kp="500" {ctrl_range}/>')
+                         actuators.append(f'{indent}    <position name="{joint_xml_name}_act" joint="{joint_xml_name}" kp="2000" kv="50" {ctrl_range}/>')
 
                 elif joint.type == 'prismatic':
                     axis_val = joint.axis if joint.axis else [1, 0, 0]
@@ -200,7 +200,8 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
 
                  xml.append(f'{indent}  <geom {vis_geom} pos="{v_pos}" euler="{v_euler}" {color_attr} />')
                  
-                 coll_geom = 'type="box" size="0.1 0.1 0.1" group="0" rgba="1 0 0 0"'
+                 # Use the SAME mesh for collision, but in group 0 (physics)
+                 coll_geom = f'type="mesh" mesh="{asset_name}" group="0" rgba="1 0 0 0"'
                  xml.append(f'{indent}  <geom {coll_geom} pos="{v_pos}" euler="{v_euler}" />')
 
             elif v.type != 'none' and v.type != 'mesh':
