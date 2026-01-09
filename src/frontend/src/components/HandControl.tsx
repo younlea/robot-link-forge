@@ -39,11 +39,16 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
     // --- 1. Initialize MediaPipe ---
     const initInProgress = useRef(false);
     const isMountedRef = useRef(true); // Track mount status
+    const webcamRunningRef = useRef(false); // Track webcam status in ref for loop
 
     useEffect(() => {
         isMountedRef.current = true;
         return () => { isMountedRef.current = false; };
     }, []);
+
+    useEffect(() => {
+        webcamRunningRef.current = webcamRunning;
+    }, [webcamRunning]);
 
     const initMediaPipe = async () => {
         if (initInProgress.current) return;
@@ -167,11 +172,16 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
             }
 
             // Stop if component unmounted or webcam stopped
+            // FIX: Use Refs for safe access in closure
+            if (!isMountedRef.current || !webcamRunningRef.current) {
+                return;
+            }
+
             if (!videoRef.current || !videoRef.current.videoWidth) {
-                if (fpsCountRef.current % 120 === 0) {
-                    // console.log("Video not ready...", videoRef.current?.readyState);
+                // Retry if valid but not ready
+                if (webcamRunningRef.current && isMountedRef.current) {
+                    requestRef.current = requestAnimationFrame(predictWebcam);
                 }
-                if (webcamRunning) requestRef.current = requestAnimationFrame(predictWebcam);
                 return;
             }
 
@@ -220,14 +230,14 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
                 clearCanvas();
             }
 
-            if (webcamRunning) {
+            if (webcamRunningRef.current && isMountedRef.current) {
                 requestRef.current = requestAnimationFrame(predictWebcam);
             }
         } catch (globalError) {
             console.error("CRITICAL LOOP ERROR:", globalError);
             addLog(`Loop Crash: ${globalError}`);
             // Attempt recovery
-            if (webcamRunning) {
+            if (webcamRunningRef.current && isMountedRef.current) {
                 requestRef.current = requestAnimationFrame(predictWebcam);
             }
         }
