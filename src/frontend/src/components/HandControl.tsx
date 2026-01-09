@@ -7,12 +7,8 @@ import { XCircle, Video, Play, Pause } from 'lucide-react';
   HandControl.tsx
   - Handles Webcam Stream
   - Runs MediaPipe Hand Landmark Detection
-  - Ports Python 'calculate_finger_curl' logic to TypeScript
-  - Updates Robot Store directly
+  - Robust Init & Logging
 */
-
-// --- Type Definitions for MediaPipe ---
-// (Implicitly handled by @mediapipe/tasks-vision types, but helpful for reference)
 
 const HandControl = ({ onClose }: { onClose: () => void }) => {
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -21,68 +17,83 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
     // MediaPipe State
     const [handLandmarker, setHandLandmarker] = useState<HandLandmarker | null>(null);
     const [webcamRunning, setWebcamRunning] = useState(false);
+    const [enableAI, setEnableAI] = useState(true);
     const [isLoading, setIsLoading] = useState(true);
-    const [statusMsg, setStatusMsg] = useState('Initializing AI Model...');
     const [fps, setFps] = useState(0);
+    const [logs, setLogs] = useState<string[]>(['Initializing component...']);
 
     // Store Access
     const { updateJoint, links, joints } = useRobotStore();
 
+    // Logger
+    const addLog = (msg: string) => {
+        setLogs(prev => [`[${new Date().toLocaleTimeString().split(' ')[0]}] ${msg}`, ...prev.slice(0, 4)]);
+    };
+
     // --- 1. Initialize MediaPipe ---
     useEffect(() => {
+        let isMounted = true;
+
         const initMediaPipe = async () => {
             try {
-                console.log("Loading MediaPipe Vision...");
+                addLog("Loading MediaPipe Vision...");
                 const vision = await FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2/wasm"
                 );
+
+                if (!isMounted) return;
+
                 const landmarker = await HandLandmarker.createFromOptions(vision, {
                     baseOptions: {
                         modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-                        delegate: "CPU" // Fallback to CPU for better linux compatibility
+                        delegate: "CPU" // Linux compatible
                     },
                     runningMode: "VIDEO",
                     numHands: 1
                 });
+
+                if (!isMounted) return;
+
                 console.log("MediaPipe Loaded Successfully");
+                addLog("MediaPipe Ready.");
                 setHandLandmarker(landmarker);
                 setIsLoading(false);
-                setStatusMsg('Ready to Start');
-                startWebcam(); // Auto-start for convenience
+
+                // Auto-start webcam if ready
+                startWebcam();
             } catch (error) {
                 console.error("Failed to load MediaPipe:", error);
-                setStatusMsg('Failed to load AI Model.');
+                addLog(`Error: ${error}`);
                 setIsLoading(false);
             }
         };
 
-        initMediaPipe();
+        // Delay slightly to ensure render
+        setTimeout(initMediaPipe, 100);
 
         return () => {
-            // Cleanup: Stop webcam
+            isMounted = false;
             stopWebcam();
         };
     }, []);
 
     // --- 2. Webcam Handling ---
     const startWebcam = async () => {
-        if (!handLandmarker) return;
         try {
+            addLog("Requesting Camera...");
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
-                // Add listener
-                videoRef.current.addEventListener("loadeddata", predictWebcam);
-                // Also trigger immediately if already ready (e.g. re-enabling)
-                if (videoRef.current.readyState >= 2) {
+                videoRef.current.addEventListener("loadeddata", () => {
+                    addLog("Camera Stream Started");
                     predictWebcam();
-                }
+                });
             }
             setWebcamRunning(true);
-            setStatusMsg('Tracking Active');
         } catch (err) {
             console.error("Webcam Error:", err);
-            setStatusMsg('Camera Permission Denied');
+            addLog("Camera Permission Denied!");
         }
     };
 
@@ -93,7 +104,7 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
             videoRef.current.srcObject = null;
         }
         setWebcamRunning(false);
-        setStatusMsg('Paused');
+        addLog("Camera Stopped");
     };
 
     // --- 3. Prediction Loop ---
@@ -103,7 +114,11 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
     const fpsCountRef = useRef(0);
 
     const predictWebcam = async () => {
-        if (!videoRef.current || !handLandmarker) return;
+        // Stop if component unmounted or webcam stopped
+        if (!videoRef.current || !videoRef.current.videoWidth) {
+            if (webcamRunning) requestRef.current = requestAnimationFrame(predictWebcam);
+            return;
+        }
 
         // FPS Calculation
         const now = Date.now();
@@ -115,21 +130,25 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
         }
 
         const video = videoRef.current;
-        if (video.currentTime !== lastVideoTimeRef.current) {
-            const startTimeMs = performance.now();
-            const results = handLandmarker.detectForVideo(video, startTimeMs);
-            lastVideoTimeRef.current = video.currentTime;
 
-            if (results.landmarks && results.landmarks.length > 0) {
-                // Visualize and Control
-                drawLandmarks(results.landmarks[0]);
-                updateRobotControl(results.landmarks[0], results.handedness[0]);
-            } else {
-                if (canvasRef.current) {
-                    const ctx = canvasRef.current.getContext('2d');
-                    if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        // Only run AI if enabled and model loaded
+        if (enableAI && handLandmarker && video.currentTime !== lastVideoTimeRef.current) {
+            const startTimeMs = performance.now();
+            try {
+                const results = handLandmarker.detectForVideo(video, startTimeMs);
+                lastVideoTimeRef.current = video.currentTime;
+
+                if (results.landmarks && results.landmarks.length > 0) {
+                    drawLandmarks(results.landmarks[0]);
+                    updateRobotControl(results.landmarks[0], results.handedness[0]);
+                } else {
+                    clearCanvas();
                 }
+            } catch (e) {
+                console.warn(e);
             }
+        } else if (!enableAI) {
+            clearCanvas();
         }
 
         if (webcamRunning) {
@@ -137,11 +156,15 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
         }
     };
 
+    const clearCanvas = () => {
+        if (canvasRef.current) {
+            const ctx = canvasRef.current.getContext('2d');
+            if (ctx) ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        }
+    };
+
     useEffect(() => {
         if (webcamRunning) {
-            // Re-trigger loop if state changes to running and loop stopped
-            // Actually `loadeddata` event triggers it initially.
-            // If we toggle play/pause, we might need to kick it.
             if (videoRef.current && videoRef.current.readyState >= 2) {
                 predictWebcam();
             }
@@ -169,7 +192,6 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
             const tip = landmarks[THUMB_TIP];
             const mcp = landmarks[INDEX_MCP]; // Distance to Index MCP
             const d = dist(tip, mcp);
-            // Heuristic from Python: curl = clip((0.2 - dist) / 0.15)
             return Math.min(Math.max((0.2 - d) / 0.15, 0.0), 1.0);
         } else {
             let tipId, mcpId;
@@ -184,7 +206,6 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
             const dist_tip = dist(tip, wrist);
             const dist_mcp = dist(mcp, wrist);
 
-            // Heuristic from Python: ratio = dist_tip / dist_mcp. curl = clip((1.8 - ratio)/1.0)
             const ratio = dist_tip / (dist_mcp + 1e-6);
             return Math.min(Math.max((1.8 - ratio) / 1.0, 0.0), 1.0);
         }
@@ -193,9 +214,6 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
 
     // --- 5. Robot Store Update ---
     const updateRobotControl = (landmarks: any[], handedness: any) => {
-        // Only process Right Hand if preferred, or generic.
-        // Python code filtered for "Right". Here we can just take the first hand.
-
         const fingers = ['thumb', 'index', 'middle', 'ring', 'pinky'];
         const curls: Record<string, number> = {};
 
@@ -203,78 +221,25 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
             curls[f] = calculateFingerCurl(landmarks, f);
         });
 
-        // Loop through joints and map curls
-        // Similar heuristics to Python patch_main.py:
-        // "thumb" -> thumb curl
-        // "index" -> index curl...
-        // Control Direction: Thumb Positive, others Negative (from Python v3 fix)
-        // Gain: In frontend we don't simulate torque (yet), we set POSITION (angle).
-        // So we need to map Curl (0~1) to Angle limit range.
-
-        // Strategy:
-        // 1. Find all joints.
-        // 2. Identify which finger they belong to.
-        // 3. Map Curl 0.0 -> LowerLimit, Curl 1.0 -> UpperLimit (or usage of Gain).
-        // In Python, Curl (0-1) became CMD. CMD -> Torque.
-        // But here we are setting `currentValues` which is Position.
-        // Ideally: Curl 0 (Open) -> 0 Angle. Curl 1 (Closed) -> 90 Angle (1.57 rad).
-
-        // Thumb: Positive rotation (Open=0, Closed=Positive?)
-        // Python "Control Direction Inversion": 
-        // Thumb: Cmd = Curl * 2.0 (Pos)
-        // Others: Cmd = Curl * -2.0 (Neg)
-
-        // Interpretation for Position Control:
-        // Thumb: Curl 0 -> 0 rad. Curl 1 -> +2.0 rad (approx).
-        // Others: Curl 0 -> 0 rad. Curl 1 -> -2.0 rad (approx).
-
         Object.values(joints).forEach(joint => {
             const lowerName = joint.name.toLowerCase();
-
-            // Skip 1st joint roll if implemented (Python logic: '1st' in lower and 'pitch' not in lower -> continue)
-            // Here `dof` handles channels. If pitch is enabled, we drive pitch.
-            // If roll is enabled, and it's 1st joint, we should probably keep it 0.
-
             let matchedFinger = fingers.find(f => lowerName.includes(f));
-            if (!matchedFinger) {
-                // Fallback or 'general'
-                return;
-            }
+            if (!matchedFinger) return;
 
-            // FILTER: 1st joint only PITCH
-            // If joint name has "1st" (e.g. index_1st_knuckle), we only want Pitch.
             const isFirst = lowerName.includes('1st');
-
             const curl = curls[matchedFinger];
-
-            // Determine Target Angle based on Python gains
-            // Thumb: +2.0 * curl
-            // Others: -2.0 * curl
             const gain = (matchedFinger === 'thumb') ? 2.0 : -2.0;
             const targetAngle = curl * gain;
 
-            // Apply to JOINT
-            // We assume mostly Rotational joints using Pitch or Roll depending on setup.
-            // Usually Finger Flexion is Pitch (Y) or Roll (X) depending on axis.
-            // Let's assume Pitch based on previous context.
-
             if (joint.type === 'rotational') {
-                // Apply to Pitch
                 if (joint.dof.pitch) {
                     updateJoint(joint.id, 'currentValues.pitch', targetAngle);
                 }
-                // If setup uses Roll for flexion (common in some URDFs), apply there too?
-                // Let's stick to Python filter logic: "1st joint ignore non-pitch".
                 if (isFirst) {
-                    // Only Pitch Allowed for 1st
-                    if (joint.dof.roll) updateJoint(joint.id, 'currentValues.roll', 0); // Lock Roll
+                    if (joint.dof.roll) updateJoint(joint.id, 'currentValues.roll', 0);
                     if (joint.dof.yaw) updateJoint(joint.id, 'currentValues.yaw', 0);
                 } else {
-                    // 2nd/3rd joints: Usually one DOF (Pitch).
-                    // If they have Roll enabled (unlikely), maybe apply same angle?
-                    // Safe bet: Apply to main axis.
                     if (joint.dof.roll && !joint.dof.pitch) {
-                        // If only Roll exists, use it.
                         updateJoint(joint.id, 'currentValues.roll', targetAngle);
                     }
                 }
@@ -311,7 +276,7 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
             {/* Header */}
             <div className="bg-gray-800 p-2 px-3 flex justify-between items-center border-b border-gray-700">
                 <div className="flex items-center space-x-2">
-                    <Video size={16} className="text-green-500" />
+                    <Video size={16} className={`${webcamRunning ? 'text-green-500' : 'text-gray-400'}`} />
                     <span className="text-sm font-bold text-gray-200">Hand Control</span>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -333,15 +298,28 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
                 <canvas ref={canvasRef} className="absolute inset-0 w-full h-full transform -scale-x-100" />
             </div>
 
+            {/* Logs Area */}
+            <div className="bg-gray-950 p-2 h-20 overflow-y-auto text-[10px] font-mono border-t border-gray-800">
+                {logs.map((log, i) => (
+                    <div key={i} className="text-gray-400 truncate">{log}</div>
+                ))}
+            </div>
+
             {/* Controls */}
             <div className="p-2 flex justify-between items-center bg-gray-800 text-xs">
-                <span className={`px-2 py-0.5 rounded ${webcamRunning ? 'bg-green-900 text-green-300' : 'bg-yellow-900 text-yellow-300'}`}>
-                    {statusMsg}
-                </span>
+                <label className="flex items-center space-x-2 cursor-pointer">
+                    <input
+                        type="checkbox"
+                        checked={enableAI}
+                        onChange={(e) => setEnableAI(e.target.checked)}
+                        className="form-checkbox text-blue-500 rounded h-3 w-3"
+                    />
+                    <span className="text-gray-300">Enable AI</span>
+                </label>
 
                 <button
                     onClick={webcamRunning ? stopWebcam : startWebcam}
-                    className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-white"
+                    className={`p-1.5 rounded text-white ${webcamRunning ? 'bg-red-900 hover:bg-red-800' : 'bg-green-700 hover:bg-green-600'}`}
                 >
                     {webcamRunning ? <Pause size={14} /> : <Play size={14} />}
                 </button>
