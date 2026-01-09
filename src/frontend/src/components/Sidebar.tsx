@@ -3,6 +3,7 @@ import { useRobotStore } from '../store';
 import { RobotLink, RobotJoint, JointType } from '../types';
 import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, FolderOpen, Upload, RotateCcw, Trash2, FilePlus, HelpCircle, Settings, Calculator, Download } from 'lucide-react';
 import HelpModal from './HelpModal';
+import HandControl from './HandControl';
 
 // --- Reusable Input Components (with fixes) ---
 const NumberInput = ({ label, value, onChange, step = 0.01 }: { label: string, value: number, onChange: (val: number) => void, step?: number }) => {
@@ -955,6 +956,7 @@ const Sidebar = () => {
 
     // State for the new export modal
     const [showExportModal, setShowExportModal] = useState(false);
+    const [showHandControl, setShowHandControl] = useState(false);
     const [exportFormat, setExportFormat] = useState<'urdf' | 'urdf_ros2' | 'mujoco_urdf' | 'mujoco_mjcf' | 'gazebo' | 'gazebo_ros2' | null>(null);
     const [robotName, setRobotName] = useState('MyRobot');
     const [useMeshCollision, setUseMeshCollision] = useState(false);
@@ -1391,8 +1393,19 @@ const Sidebar = () => {
                         >
                             <Settings className="h-4 w-4" />
                         </button>
+
+                        <button
+                            onClick={() => setShowHandControl(!showHandControl)}
+                            className={`flex-none flex items-center justify-center p-2 rounded text-sm ${showHandControl ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-600 hover:bg-gray-700'}`}
+                            title="Webcam Hand Control"
+                        >
+                            <ToyBrick className="h-4 w-4" /> {/* Fallback icon or add Camera */}
+                        </button>
                     </div>
                 </div>
+
+                {/* Hand Control Overlay */}
+                {showHandControl && <HandControl onClose={() => setShowHandControl(false)} />}
 
                 {/* Inspector / Global Controls */}
                 <div className="flex justify-between items-center mb-4">
