@@ -390,6 +390,16 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
         // }
     };
 
+    const restartAI = async () => {
+        addLog("Restarting AI...");
+        await initMediaPipe();
+        // Kickstart loop if it died
+        if (webcamRunningRef.current && isMountedRef.current) {
+            addLog("Restarting Loop...");
+            predictWebcam();
+        }
+    };
+
     return (
         <div className="absolute bottom-4 right-4 w-72 bg-gray-900 rounded-lg shadow-2xl border border-gray-700 overflow-hidden flex flex-col z-50">
             {/* Header */}
