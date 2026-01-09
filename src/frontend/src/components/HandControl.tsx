@@ -36,16 +36,16 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
 
         const initMediaPipe = async () => {
             try {
-                addLog("Loading MediaPipe Vision...");
+                addLog("Loading MediaPipe Vision (Local)...");
                 const vision = await FilesetResolver.forVisionTasks(
-                    "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2/wasm"
+                    "/mediapipe"
                 );
 
                 if (!isMounted) return;
 
                 const landmarker = await HandLandmarker.createFromOptions(vision, {
                     baseOptions: {
-                        modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
+                        modelAssetPath: `/mediapipe/hand_landmarker.task`,
                         delegate: "CPU" // Linux compatible
                     },
                     runningMode: "VIDEO",
