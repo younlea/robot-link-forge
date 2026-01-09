@@ -200,24 +200,11 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
 
                  xml.append(f'{indent}  <geom {vis_geom} pos="{v_pos}" euler="{v_euler}" {color_attr} />')
                  
-                 # Hybrid Collision:
-                 # 1st Joint uses Cylinder (to prevent internal twisting)
-                 # 2nd/3rd/Base uses detailed Mesh
-                 is_first_link = False
-                 if parent_joint_id:
-                     p_joint = robot.joints.get(parent_joint_id)
-                     if p_joint and "1st" in p_joint.name.lower():
-                         is_first_link = True
-                 
-                 if is_first_link:
-                     # Primitive Cylinder for Proximal Phalanx
-                     # Heuristic: Radius 12mm, Length 40mm (half-height 20mm), Oriented along X
-                     coll_geom = 'type="cylinder" size="0.012 0.02" pos="0.02 0 0" euler="0 1.5708 0" group="0" rgba="0 0 1 0.4"'
-                     xml.append(f'{indent}  <geom {coll_geom} />')
-                 else:
-                     # Detailed Mesh for Base and Distal/Middle
-                     coll_geom = f'type="mesh" mesh="{asset_name}" group="0" rgba="1 0 0 0"'
-                     xml.append(f'{indent}  <geom {coll_geom} pos="{v_pos}" euler="{v_euler}" />')
+                 # Simplified Collision: Use Primitive Cylinder for ALL Mesh parts
+                 # This prevents jagged STL interference while maintaining approximate shape.
+                 # Heuristic: Radius 12mm, Length 40mm, Oriented along X (Bone axis)
+                 coll_geom = 'type="cylinder" size="0.012 0.02" pos="0.02 0 0" euler="0 1.5708 0" group="0" rgba="0 0 1 0.3"'
+                 xml.append(f'{indent}  <geom {coll_geom} />')
 
             elif v.type != 'none' and v.type != 'mesh':
                 geom_str = ""
