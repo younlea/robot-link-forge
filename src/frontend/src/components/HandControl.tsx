@@ -132,6 +132,11 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
 
         const video = videoRef.current;
 
+        // Debug Preconditions (Throttle this log?)
+        if (enableAI && !handLandmarker && fpsCountRef.current % 60 === 0) {
+            addLog("AI: Waiting for model to load...");
+        }
+
         // Only run AI if enabled and model loaded
         if (enableAI && handLandmarker && video.currentTime !== lastVideoTimeRef.current) {
             const startTimeMs = performance.now();
@@ -146,7 +151,12 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
                     clearCanvas();
                 }
             } catch (e) {
-                console.warn(e);
+                console.error(e);
+                const msg = e instanceof Error ? e.message : JSON.stringify(e);
+                // Only log unique errors to avoid flooding
+                if (!logs[0]?.includes(msg.substring(0, 20))) {
+                    addLog(`AI Error: ${msg}`);
+                }
             }
         } else if (!enableAI) {
             clearCanvas();
