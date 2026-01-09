@@ -158,69 +158,78 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
     const lastLoopLogTimeRef = useRef(0);
 
     const predictWebcam = async () => {
-        // Loop Log (Throttled 5s) - Moved to top for debug
-        const now = Date.now();
-        if (now - lastLoopLogTimeRef.current >= 5000) {
-            addLog("Loop Alive");
-            lastLoopLogTimeRef.current = now;
-        }
-
-        // Stop if component unmounted or webcam stopped
-        if (!videoRef.current || !videoRef.current.videoWidth) {
-            if (fpsCountRef.current % 120 === 0) {
-                // console.log("Video not ready...", videoRef.current?.readyState);
+        try {
+            // Loop Log (Throttled 5s) - Moved to top for debug
+            const now = Date.now();
+            if (now - lastLoopLogTimeRef.current >= 5000) {
+                addLog("Loop Alive");
+                lastLoopLogTimeRef.current = now;
             }
-            if (webcamRunning) requestRef.current = requestAnimationFrame(predictWebcam);
-            return;
-        }
 
-        // FPS Calculation
-        fpsCountRef.current++;
-        if (now - fpsTimeRef.current >= 1000) {
-            setFps(fpsCountRef.current);
-            fpsCountRef.current = 0;
-            fpsTimeRef.current = now;
-        }
-
-        const video = videoRef.current;
-
-        // Debug Preconditions (Throttle this log?)
-        // Only run AI if enabled and model loaded
-        // FIX: Use ref to avoid closure staleness
-        const landmarkerStart = landmarkerRef.current;
-
-        if (enableAIRef.current && landmarkerStart && video.currentTime !== lastVideoTimeRef.current) {
-            const startTimeMs = performance.now();
-            try {
-                const results = landmarkerStart.detectForVideo(video, startTimeMs);
-                lastVideoTimeRef.current = video.currentTime;
-
-                if (results.landmarks && results.landmarks.length > 0) {
-                    if (fpsCountRef.current % 60 === 0) {
-                        addLog(`Hands: ${results.landmarks.length}`);
-                    }
-                    drawLandmarks(results.landmarks[0]);
-                    updateRobotControl(results.landmarks[0], results.handedness[0]);
-                } else {
-                    if (fpsCountRef.current % 120 === 0) {
-                        addLog("No hands detected");
-                    }
-                    clearCanvas();
+            // Stop if component unmounted or webcam stopped
+            if (!videoRef.current || !videoRef.current.videoWidth) {
+                if (fpsCountRef.current % 120 === 0) {
+                    // console.log("Video not ready...", videoRef.current?.readyState);
                 }
-            } catch (e) {
-                console.error(e);
-                const msg = e instanceof Error ? e.message : JSON.stringify(e);
-                // Only log unique errors to avoid flooding
-                if (!logs[0]?.includes(msg.substring(0, 20))) {
-                    addLog(`AI Error: ${msg}`);
-                }
+                if (webcamRunning) requestRef.current = requestAnimationFrame(predictWebcam);
+                return;
             }
-        } else if (!enableAIRef.current) {
-            clearCanvas();
-        }
 
-        if (webcamRunning) {
-            requestRef.current = requestAnimationFrame(predictWebcam);
+            // FPS Calculation
+            fpsCountRef.current++;
+            if (now - fpsTimeRef.current >= 1000) {
+                setFps(fpsCountRef.current);
+                fpsCountRef.current = 0;
+                fpsTimeRef.current = now;
+            }
+
+            const video = videoRef.current;
+
+            // Debug Preconditions (Throttle this log?)
+            // Only run AI if enabled and model loaded
+            // FIX: Use ref to avoid closure staleness
+            const landmarkerStart = landmarkerRef.current;
+
+            if (enableAIRef.current && landmarkerStart && video.currentTime !== lastVideoTimeRef.current) {
+                const startTimeMs = performance.now();
+                try {
+                    const results = landmarkerStart.detectForVideo(video, startTimeMs);
+                    lastVideoTimeRef.current = video.currentTime;
+
+                    if (results.landmarks && results.landmarks.length > 0) {
+                        if (fpsCountRef.current % 60 === 0) {
+                            addLog(`Hands: ${results.landmarks.length}`);
+                        }
+                        drawLandmarks(results.landmarks[0]);
+                        updateRobotControl(results.landmarks[0], results.handedness[0]);
+                    } else {
+                        if (fpsCountRef.current % 120 === 0) {
+                            addLog("No hands detected");
+                        }
+                        clearCanvas();
+                    }
+                } catch (e) {
+                    // Inner catch for AI errors
+                    console.error(e);
+                    const msg = e instanceof Error ? e.message : JSON.stringify(e);
+                    if (!logs[0]?.includes(msg.substring(0, 20))) {
+                        addLog(`AI Error: ${msg}`);
+                    }
+                }
+            } else if (!enableAIRef.current) {
+                clearCanvas();
+            }
+
+            if (webcamRunning) {
+                requestRef.current = requestAnimationFrame(predictWebcam);
+            }
+        } catch (globalError) {
+            console.error("CRITICAL LOOP ERROR:", globalError);
+            addLog(`Loop Crash: ${globalError}`);
+            // Attempt recovery
+            if (webcamRunning) {
+                requestRef.current = requestAnimationFrame(predictWebcam);
+            }
         }
     };
 
@@ -420,7 +429,7 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
                 </label>
 
                 <button
-                    onClick={() => initMediaPipe()}
+                    onClick={restartAI}
                     className="ml-2 px-2 py-0.5 bg-blue-900 text-blue-200 rounded text-[10px] hover:bg-blue-800"
                 >
                     Restart AI
