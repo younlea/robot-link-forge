@@ -1684,7 +1684,20 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         cv2.imshow('Hand Control (Right Hand)', frame)
         if cv2.waitKey(1) & 0xFF == 27: break
 
-        mujoco.mj_step(model, data)
+        # Sync Physics to Real-Time (Webcam ~30fps, Physics ~2ms step)
+        # Cap read blocks for ~33ms. We need multiple physics steps per frame.
+        dt_frame = time.time() - start_time
+        # Standard webcam is 30Hz-60Hz. If efficient, dt is small, but cap.read blocks.
+        # Let's assume at least 33ms passed.
+        # Robust approach: Step until simulation time catches up to wall clock, 
+        # but reset offset to avoid spiral.
+        
+        # Simple fixed catch-up: 1 step is too slow. 
+        # Approx 33ms / 2ms = 16 steps.
+        # We perform a fixed burst to keep it responsive but stable.
+        for _ in range(15): 
+            mujoco.mj_step(model, data)
+            
         viewer.sync()
         
         # Update Plots
@@ -1700,7 +1713,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         fig.canvas.flush_events()
         
         # Detailed Logging
-        if frame_count % 30 == 0:
+        if frame_count % 5 == 0:
              print("-" * 60)
              print(f"[Frame {{frame_count}}] MP Status:")
              for fname in finger_names:
