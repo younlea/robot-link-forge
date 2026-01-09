@@ -63,7 +63,8 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
                 startWebcam();
             } catch (error) {
                 console.error("Failed to load MediaPipe:", error);
-                addLog(`Error: ${error}`);
+                const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
+                addLog(`Error: ${errorMsg}`);
                 setIsLoading(false);
             }
         };
