@@ -172,14 +172,23 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
             fpsTimeRef.current = now;
         }
 
+        // Loop Alive Log (throttled to 5 seconds)
+        if (now - lastLoopLogTimeRef.current >= 5000) {
+            addLog("Loop Alive");
+            lastLoopLogTimeRef.current = now;
+        }
+
         const video = videoRef.current;
 
         // Debug Preconditions (Throttle this log?)
         // Only run AI if enabled and model loaded
-        if (enableAIRef.current && handLandmarker && video.currentTime !== lastVideoTimeRef.current) {
+        // FIX: Use ref to avoid closure staleness
+        const landmarkerStart = landmarkerRef.current;
+
+        if (enableAIRef.current && landmarkerStart && video.currentTime !== lastVideoTimeRef.current) {
             const startTimeMs = performance.now();
             try {
-                const results = handLandmarker.detectForVideo(video, startTimeMs);
+                const results = landmarkerStart.detectForVideo(video, startTimeMs);
                 lastVideoTimeRef.current = video.currentTime;
 
                 if (results.landmarks && results.landmarks.length > 0) {
