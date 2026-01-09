@@ -139,7 +139,7 @@ export interface RobotActions {
   exportURDF: (robotName: string) => Promise<void>;
   exportURDF_ROS2: (robotName: string) => Promise<void>;
   exportMujocoURDF: (robotName: string) => Promise<void>;
-  exportMujocoMJCF: (robotName: string) => Promise<void>;
+  exportMujocoMJCF: (robotName: string, useMeshCollision?: boolean) => Promise<void>;
   exportGazebo: (robotName: string) => Promise<void>;
   exportGazeboROS2: (robotName: string) => Promise<void>;
 
