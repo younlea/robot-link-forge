@@ -379,6 +379,13 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
                 </label>
 
                 <button
+                    onClick={() => initMediaPipe()}
+                    className="ml-2 px-2 py-0.5 bg-blue-900 text-blue-200 rounded text-[10px] hover:bg-blue-800"
+                >
+                    Restart AI
+                </button>
+
+                <button
                     onClick={webcamRunning ? stopWebcam : startWebcam}
                     className={`p-1.5 rounded text-white ${webcamRunning ? 'bg-red-900 hover:bg-red-800' : 'bg-green-700 hover:bg-green-600'}`}
                 >
