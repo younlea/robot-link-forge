@@ -155,27 +155,31 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
     const requestRef = useRef<number>();
     const fpsTimeRef = useRef(Date.now());
     const fpsCountRef = useRef(0);
+    const lastLoopLogTimeRef = useRef(0);
 
     const predictWebcam = async () => {
+        // Loop Log (Throttled 5s) - Moved to top for debug
+        const now = Date.now();
+        if (now - lastLoopLogTimeRef.current >= 5000) {
+            addLog("Loop Alive");
+            lastLoopLogTimeRef.current = now;
+        }
+
         // Stop if component unmounted or webcam stopped
         if (!videoRef.current || !videoRef.current.videoWidth) {
+            if (fpsCountRef.current % 120 === 0) {
+                // console.log("Video not ready...", videoRef.current?.readyState);
+            }
             if (webcamRunning) requestRef.current = requestAnimationFrame(predictWebcam);
             return;
         }
 
         // FPS Calculation
-        const now = Date.now();
         fpsCountRef.current++;
         if (now - fpsTimeRef.current >= 1000) {
             setFps(fpsCountRef.current);
             fpsCountRef.current = 0;
             fpsTimeRef.current = now;
-        }
-
-        // Loop Alive Log (throttled to 5 seconds)
-        if (now - lastLoopLogTimeRef.current >= 5000) {
-            addLog("Loop Alive");
-            lastLoopLogTimeRef.current = now;
         }
 
         const video = videoRef.current;
