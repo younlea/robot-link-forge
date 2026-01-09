@@ -187,9 +187,15 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
                 lastVideoTimeRef.current = video.currentTime;
 
                 if (results.landmarks && results.landmarks.length > 0) {
+                    if (fpsCountRef.current % 30 === 0) {
+                        // console.log(`Hands detected: ${results.landmarks.length}`);
+                    }
                     drawLandmarks(results.landmarks[0]);
                     updateRobotControl(results.landmarks[0], results.handedness[0]);
                 } else {
+                    if (fpsCountRef.current % 100 === 0) {
+                        // console.log("No hands detected");
+                    }
                     clearCanvas();
                 }
             } catch (e) {
