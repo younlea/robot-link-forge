@@ -18,6 +18,11 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
     const [handLandmarker, setHandLandmarker] = useState<HandLandmarker | null>(null);
     const [webcamRunning, setWebcamRunning] = useState(false);
     const [enableAI, setEnableAI] = useState(true);
+    const enableAIRef = useRef(true); // Ref to avoid closure staleness in loop
+
+    // Sync Ref
+    useEffect(() => { enableAIRef.current = enableAI; }, [enableAI]);
+
     const [isLoading, setIsLoading] = useState(true);
     const [fps, setFps] = useState(0);
     const [logs, setLogs] = useState<string[]>(['Initializing component...']);
@@ -133,12 +138,12 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
         const video = videoRef.current;
 
         // Debug Preconditions (Throttle this log?)
-        if (enableAI && !handLandmarker && fpsCountRef.current % 60 === 0) {
+        if (enableAIRef.current && !handLandmarker && fpsCountRef.current % 60 === 0) {
             addLog("AI: Waiting for model to load...");
         }
 
         // Only run AI if enabled and model loaded
-        if (enableAI && handLandmarker && video.currentTime !== lastVideoTimeRef.current) {
+        if (enableAIRef.current && handLandmarker && video.currentTime !== lastVideoTimeRef.current) {
             const startTimeMs = performance.now();
             try {
                 const results = handLandmarker.detectForVideo(video, startTimeMs);
@@ -158,7 +163,7 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
                     addLog(`AI Error: ${msg}`);
                 }
             }
-        } else if (!enableAI) {
+        } else if (!enableAIRef.current) {
             clearCanvas();
         }
 
@@ -235,6 +240,12 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
         Object.values(joints).forEach(joint => {
             const lowerName = joint.name.toLowerCase();
             let matchedFinger = fingers.find(f => lowerName.includes(f));
+
+            // Debug: Periodic log of un-matched joints?
+            // if (fpsCountRef.current % 120 === 0 && !matchedFinger) {
+            //      console.log(`Joint ${joint.name} not controlled (no finger match)`);
+            // }
+
             if (!matchedFinger) return;
 
             const isFirst = lowerName.includes('1st');
@@ -244,14 +255,25 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
 
             if (joint.type === 'rotational') {
                 if (joint.dof.pitch) {
-                    updateJoint(joint.id, 'currentValues.pitch', targetAngle);
+                    const currentPitch = (joint.currentValues as any).pitch || 0;
+                    // Optimization: Only update if change is significant (> 0.05 rad ~ 3 deg)
+                    if (Math.abs(currentPitch - targetAngle) > 0.05) {
+                        if (matchedFinger === 'index' && isFirst && fpsCountRef.current % 60 === 0) {
+                            addLog(`Ctrl: ${joint.name} -> ${targetAngle.toFixed(2)}`);
+                        }
+                        updateJoint(joint.id, 'currentValues.pitch', targetAngle);
+                    }
                 }
                 if (isFirst) {
-                    if (joint.dof.roll) updateJoint(joint.id, 'currentValues.roll', 0);
-                    if (joint.dof.yaw) updateJoint(joint.id, 'currentValues.yaw', 0);
+                    // Locks
+                    if (joint.dof.roll && Math.abs((joint.currentValues as any).roll || 0) > 0.01) updateJoint(joint.id, 'currentValues.roll', 0);
+                    if (joint.dof.yaw && Math.abs((joint.currentValues as any).yaw || 0) > 0.01) updateJoint(joint.id, 'currentValues.yaw', 0);
                 } else {
                     if (joint.dof.roll && !joint.dof.pitch) {
-                        updateJoint(joint.id, 'currentValues.roll', targetAngle);
+                        const currentRoll = (joint.currentValues as any).roll || 0;
+                        if (Math.abs(currentRoll - targetAngle) > 0.05) {
+                            updateJoint(joint.id, 'currentValues.roll', targetAngle);
+                        }
                     }
                 }
             }
