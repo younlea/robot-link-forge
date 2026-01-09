@@ -32,17 +32,19 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
     useEffect(() => {
         const initMediaPipe = async () => {
             try {
+                console.log("Loading MediaPipe Vision...");
                 const vision = await FilesetResolver.forVisionTasks(
                     "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.2/wasm"
                 );
                 const landmarker = await HandLandmarker.createFromOptions(vision, {
                     baseOptions: {
                         modelAssetPath: `https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task`,
-                        delegate: "GPU"
+                        delegate: "CPU" // Fallback to CPU for better linux compatibility
                     },
                     runningMode: "VIDEO",
                     numHands: 1
                 });
+                console.log("MediaPipe Loaded Successfully");
                 setHandLandmarker(landmarker);
                 setIsLoading(false);
                 setStatusMsg('Ready to Start');
@@ -69,7 +71,12 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
             const stream = await navigator.mediaDevices.getUserMedia({ video: true });
             if (videoRef.current) {
                 videoRef.current.srcObject = stream;
+                // Add listener
                 videoRef.current.addEventListener("loadeddata", predictWebcam);
+                // Also trigger immediately if already ready (e.g. re-enabling)
+                if (videoRef.current.readyState >= 2) {
+                    predictWebcam();
+                }
             }
             setWebcamRunning(true);
             setStatusMsg('Tracking Active');
