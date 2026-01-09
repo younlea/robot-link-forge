@@ -38,12 +38,20 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
     // --- 1. Initialize MediaPipe ---
     // --- 1. Initialize MediaPipe ---
     const initInProgress = useRef(false);
+    const isMountedRef = useRef(true); // Track mount status
+
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => { isMountedRef.current = false; };
+    }, []);
 
     const initMediaPipe = async () => {
         if (initInProgress.current) return;
         initInProgress.current = true;
 
         try {
+            if (!isMountedRef.current) return;
+
             setLogs(prev => [`[${new Date().toLocaleTimeString()}] Init...`, ...prev]);
             addLog("Loading MediaPipe Vision (Local)...");
 
@@ -57,6 +65,8 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
                 "/mediapipe"
             );
 
+            if (!isMountedRef.current) return;
+
             const landmarker = await HandLandmarker.createFromOptions(vision, {
                 baseOptions: {
                     modelAssetPath: `/mediapipe/hand_landmarker.task`,
@@ -66,13 +76,18 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
                 numHands: 1
             });
 
+            if (!isMountedRef.current) {
+                landmarker.close();
+                return;
+            }
+
             console.log("MediaPipe Loaded Successfully");
             addLog("MediaPipe Ready.");
             setHandLandmarker(landmarker);
             setIsLoading(false);
 
             // Auto-start webcam if ready
-            if (!webcamRunning) startWebcam();
+            if (!webcamRunning && isMountedRef.current) startWebcam();
         } catch (error) {
             console.error("Failed to load MediaPipe:", error);
             const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
@@ -84,16 +99,10 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
     };
 
     useEffect(() => {
-        let isMounted = true;
         initMediaPipe();
 
         return () => {
-            isMounted = false;
             stopWebcam();
-            // Cleanup landmarker if it exists in state? 
-            // We can't access state here easily if it changes.
-            // But we can try relying on garbage collection or user manual restart if weird.
-            // Ideally we track it in a ref for cleanup.
         };
     }, []);
 
