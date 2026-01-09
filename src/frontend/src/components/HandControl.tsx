@@ -36,50 +36,78 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
     };
 
     // --- 1. Initialize MediaPipe ---
+    // --- 1. Initialize MediaPipe ---
+    const initInProgress = useRef(false);
+
+    const initMediaPipe = async () => {
+        if (initInProgress.current) return;
+        initInProgress.current = true;
+
+        try {
+            setLogs(prev => [`[${new Date().toLocaleTimeString()}] Init...`, ...prev]);
+            addLog("Loading MediaPipe Vision (Local)...");
+
+            // Close existing if any (manual restart case)
+            if (handLandmarker) {
+                handLandmarker.close();
+                setHandLandmarker(null);
+            }
+
+            const vision = await FilesetResolver.forVisionTasks(
+                "/mediapipe"
+            );
+
+            const landmarker = await HandLandmarker.createFromOptions(vision, {
+                baseOptions: {
+                    modelAssetPath: `/mediapipe/hand_landmarker.task`,
+                    delegate: "CPU" // Linux compatible
+                },
+                runningMode: "VIDEO",
+                numHands: 1
+            });
+
+            console.log("MediaPipe Loaded Successfully");
+            addLog("MediaPipe Ready.");
+            setHandLandmarker(landmarker);
+            setIsLoading(false);
+
+            // Auto-start webcam if ready
+            if (!webcamRunning) startWebcam();
+        } catch (error) {
+            console.error("Failed to load MediaPipe:", error);
+            const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
+            addLog(`Error: ${errorMsg}`);
+            setIsLoading(false);
+        } finally {
+            initInProgress.current = false;
+        }
+    };
+
     useEffect(() => {
         let isMounted = true;
-
-        const initMediaPipe = async () => {
-            try {
-                addLog("Loading MediaPipe Vision (Local)...");
-                const vision = await FilesetResolver.forVisionTasks(
-                    "/mediapipe"
-                );
-
-                if (!isMounted) return;
-
-                const landmarker = await HandLandmarker.createFromOptions(vision, {
-                    baseOptions: {
-                        modelAssetPath: `/mediapipe/hand_landmarker.task`,
-                        delegate: "CPU" // Linux compatible
-                    },
-                    runningMode: "VIDEO",
-                    numHands: 1
-                });
-
-                if (!isMounted) return;
-
-                console.log("MediaPipe Loaded Successfully");
-                addLog("MediaPipe Ready.");
-                setHandLandmarker(landmarker);
-                setIsLoading(false);
-
-                // Auto-start webcam if ready
-                startWebcam();
-            } catch (error) {
-                console.error("Failed to load MediaPipe:", error);
-                const errorMsg = error instanceof Error ? error.message : JSON.stringify(error);
-                addLog(`Error: ${errorMsg}`);
-                setIsLoading(false);
-            }
-        };
-
-        // Delay slightly to ensure render
-        setTimeout(initMediaPipe, 100);
+        initMediaPipe();
 
         return () => {
             isMounted = false;
             stopWebcam();
+            // Cleanup landmarker if it exists in state? 
+            // We can't access state here easily if it changes.
+            // But we can try relying on garbage collection or user manual restart if weird.
+            // Ideally we track it in a ref for cleanup.
+        };
+    }, []);
+
+    // Track landmarker in ref for cleanup
+    const landmarkerRef = useRef<HandLandmarker | null>(null);
+    useEffect(() => { landmarkerRef.current = handLandmarker; }, [handLandmarker]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (landmarkerRef.current) {
+                console.log("Closing MediaPipe Landmarker...");
+                landmarkerRef.current.close();
+            }
         };
     }, []);
 
