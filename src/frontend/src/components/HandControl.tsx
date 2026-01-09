@@ -187,14 +187,14 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
                 lastVideoTimeRef.current = video.currentTime;
 
                 if (results.landmarks && results.landmarks.length > 0) {
-                    if (fpsCountRef.current % 30 === 0) {
-                        // console.log(`Hands detected: ${results.landmarks.length}`);
+                    if (fpsCountRef.current % 60 === 0) {
+                        // addLog(`Hands detected: ${results.landmarks.length}`);
                     }
                     drawLandmarks(results.landmarks[0]);
                     updateRobotControl(results.landmarks[0], results.handedness[0]);
                 } else {
-                    if (fpsCountRef.current % 100 === 0) {
-                        // console.log("No hands detected");
+                    if (fpsCountRef.current % 120 === 0) {
+                        // addLog("No hands detected");
                     }
                     clearCanvas();
                 }
@@ -330,21 +330,36 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
         if (!canvas || !video) return;
 
         const ctx = canvas.getContext('2d');
-        if (!ctx) return;
+        if (!ctx) {
+            console.error("Canvas Context Lost");
+            return;
+        }
 
-        canvas.width = video.videoWidth;
-        canvas.height = video.videoHeight;
+        // Sync local dimensions to video source dimensions
+        if (canvas.width !== video.videoWidth || canvas.height !== video.videoHeight) {
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+        }
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Debug: Draw a visible constant marker (Top-Left)
+        // ctx.fillStyle = "red";
+        // ctx.fillRect(10, 10, 50, 50);
 
         ctx.fillStyle = "#00FF00";
         landmarks.forEach(lm => {
             const x = lm.x * canvas.width;
             const y = lm.y * canvas.height;
             ctx.beginPath();
-            ctx.arc(x, y, 3, 0, 2 * Math.PI);
+            ctx.arc(x, y, 5, 0, 2 * Math.PI); // Increased size 3->5
             ctx.fill();
         });
+
+        // Debug Log Data
+        // if (fpsCountRef.current % 60 === 0) {
+        //    console.log("Landmark 0:", landmarks[0]);
+        // }
     };
 
     return (
