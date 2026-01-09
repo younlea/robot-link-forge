@@ -1314,7 +1314,8 @@ async def export_mujoco_mjcf(
     background_tasks: BackgroundTasks,
     robot_data: str = Form(...),
     robot_name: str = Form(...),
-    files: Optional[List[UploadFile]] = File(None)
+    files: Optional[List[UploadFile]] = File(None),
+    mesh_collision: bool = Form(False)
 ):
     try:
         try:
@@ -1361,7 +1362,7 @@ async def export_mujoco_mjcf(
                      mesh_files_map[link_id] = safe_filename
 
         # Generate MJCF XML
-        mjcf_content = generate_mjcf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
+        mjcf_content = generate_mjcf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names, use_mesh_collision=mesh_collision)
         mjcf_filename = f"{sanitized_robot_name}.xml"
         with open(os.path.join(package_dir, mjcf_filename), "w") as f:
             f.write(mjcf_content)

@@ -3,7 +3,7 @@ from typing import Dict, Optional
 from robot_models import RobotData
 from utils import to_snake_case
 
-def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[str, str], unique_link_names: Dict[str, str]):
+def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[str, str], unique_link_names: Dict[str, str], use_mesh_collision: bool = False):
     """
     Generates a native MuJoCo XML string (MJCF) for the robot.
     Recursive function to build the body tree from base link.
@@ -200,11 +200,32 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
 
                  xml.append(f'{indent}  <geom {vis_geom} pos="{v_pos}" euler="{v_euler}" {color_attr} />')
                  
-                 # Simplified Collision: Use Primitive Cylinder for ALL Mesh parts
-                 # This prevents jagged STL interference while maintaining approximate shape.
-                 # Heuristic: Radius 12mm, Length 40mm, Oriented along X (Bone axis)
-                 coll_geom = 'type="cylinder" size="0.012 0.02" pos="0.02 0 0" euler="0 1.5708 0" group="0" rgba="0 0 1 0.3"'
-                 xml.append(f'{indent}  <geom {coll_geom} />')
+                 # Collision Geometry Logic
+                 # If 'use_mesh_collision' is TRUE: Use Hybrid (Cyl for 1st, Mesh for others).
+                 # If 'use_mesh_collision' is FALSE: Use Primitive Cylinder for ALL (Simplest).
+                 
+                 use_cylinder = True # Default for simpliciy
+                 
+                 if use_mesh_collision:
+                     # Check if it's the 1st joint (Proximal) which needs Cylinder anyway to avoid twisting
+                     is_first_link = False
+                     if parent_joint_id:
+                         p_joint = robot.joints.get(parent_joint_id)
+                         if p_joint and "1st" in p_joint.name.lower():
+                             is_first_link = True
+                     
+                     if not is_first_link:
+                         use_cylinder = False # Use MESH for Base/Distal/Middle if requested
+                 
+                 if use_cylinder:
+                     # Primitive Cylinder
+                     # Heuristic: Radius 12mm, Length 40mm, Oriented along X
+                     coll_geom = 'type="cylinder" size="0.012 0.02" pos="0.02 0 0" euler="0 1.5708 0" group="0" rgba="0 0 1 0.4"'
+                     xml.append(f'{indent}  <geom {coll_geom} />')
+                 else:
+                     # Detailed Mesh 
+                     coll_geom = f'type="mesh" mesh="{asset_name}" group="0" rgba="1 0 0 0"'
+                     xml.append(f'{indent}  <geom {coll_geom} pos="{v_pos}" euler="{v_euler}" />')
 
             elif v.type != 'none' and v.type != 'mesh':
                 geom_str = ""
