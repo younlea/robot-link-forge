@@ -407,7 +407,70 @@ async def export_urdf_package_ros2(
                 # We also assume 'rclpy' is available.
                 install_program_cmds += f"install(PROGRAMS scripts/replay_node.py DESTINATION lib/${{PROJECT_NAME}})\n"
 
-                # 3. Generate Shell Scripts for each recording
+                # 3. Generate replay.launch.py (Exclusive launch preventing conflict with joint_state_publisher)
+                replay_launch_py = f"""import os
+from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
+def generate_launch_description():
+    use_sim_time = LaunchConfiguration('use_sim_time', default='false')
+    recording_index = LaunchConfiguration('recording_index', default='0')
+
+    urdf_file_name = '{sanitized_robot_name}.urdf'
+    urdf = os.path.join(
+        get_package_share_directory('{sanitized_robot_name}'),
+        'urdf',
+        urdf_file_name)
+    with open(urdf, 'r') as infp:
+        robot_desc = infp.read()
+    
+    rviz_config_file = os.path.join(
+        get_package_share_directory('{sanitized_robot_name}'),
+        'rviz',
+        'display.rviz'
+    )
+
+    return LaunchDescription([
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='false',
+            description='Use simulation (Gazebo) clock if true'),
+        DeclareLaunchArgument(
+            'recording_index',
+            default_value='0',
+            description='Index of the recording to play'),
+            
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
+            output='screen',
+            parameters=[{{'use_sim_time': use_sim_time, 'robot_description': robot_desc}}]),
+
+        # Replay Node (replaces joint_state_publisher)
+        Node(
+            package='{sanitized_robot_name}',
+            executable='replay_node.py',
+            name='replay_node',
+            output='screen',
+            parameters=[{{'recording_index': recording_index}}]),
+
+        Node(
+            package='rviz2',
+            executable='rviz2',
+            name='rviz2',
+            output='screen',
+            arguments=['-d', rviz_config_file])
+    ])
+"""
+                launch_dir = os.path.join(package_dir, "launch")
+                with open(os.path.join(launch_dir, "replay.launch.py"), "w") as f:
+                    f.write(replay_launch_py)
+
+                # 4. Generate Shell Scripts for each recording
                 for i, rec in enumerate(processed_recs):
                     rec_name_clean = to_snake_case(rec.get('name', f'rec_{i}'))
                     sh_filename = f"replay_{i}_{rec_name_clean}.sh"
@@ -415,7 +478,7 @@ async def export_urdf_package_ros2(
                     
                     sh_content = f"""#!/bin/bash
 # Replay recording #{i}: {rec.get('name')}
-# Note: Ensure you have built the workspace first!
+# Uses replay.launch.py to avoid conflict with joint_state_publisher
 
 if [ -f "install/setup.bash" ]; then
     source install/setup.bash
@@ -425,8 +488,9 @@ else
     echo "Warning: setup.bash not found. Attempting to run anyway..."
 fi
 
-echo "Launching Replay Node for Recording #{i}..."
-ros2 run {sanitized_robot_name} replay_node.py --ros-args -p recording_index:={i}
+echo "Launching Replay for Recording #{i}..."
+# Use ros2 launch to start everything properly (without GUI slider conflict)
+ros2 launch {sanitized_robot_name} replay.launch.py recording_index:={i}
 """
                     with open(sh_path, "w") as f:
                         f.write(sh_content)
