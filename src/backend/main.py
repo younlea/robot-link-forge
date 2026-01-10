@@ -14,10 +14,11 @@ from datetime import datetime
 
 # --- Refactored Modules ---
 from robot_models import RobotData, RobotLink, RobotJoint, Visual
-from utils import to_snake_case, generate_unique_names
+from utils import to_snake_case, generate_unique_names, generate_unique_joint_names
 from exporters.urdf_exporter import generate_urdf_xml
 from exporters.mjcf_exporter import generate_mjcf_xml
 from exporters.gazebo_exporter import inject_gazebo_tags, generate_gazebo_launch, inject_gazebo_ros2_tags, generate_gazebo_ros2_launch
+from exporters.motion_exporter import process_recordings_for_export, generate_ros2_playback_node, generate_mujoco_playback_script
 from exporters.stl_utils import ensure_binary_stl
 
 app = FastAPI()
@@ -304,6 +305,7 @@ async def export_urdf_package_ros2(
     background_tasks: BackgroundTasks,
     robot_data: str = Form(...),
     robot_name: str = Form(...),
+    recordings: Optional[str] = Form(None),
     files: Optional[List[UploadFile]] = File(None)
 ):
     try:
@@ -376,6 +378,41 @@ async def export_urdf_package_ros2(
         with open(os.path.join(package_dir, "package.xml"), "w") as f:
             f.write(package_xml)
 
+        # Process Motion Recordings if present
+        extra_install_dirs = "urdf launch meshes rviz"
+        
+        if recordings:
+            try:
+                recs_raw = json.loads(recordings)
+                unique_joint_names = generate_unique_joint_names(robot)
+                processed_recs = process_recordings_for_export(recs_raw, unique_joint_names, robot)
+                
+                # 1. Save recordings.json to config/
+                config_dir = os.path.join(package_dir, "config")
+                os.makedirs(config_dir, exist_ok=True)
+                with open(os.path.join(config_dir, "recordings.json"), "w") as f:
+                    json.dump(processed_recs, f, indent=2)
+                extra_install_dirs += " config"
+                
+                # 2. Generate Replay Node in scripts/
+                scripts_dir = os.path.join(package_dir, "scripts")
+                os.makedirs(scripts_dir, exist_ok=True)
+                replay_script = generate_ros2_playback_node(sanitized_robot_name)
+                replay_script_path = os.path.join(scripts_dir, "replay_node.py")
+                with open(replay_script_path, "w") as f:
+                    f.write(replay_script)
+                os.chmod(replay_script_path, 0o755)
+                # Note: 'scripts' folder installation is usually PROGRAMS or mapping.
+                # Simplified: Install whole 'scripts' directory to share/pkg/scripts? 
+                # Or 'lib/pkg' for executables.
+                # For CMake 'install(DIRECTORY...)', it installs to share.
+                # We can install 'scripts' to 'share/pkg/scripts' just like launch files.
+                extra_install_dirs += " scripts"
+                
+            except Exception as e:
+                print(f"Error processing recordings: {e}")
+
+        # Update CMakeLists to match
         cmakelists_txt = f"""cmake_minimum_required(VERSION 3.8)
 project({sanitized_robot_name})
 
@@ -386,7 +423,7 @@ endif()
 find_package(ament_cmake REQUIRED)
 
 install(
-    DIRECTORY urdf launch meshes rviz
+    DIRECTORY {extra_install_dirs}
     DESTINATION share/${{PROJECT_NAME}})
 
 ament_package()
@@ -595,6 +632,45 @@ fi
         # Make executable
         os.chmod(script_path, 0o755)
 
+        # Generate README
+        readme_content = f"""# {sanitized_robot_name} ROS 2 Package
+
+## Installation
+1. Copy this folder to your ROS 2 workspace (e.g. `src/`).
+2. Build the workspace:
+   ```bash
+   colcon build --packages-select {sanitized_robot_name} --symlink-install
+   source install/setup.bash
+   ```
+
+## Visualization
+Launch the robot in RViz with:
+```bash
+ros2 launch {sanitized_robot_name} display.launch.py
+```
+"""
+        if recordings:
+             readme_content += f"""
+## Motion Replay
+This package includes exported motion recordings (from Robot Link Forge).
+
+### Playback
+To play back the recorded motions:
+1. Launch the robot visualization as above.
+2. In a new terminal, source the workspace:
+   ```bash
+   source install/setup.bash
+   ```
+3. Run the replay node:
+   ```bash
+   ros2 run {sanitized_robot_name} replay_node.py
+   ```
+   
+   The robot should start moving according to the recording!
+"""
+        with open(os.path.join(package_dir, "README.md"), "w") as f:
+            f.write(readme_content)
+
         # Create the zip archive
         archive_path = shutil.make_archive(
             base_name=os.path.join(tmpdir, sanitized_robot_name),
@@ -717,6 +793,7 @@ async def export_mujoco_urdf(
     background_tasks: BackgroundTasks,
     robot_data: str = Form(...),
     robot_name: str = Form(...),
+    recordings: Optional[str] = Form(None),
     files: Optional[List[UploadFile]] = File(None)
 ):
     try:
@@ -866,6 +943,25 @@ mujoco.viewer.launch(model, data)
         with open(os.path.join(package_dir, "visualize_urdf.py"), "w") as f:
             f.write(script_content)
 
+        # Process Motion Recordings if present
+        if recordings:
+            try:
+                recs_raw = json.loads(recordings)
+                unique_joint_names = generate_unique_joint_names(robot)
+                processed_recs = process_recordings_for_export(recs_raw, unique_joint_names, robot)
+                
+                # Save recordings.json
+                with open(os.path.join(package_dir, "recordings.json"), "w") as f:
+                    json.dump(processed_recs, f, indent=2)
+                
+                # Generate Replay Script
+                replay_py = generate_mujoco_playback_script(urdf_filename)
+                with open(os.path.join(package_dir, "replay_recording.py"), "w") as f:
+                    f.write(replay_py)
+                    
+            except Exception as e:
+                print(f"Error processing recordings: {e}")
+
         # Generate Launch Scripts
         # 1. launch.sh
         launch_sh = f"""#!/bin/bash
@@ -931,6 +1027,18 @@ Or drag and drop `{urdf_filename}` into the standalone MuJoCo simulator.
 - `meshes/`: STL files for links.
 - `visualize_urdf.py`: Simple python script to load and view the model.
 """
+        if recordings:
+            readme_content += """
+## Motion Playback
+This package includes exported motion recordings.
+
+To replay the recorded motions:
+```bash
+python replay_recording.py
+```
+This script loads `recordings.json` and animates the robot.
+"""
+
         with open(os.path.join(package_dir, "README_MUJOCO.md"), "w") as f:
             f.write(readme_content)
 

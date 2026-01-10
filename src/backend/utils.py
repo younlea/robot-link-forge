@@ -109,3 +109,23 @@ def generate_unique_names(robot_data: RobotData) -> Dict[str, str]:
         used_names.add(final_name)
     
     return unique_link_names
+
+def generate_unique_joint_names(robot_data: RobotData) -> Dict[str, str]:
+    """Generates a mapping of joint_id -> unique_clean_name."""
+    unique_names = {}
+    used_names = set()
+
+    for joint_id, joint in robot_data.joints.items():
+        base_name = to_snake_case(joint.name)
+        if not base_name: base_name = "joint"
+        
+        final_name = base_name
+        counter = 1
+        while final_name in used_names:
+            final_name = f"{base_name}_{counter}"
+            counter += 1
+        
+        unique_names[joint_id] = final_name
+        used_names.add(final_name)
+    
+    return unique_names

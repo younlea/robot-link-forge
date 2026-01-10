@@ -848,6 +848,10 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
             const formData = new FormData();
             formData.append('robot_data', JSON.stringify(robotData));
+            const state = getState();
+            if (state.recordings && state.recordings.length > 0) {
+                formData.append('recordings', JSON.stringify(state.recordings));
+            }
             formData.append('robot_name', robotName);
 
             for (const meshData of meshDatas) {
@@ -935,6 +939,10 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
             const formData = new FormData();
             formData.append('robot_data', JSON.stringify(robotData));
+            const state = getState();
+            if (state.recordings && state.recordings.length > 0) {
+                formData.append('recordings', JSON.stringify(state.recordings));
+            }
             formData.append('robot_name', robotName);
 
             for (const meshData of meshDatas) {
