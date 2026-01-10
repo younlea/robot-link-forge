@@ -13,7 +13,8 @@ import {
     Trash2,
     Plus,
     X,
-    Clock
+    Clock,
+    RefreshCw
 } from 'lucide-react';
 
 interface RecordingPanelProps {
@@ -40,6 +41,8 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         seekPlayback,
         deleteRecording,
         updateJoint,
+        updateKeyframePose,
+        loadKeyframePose,
     } = useRobotStore();
 
     const [recordingName, setRecordingName] = useState('');
@@ -251,25 +254,39 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
                         {currentRecording.keyframes.map((kf, idx) => (
                             <div
                                 key={kf.id}
-                                className="flex items-center justify-between bg-gray-800 rounded px-2 py-1"
+                                className="flex flex-col bg-gray-800 rounded px-2 py-1 space-y-1"
                             >
-                                <span className="text-xs text-gray-400">#{idx + 1}</span>
-                                <div className="flex items-center space-x-2">
-                                    <Clock size={10} className="text-gray-500" />
-                                    <input
-                                        type="number"
-                                        value={kf.timestamp}
-                                        onChange={(e) => updateKeyframeTiming(kf.id, Number(e.target.value))}
-                                        className="w-20 bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-gray-200"
-                                    />
-                                    <span className="text-xs text-gray-500">ms</span>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2 cursor-pointer hover:text-blue-400" onClick={() => loadKeyframePose(kf.id)} title="Click to Load Pose">
+                                        <span className="text-xs text-gray-400">#{idx + 1}</span>
+                                        <div className="flex items-center space-x-1">
+                                            <Clock size={10} className="text-gray-500" />
+                                            <input
+                                                type="number"
+                                                value={kf.timestamp}
+                                                onChange={(e) => updateKeyframeTiming(kf.id, Number(e.target.value))}
+                                                onClick={(e) => e.stopPropagation()}
+                                                className="w-16 bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-gray-200"
+                                            />
+                                            <span className="text-[10px] text-gray-500">ms</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center space-x-1">
+                                        <button
+                                            onClick={() => updateKeyframePose(kf.id)}
+                                            className="text-blue-500 hover:text-blue-400 p-1"
+                                            title="Update Pose with Current Sliders"
+                                        >
+                                            <RefreshCw size={12} />
+                                        </button>
+                                        <button
+                                            onClick={() => deleteKeyframe(kf.id)}
+                                            className="text-red-500 hover:text-red-400 p-1"
+                                        >
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </div>
                                 </div>
-                                <button
-                                    onClick={() => deleteKeyframe(kf.id)}
-                                    className="text-red-500 hover:text-red-400"
-                                >
-                                    <Trash2 size={12} />
-                                </button>
                             </div>
                         ))}
                     </div>

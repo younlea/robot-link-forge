@@ -201,6 +201,8 @@ export interface RobotActions {
   captureKeyframe: () => void;  // For Slider mode
   deleteKeyframe: (keyframeId: string) => void;
   updateKeyframeTiming: (keyframeId: string, newTimestamp: number) => void;
+  updateKeyframePose: (keyframeId: string) => void;
+  loadKeyframePose: (keyframeId: string) => void;
   playRecording: (recordingId?: string) => void;
   pausePlayback: () => void;
   stopPlayback: () => void;

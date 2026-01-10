@@ -1411,6 +1411,50 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         });
     },
 
+    updateKeyframePose: (keyframeId) => {
+        const state = getState();
+        if (!state.currentRecording) return;
+
+        // Capture current values
+        const jointValues: Record<string, JointValues> = {};
+        Object.entries(state.joints).forEach(([jointId, joint]) => {
+            jointValues[jointId] = { ...joint.currentValues };
+        });
+
+        const updatedKeyframes = state.currentRecording.keyframes.map(k =>
+            k.id === keyframeId ? { ...k, jointValues } : k
+        );
+
+        setState({
+            currentRecording: {
+                ...state.currentRecording,
+                keyframes: updatedKeyframes,
+            },
+        });
+    },
+
+    loadKeyframePose: (keyframeId) => {
+        const state = getState();
+        const recording = state.currentRecording; // Can only edit current recording for now
+        if (!recording) return;
+
+        const keyframe = recording.keyframes.find(k => k.id === keyframeId);
+        if (!keyframe) return;
+
+        // Apply to joints
+        const newJoints = { ...state.joints };
+        Object.entries(keyframe.jointValues).forEach(([jointId, values]) => {
+            if (newJoints[jointId]) {
+                newJoints[jointId] = {
+                    ...newJoints[jointId],
+                    currentValues: { ...values }
+                };
+            }
+        });
+
+        setState({ joints: newJoints });
+    },
+
     playRecording: (recordingId) => {
         const state = getState();
         const recording = recordingId
