@@ -28,7 +28,14 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
     const [logs, setLogs] = useState<string[]>(['Initializing component...']);
 
     // Store Access
-    const { updateJoint, links, joints } = useRobotStore();
+    const { updateJoint, links, joints, isRecording, recordingMode, captureKeyframe } = useRobotStore();
+
+    // Init Refs for Recording to avoid loop staleness
+    const isRecordingRef = useRef(isRecording);
+    const recordingModeRef = useRef(recordingMode);
+
+    useEffect(() => { isRecordingRef.current = isRecording; }, [isRecording]);
+    useEffect(() => { recordingModeRef.current = recordingMode; }, [recordingMode]);
 
     // Logger
     const addLog = (msg: string) => {
@@ -212,6 +219,12 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
                         }
                         drawLandmarks(results.landmarks[0]);
                         updateRobotControl(results.landmarks[0], results.handedness[0]);
+
+                        // --- Camera Recording Capture ---
+                        if (isRecordingRef.current && recordingModeRef.current === 'camera') {
+                            captureKeyframe();
+                        }
+                        // --------------------------------
                     } else {
                         if (fpsCountRef.current % 120 === 0) {
                             addLog("No hands detected");
