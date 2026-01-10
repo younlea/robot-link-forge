@@ -87,7 +87,68 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                     </section>
 
                     <section>
-                        <h3 className="text-xl font-semibold text-white mb-3">5. Exporting to ROS</h3>
+                        <h3 className="text-xl font-semibold text-white mb-3">5. Webcam Hand Control 🎬</h3>
+                        <div className="bg-gray-900 p-4 rounded border-l-4 border-purple-500">
+                            <div className="flex items-start gap-4">
+                                <div className="text-3xl">🖐️</div>
+                                <div>
+                                    <h4 className="font-bold text-white mb-2">Control your Robot with AI!</h4>
+                                    <p className="text-sm text-gray-300 mb-2">
+                                        Click the <span className="text-purple-400 font-bold">Lego Block Icon</span> in the sidebar to open the Hand Control panel.
+                                    </p>
+                                    <ol className="list-decimal ml-5 space-y-1 text-sm text-gray-400">
+                                        <li><strong>Camera Access:</strong> Allow browser permission to use your webcam.</li>
+                                        <li><strong>Select a Joint:</strong> Click any joint on your 3D robot model.</li>
+                                        <li><strong>Move your Finger:</strong> Show your hand to the camera. Move your <strong>Index Finger tip</strong> left/right or up/down.</li>
+                                        <li>The selected joint will mimic your finger's movement in real-time! 🤖</li>
+                                    </ol>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section>
+                        <h3 className="text-xl font-semibold text-white mb-3">6. Motion Recording & Timeline 🎞️</h3>
+                        <p className="mb-4 text-gray-300">
+                            Create complex animations by recording sequences and fine-tuning them in the timeline editor.
+                        </p>
+
+                        <div className="space-y-4">
+                            {/* Recording Modes */}
+                            <div className="bg-gray-900 p-4 rounded">
+                                <h4 className="font-bold text-red-400 mb-2">🔴 Recording Modes</h4>
+                                <ul className="space-y-2 text-sm text-gray-400">
+                                    <li><strong>Slider Mode:</strong> Manually move joints using the sidebar sliders. Keyframes are saved automatically.</li>
+                                    <li><strong>Camera Mode:</strong> Use Hand Control to act out movements. Press "Capture Keyframe" (or Spacebar) to save poses.</li>
+                                </ul>
+                            </div>
+
+                            {/* Timeline Editor */}
+                            <div className="bg-gray-900 p-4 rounded border-l-4 border-blue-500">
+                                <h4 className="font-bold text-blue-400 mb-2">⏱️ Timeline Editor</h4>
+                                <p className="text-sm text-gray-300 mb-2">
+                                    The timeline appears at the bottom when you edit a recording.
+                                </p>
+                                <ul className="list-disc ml-5 space-y-1 text-sm text-gray-400">
+                                    <li><strong>Zoom & Pan:</strong> Use <span className="text-white">Mouse Wheel</span> to zoom. <span className="text-white">Click & Drag</span> the background to pan left/right.</li>
+                                    <li><strong>Edit Timing:</strong> Drag the <span className="text-blue-400">Blue Dots</span> to change when a move happens.</li>
+                                    <li><strong>Adjust Speed:</strong> Drag the <span className="text-blue-600">Horizontal Bars</span> UP to make the move faster, or DOWN to make it slower.</li>
+                                    <li><strong>Real-time Preview:</strong> Scrubbing the timeline instantly updates the robot's pose!</li>
+                                </ul>
+                            </div>
+
+                            {/* Storage */}
+                            <div className="bg-gray-900 p-4 rounded">
+                                <h4 className="font-bold text-green-400 mb-2">💾 Saving Your Moves</h4>
+                                <p className="text-sm text-gray-400">
+                                    Click the <span className="text-white font-bold">Storage Icon (Hard Drive)</span> in the recording panel header.
+                                    You can save your best dances to the <strong>Server cloud</strong> or download them as <strong>JSON files</strong> to your computer.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+                    <section>
+                        <h3 className="text-xl font-semibold text-white mb-3">7. Exporting to ROS</h3>
                         <p className="mb-2">
                             Click <strong>Export</strong> to generate a ROS-compatible package.
                         </p>
@@ -118,7 +179,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                     </button>
                 </div>
             </div>
-        </div>
+        </div >
     );
 };
 
