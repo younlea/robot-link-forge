@@ -1328,6 +1328,12 @@ const Sidebar = () => {
                 </div>
             )}
 
+            {/* Hand Control Overlay (Fixed to Screen) */}
+            {showHandControl && <HandControl onClose={() => setShowHandControl(false)} />}
+
+            {/* Recording Panel Overlay (Fixed to Screen) */}
+            {showRecordingPanel && <RecordingPanel onClose={() => setShowRecordingPanel(false)} />}
+
             <div className="absolute top-0 right-0 h-screen w-80 bg-gray-800 bg-opacity-80 backdrop-blur-sm text-white p-4 border-l border-gray-700 overflow-y-auto">
                 {/* File Operations */}
                 <div className="pb-4 mb-4 border-b border-gray-700">
@@ -1414,11 +1420,7 @@ const Sidebar = () => {
                     </div>
                 </div>
 
-                {/* Hand Control Overlay */}
-                {showHandControl && <HandControl onClose={() => setShowHandControl(false)} />}
 
-                {/* Recording Panel Overlay */}
-                {showRecordingPanel && <RecordingPanel onClose={() => setShowRecordingPanel(false)} />}
 
                 {/* Inspector / Global Controls */}
                 <div className="flex justify-between items-center mb-4">
