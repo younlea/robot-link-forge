@@ -207,10 +207,10 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
 
     // Live update when stopped (scrubbing or editing)
     useEffect(() => {
-        if (!playbackState.isPlaying && currentRecording) {
+        if (!playbackState.isPlaying && currentRecording && !isRecording) {
             interpolateJointValues(currentRecording, playbackState.currentTime);
         }
-    }, [playbackState.isPlaying, playbackState.currentTime, currentRecording]);
+    }, [playbackState.isPlaying, playbackState.currentTime, currentRecording, isRecording]);
 
     const modes: { id: RecordingMode; label: string; icon: any; disabled: boolean }[] = [
         { id: 'slider', label: 'Slider', icon: Video, disabled: false },
