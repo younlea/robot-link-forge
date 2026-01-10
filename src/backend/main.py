@@ -608,7 +608,6 @@ ros2 launch {sanitized_robot_name} display.launch.py use_jsp:=false
 
         rviz_config = f"""Panels:
 
-        rviz_config = f"""Panels:
 - Class: rviz_common/Displays
   Help Height: 78
   Name: Displays
