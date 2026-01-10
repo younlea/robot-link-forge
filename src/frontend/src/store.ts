@@ -1593,4 +1593,92 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         }));
     },
 
+    saveRecordingsLocal: () => {
+        const state = getState();
+        const json = JSON.stringify(state.recordings, null, 2);
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `robot_recordings_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    },
+
+    loadRecordingsLocal: async (file: File) => {
+        try {
+            const text = await file.text();
+            const loadedRecordings = JSON.parse(text);
+            if (!Array.isArray(loadedRecordings)) throw new Error('Invalid format');
+            const state = getState();
+            // Append or Replace? Let's Confirm. Or just Append for safety.
+            // But merging by ID is better.
+            const merged = [...state.recordings];
+            loadedRecordings.forEach((r: any) => {
+                if (!merged.find(existing => existing.id === r.id)) {
+                    merged.push(r);
+                } else {
+                    // Update existing?
+                    const idx = merged.findIndex(existing => existing.id === r.id);
+                    merged[idx] = r;
+                }
+            });
+            setState({ recordings: merged });
+            alert(`Loaded ${loadedRecordings.length} recordings.`);
+        } catch (e: any) {
+            console.error(e);
+            alert('Failed to load recordings: ' + e.message);
+        }
+    },
+
+    fetchRecordingList: async () => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/recordings`);
+            if (!res.ok) throw new Error('Failed to fetch list');
+            const data = await res.json();
+            return data.files || [];
+        } catch (e) {
+            console.error(e);
+            return [];
+        }
+    },
+
+    saveRecordingsToServer: async (filename: string) => {
+        const state = getState();
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/recordings`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    filename,
+                    recordings: state.recordings
+                })
+            });
+            if (!res.ok) throw new Error('Failed to save');
+            alert('Recordings saved to server!');
+        } catch (e: any) {
+            alert('Error saving to server: ' + e.message);
+        }
+    },
+
+    loadRecordingsFromServer: async (filename: string) => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/recordings/${filename}`);
+            if (!res.ok) throw new Error('Failed to load');
+            const data = await res.json();
+            const newRecordings = data.recordings;
+            if (!Array.isArray(newRecordings)) throw new Error('Invalid data');
+
+            setState({ recordings: newRecordings }); // Replace state for server load? Or merge?
+            // "Load Project" usually replaces. "Load Recordings" might replace too.
+            // Let's stick to REPLACE for server load (consistency with project load)
+            // or maybe confirm with user? Simpler to just replace for now as it's a "Load" action.
+            alert('Recordings loaded from server!');
+        } catch (e: any) {
+            alert('Error loading from server: ' + e.message);
+        }
+    },
+
 }));

@@ -35,11 +35,53 @@ app.add_middleware(
 MESH_DIR = "static/meshes"
 os.makedirs(MESH_DIR, exist_ok=True)
 
+
 # --- Project Storage ---
 PROJECTS_DIR = "saved_projects"
 os.makedirs(PROJECTS_DIR, exist_ok=True)
 
+# --- Recordings Storage ---
+RECORDINGS_DIR = "saved_recordings"
+os.makedirs(RECORDINGS_DIR, exist_ok=True)
+
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get("/api/recordings")
+def list_recordings():
+    files = [f for f in os.listdir(RECORDINGS_DIR) if f.endswith(".json")]
+    return {"files": files}
+
+@app.post("/api/recordings")
+async def save_recordings(request: Request):
+    data = await request.json()
+    filename = data.get("filename", "recordings")
+    recordings = data.get("recordings", [])
+    
+    # Sanitize filename
+    filename = re.sub(r'[^a-zA-Z0-9_\-\.]', '', filename)
+    if not filename.endswith(".json"):
+        filename += ".json"
+    
+    filepath = os.path.join(RECORDINGS_DIR, filename)
+    with open(filepath, "w") as f:
+        json.dump(recordings, f, indent=2)
+    return {"message": "Saved successfully", "filename": filename}
+
+@app.get("/api/recordings/{filename}")
+def load_recordings(filename: str):
+    # Sanitize
+    filename = re.sub(r'[^a-zA-Z0-9_\-\.]', '', filename)
+    if not filename.endswith(".json"):
+        filename += ".json"
+        
+    filepath = os.path.join(RECORDINGS_DIR, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Recording file not found")
+        
+    with open(filepath, "r") as f:
+        recordings = json.load(f)
+    return {"recordings": recordings}
+
 
 
 @app.post("/api/export-urdf")

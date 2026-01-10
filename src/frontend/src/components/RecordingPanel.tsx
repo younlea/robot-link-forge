@@ -17,7 +17,11 @@ import {
     RefreshCw,
     Pencil,
     Save,
-    CalendarClock
+    CalendarClock,
+    HardDrive,
+    Cloud,
+    Download,
+    Upload
 } from 'lucide-react';
 import TimelineEditor from './TimelineEditor';
 
@@ -51,6 +55,13 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         saveRecording,
         cancelEditRecording,
         updateKeyframeTransition,
+
+        // Persistence
+        saveRecordingsLocal,
+        loadRecordingsLocal,
+        fetchRecordingList,
+        saveRecordingsToServer,
+        loadRecordingsFromServer,
     } = useRobotStore();
 
     const [recordingName, setRecordingName] = useState('');
@@ -221,24 +232,119 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         return `${secs}.${millis.toString().padStart(3, '0')}s`;
     };
 
+    // New state and handlers for storage menu
+    const [showStorageMenu, setShowStorageMenu] = useState(false);
+    const [serverFiles, setServerFiles] = useState<string[]>([]);
+    const [showServerLoad, setShowServerLoad] = useState(false);
+
+    const handleServerSave = async () => {
+        const name = prompt("Enter filename to save to server:", "my_recordings");
+        if (name) {
+            await saveRecordingsToServer(name);
+            setShowStorageMenu(false);
+        }
+    };
+
+    const handleServerLoadRequest = async () => {
+        const files = await fetchRecordingList();
+        setServerFiles(files);
+        setShowServerLoad(true);
+    };
+
+    const handleServerLoadConfirm = async (file: string) => {
+        if (confirm(`Replace all current recordings with ${file}?`)) {
+            await loadRecordingsFromServer(file);
+            setShowServerLoad(false);
+            setShowStorageMenu(false);
+        }
+    };
+
+    const handleLocalUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            loadRecordingsLocal(e.target.files[0]);
+            setShowStorageMenu(false);
+        }
+    };
+
     return (
         <div
-            className="fixed w-72 bg-gray-900 rounded-lg shadow-2xl border border-gray-700 overflow-hidden flex flex-col z-50 max-h-[80vh]"
-            style={{ left: position.x, top: position.y }}
+            style={{ top: position.y, left: position.x }}
+            className={`cursor-move fixed w-72 bg-gray-900 border border-gray-700 rounded-lg shadow-xl flex flex-col z-40 transition-shadow hover:shadow-2xl ${isDragging.current ? 'opacity-90' : 'opacity-100'}`}
         >
             {/* Header */}
             <div
-                className="bg-gray-800 p-2 px-3 flex justify-between items-center border-b border-gray-700 cursor-move"
+                className="flex items-center justify-between p-3 bg-gray-800 border-b border-gray-700 rounded-t-lg"
                 onMouseDown={handleMouseDown}
             >
-                <div className="flex items-center space-x-2 pointer-events-none">
-                    <Video size={16} className={`${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-400'}`} />
-                    <span className="text-sm font-bold text-gray-200">Motion Recording</span>
+                <div className="flex items-center gap-2">
+                    <span className="font-bold text-gray-100">Motion Recording</span>
+                    {isRecording && <span className="animate-pulse text-red-500 text-xs font-bold">● REC</span>}
                 </div>
-                <button onClick={onClose} className="text-gray-400 hover:text-white">
-                    <X size={16} />
-                </button>
+
+                <div className="flex items-center gap-1">
+                    <button
+                        onClick={() => setShowStorageMenu(!showStorageMenu)}
+                        className={`p-1 rounded hover:bg-gray-700 ${showStorageMenu ? 'text-blue-400' : 'text-gray-400'}`}
+                        title="Storage Options"
+                        onMouseDown={(e) => e.stopPropagation()}
+                    >
+                        <HardDrive size={16} />
+                    </button>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white">
+                        <X size={16} />
+                    </button>
+                </div>
             </div>
+
+            {/* Storage Menu Overlay */}
+            {showStorageMenu && (
+                <div className="bg-gray-800 border-b border-gray-700 p-2 text-sm space-y-2 animate-in slide-in-from-top-2">
+                    {!showServerLoad ? (
+                        <>
+                            <div className="text-xs text-gray-500 font-bold uppercase">Server Storage</div>
+                            <div className="flex gap-2">
+                                <button onClick={handleServerSave} className="flex-1 flex items-center justify-center gap-1 bg-blue-900/50 hover:bg-blue-800 p-1.5 rounded text-blue-200 border border-blue-800">
+                                    <Cloud size={14} /> Save
+                                </button>
+                                <button onClick={handleServerLoadRequest} className="flex-1 flex items-center justify-center gap-1 bg-gray-700 hover:bg-gray-600 p-1.5 rounded text-gray-200 border border-gray-600">
+                                    <Cloud size={14} /> Load
+                                </button>
+                            </div>
+
+                            <div className="text-xs text-gray-500 font-bold uppercase mt-2">Local File (JSON)</div>
+                            <div className="flex gap-2">
+                                <button onClick={saveRecordingsLocal} className="flex-1 flex items-center justify-center gap-1 bg-green-900/50 hover:bg-green-800 p-1.5 rounded text-green-200 border border-green-800">
+                                    <Download size={14} /> Export
+                                </button>
+                                <label className="flex-1 flex items-center justify-center gap-1 bg-gray-700 hover:bg-gray-600 p-1.5 rounded text-gray-200 border border-gray-600 cursor-pointer">
+                                    <Upload size={14} /> Import
+                                    <input type="file" accept=".json" onChange={handleLocalUpload} className="hidden" />
+                                </label>
+                            </div>
+                        </>
+                    ) : (
+                        <div className="space-y-1">
+                            <div className="flex justify-between items-center text-xs text-gray-400 mb-1">
+                                <span>Select File to Load</span>
+                                <button onClick={() => setShowServerLoad(false)} className="hover:text-white"><X size={12} /></button>
+                            </div>
+                            <div className="max-h-32 overflow-y-auto space-y-1">
+                                {serverFiles.length > 0 ? serverFiles.map(f => (
+                                    <button
+                                        key={f}
+                                        onClick={() => handleServerLoadConfirm(f)}
+                                        className="w-full text-left px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded truncate"
+                                    >
+                                        {f}
+                                    </button>
+                                )) : (
+                                    <div className="text-gray-500 text-xs italic text-center py-2">No files found</div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* Mode Selection */}
             <div className="p-3 border-b border-gray-700">

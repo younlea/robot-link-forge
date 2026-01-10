@@ -204,6 +204,13 @@ export interface RobotActions {
   updateKeyframeTiming: (keyframeId: string, newTimestamp: number) => void;
   updateKeyframePose: (keyframeId: string) => void;
   updateKeyframeTransition: (keyframeId: string, duration: number | undefined) => void;
+
+  // Persistence
+  saveRecordingsLocal: () => void;
+  loadRecordingsLocal: (file: File) => Promise<void>;
+  fetchRecordingList: () => Promise<string[]>;
+  saveRecordingsToServer: (filename: string) => Promise<void>;
+  loadRecordingsFromServer: (filename: string) => Promise<void>;
   loadKeyframePose: (keyframeId: string) => void;
   editRecording: (recordingId: string) => void;
   saveRecording: () => void;
