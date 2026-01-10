@@ -2,7 +2,7 @@
 import json
 import math
 from typing import List, Dict, Any
-from robot_models import RobotData, JointType
+from robot_models import RobotData
 
 def process_recordings_for_export(recordings_raw: List[Dict], unique_joint_names: Dict[str, str], robot_data: RobotData) -> List[Dict]:
     """
