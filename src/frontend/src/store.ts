@@ -1340,18 +1340,26 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         const state = getState();
         if (!state.isRecording || !state.currentRecording) return;
 
-        const finalRecording = {
+        const finalRecording: MotionRecording = {
             ...state.currentRecording,
             duration: state.currentRecording.keyframes.length > 0
                 ? Math.max(...state.currentRecording.keyframes.map(k => k.timestamp))
                 : 0,
         };
 
+        const existingIdx = state.recordings.findIndex(r => r.id === finalRecording.id);
+        const newRecordings = [...state.recordings];
+        if (existingIdx >= 0) {
+            newRecordings[existingIdx] = finalRecording;
+        } else {
+            newRecordings.push(finalRecording);
+        }
+
         setState({
             isRecording: false,
             recordingStartTime: null,
             currentRecording: null,
-            recordings: [...state.recordings, finalRecording],
+            recordings: newRecordings,
         });
     },
 
@@ -1453,6 +1461,43 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         });
 
         setState({ joints: newJoints });
+    },
+
+    editRecording: (recordingId) => {
+        const state = getState();
+        const recording = state.recordings.find(r => r.id === recordingId);
+        if (!recording) return;
+
+        setState({
+            currentRecording: JSON.parse(JSON.stringify(recording)), // Deep copy
+            isRecording: false,
+            recordingStartTime: null, // Not recording live
+        });
+    },
+
+    saveRecording: () => {
+        const state = getState();
+        if (!state.currentRecording) return;
+
+        const finalRecording = { ...state.currentRecording };
+        // Recalculate duration if needed? For editing, we might keep duration or update based on max timestamp
+        if (finalRecording.keyframes.length > 0) {
+            const maxTime = Math.max(...finalRecording.keyframes.map(k => k.timestamp));
+            finalRecording.duration = Math.max(finalRecording.duration, maxTime);
+        }
+
+        const existingIdx = state.recordings.findIndex(r => r.id === finalRecording.id);
+        const newRecordings = [...state.recordings];
+        if (existingIdx >= 0) {
+            newRecordings[existingIdx] = finalRecording;
+        } else {
+            newRecordings.push(finalRecording);
+        }
+
+        setState({
+            recordings: newRecordings,
+            currentRecording: null, // Exit editing mode
+        });
     },
 
     playRecording: (recordingId) => {

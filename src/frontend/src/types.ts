@@ -203,6 +203,8 @@ export interface RobotActions {
   updateKeyframeTiming: (keyframeId: string, newTimestamp: number) => void;
   updateKeyframePose: (keyframeId: string) => void;
   loadKeyframePose: (keyframeId: string) => void;
+  editRecording: (recordingId: string) => void;
+  saveRecording: () => void;
   playRecording: (recordingId?: string) => void;
   pausePlayback: () => void;
   stopPlayback: () => void;

@@ -14,7 +14,9 @@ import {
     Plus,
     X,
     Clock,
-    RefreshCw
+    RefreshCw,
+    Pencil,
+    Save
 } from 'lucide-react';
 
 interface RecordingPanelProps {
@@ -43,6 +45,8 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         updateJoint,
         updateKeyframePose,
         loadKeyframePose,
+        editRecording,
+        saveRecording,
     } = useRobotStore();
 
     const [recordingName, setRecordingName] = useState('');
@@ -255,14 +259,26 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
                 </div>
                 <div className="flex space-x-2">
                     {!isRecording ? (
-                        <button
-                            onClick={handleStartRecording}
-                            disabled={!recordingMode}
-                            className="flex-1 bg-red-600 hover:bg-red-500 disabled:bg-gray-700 disabled:text-gray-500 text-white py-2 rounded text-xs flex items-center justify-center space-x-1"
-                        >
-                            <Circle size={12} fill="currentColor" />
-                            <span>Start Recording</span>
-                        </button>
+                        <>
+                            {currentRecording && (
+                                <button
+                                    onClick={saveRecording}
+                                    className="flex-1 bg-green-600 hover:bg-green-500 text-white py-2 rounded text-xs flex items-center justify-center space-x-1"
+                                    title="Save edited recording"
+                                >
+                                    <Save size={12} />
+                                    <span>Save</span>
+                                </button>
+                            )}
+                            <button
+                                onClick={handleStartRecording}
+                                disabled={!recordingMode}
+                                className="flex-1 bg-red-600 hover:bg-red-500 disabled:bg-gray-700 disabled:text-gray-500 text-white py-2 rounded text-xs flex items-center justify-center space-x-1"
+                            >
+                                <Circle size={12} fill="currentColor" />
+                                <span>{currentRecording ? 'New Recording' : 'Start Recording'}</span>
+                            </button>
+                        </>
                     ) : (
                         <>
                             <button
@@ -373,33 +389,45 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
                 <div className="p-3 max-h-40 overflow-y-auto">
                     <div className="text-xs text-gray-500 mb-2">Saved Recordings</div>
                     <div className="space-y-1">
-                        {recordings.map(rec => (
-                            <div
-                                key={rec.id}
-                                className="flex items-center justify-between bg-gray-800 rounded px-2 py-1.5"
-                            >
-                                <div className="flex-1">
-                                    <div className="text-xs text-gray-200">{rec.name}</div>
-                                    <div className="text-[10px] text-gray-500">
-                                        {rec.keyframes.length} keyframes · {formatTime(rec.duration)}
+                        {recordings.map(rec => {
+                            const isPlayingThis = playbackState.isPlaying && playbackState.recordingId === rec.id;
+                            return (
+                                <div
+                                    key={rec.id}
+                                    className="flex items-center justify-between bg-gray-800 rounded px-2 py-1.5"
+                                >
+                                    <div className="flex-1">
+                                        <div className="text-xs text-gray-200">{rec.name}</div>
+                                        <div className="text-[10px] text-gray-500">
+                                            {rec.keyframes.length} keyframes · {formatTime(rec.duration)}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center space-x-1">
+                                        <button
+                                            onClick={() => isPlayingThis ? pausePlayback() : playRecording(rec.id)}
+                                            className="p-1 text-gray-400 hover:text-white"
+                                            title={isPlayingThis ? "Pause" : "Play"}
+                                        >
+                                            {isPlayingThis ? <Pause size={12} /> : <Play size={12} />}
+                                        </button>
+                                        <button
+                                            onClick={() => editRecording(rec.id)}
+                                            className="p-1 text-blue-400 hover:text-blue-300"
+                                            title="Edit Recording"
+                                        >
+                                            <Pencil size={12} />
+                                        </button>
+                                        <button
+                                            onClick={() => deleteRecording(rec.id)}
+                                            className="p-1 text-red-500 hover:text-red-400"
+                                            title="Delete"
+                                        >
+                                            <Trash2 size={12} />
+                                        </button>
                                     </div>
                                 </div>
-                                <div className="flex items-center space-x-1">
-                                    <button
-                                        onClick={() => playRecording(rec.id)}
-                                        className="p-1 text-green-500 hover:text-green-400"
-                                    >
-                                        <Play size={12} />
-                                    </button>
-                                    <button
-                                        onClick={() => deleteRecording(rec.id)}
-                                        className="p-1 text-red-500 hover:text-red-400"
-                                    >
-                                        <Trash2 size={12} />
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}
