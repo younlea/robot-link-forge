@@ -380,6 +380,7 @@ async def export_urdf_package_ros2(
 
         # Process Motion Recordings if present
         extra_install_dirs = "urdf launch meshes rviz"
+        install_program_cmds = ""
         
         if recordings:
             try:
@@ -402,12 +403,35 @@ async def export_urdf_package_ros2(
                 with open(replay_script_path, "w") as f:
                     f.write(replay_script)
                 os.chmod(replay_script_path, 0o755)
-                # Note: 'scripts' folder installation is usually PROGRAMS or mapping.
-                # Simplified: Install whole 'scripts' directory to share/pkg/scripts? 
-                # Or 'lib/pkg' for executables.
-                # For CMake 'install(DIRECTORY...)', it installs to share.
-                # We can install 'scripts' to 'share/pkg/scripts' just like launch files.
-                extra_install_dirs += " scripts"
+                
+                # Install replay_node.py to lib/pkg_name so 'ros2 run' finds it
+                # We also assume 'rclpy' is available.
+                install_program_cmds += f"install(PROGRAMS scripts/replay_node.py DESTINATION lib/${{PROJECT_NAME}})\n"
+
+                # 3. Generate Shell Scripts for each recording
+                for i, rec in enumerate(processed_recs):
+                    rec_name_clean = to_snake_case(rec.get('name', f'rec_{i}'))
+                    sh_filename = f"replay_{i}_{rec_name_clean}.sh"
+                    sh_path = os.path.join(package_dir, sh_filename)
+                    
+                    sh_content = f"""#!/bin/bash
+# Replay recording #{i}: {rec.get('name')}
+# Note: Ensure you have built the workspace first!
+
+if [ -f "install/setup.bash" ]; then
+    source install/setup.bash
+elif [ -f "../install/setup.bash" ]; then
+    source ../install/setup.bash
+else
+    echo "Warning: setup.bash not found. Attempting to run anyway..."
+fi
+
+echo "Launching Replay Node for Recording #{i}..."
+ros2 run {sanitized_robot_name} replay_node.py --ros-args -p recording_index:={i}
+"""
+                    with open(sh_path, "w") as f:
+                        f.write(sh_content)
+                    os.chmod(sh_path, 0o755)
                 
             except Exception as e:
                 print(f"Error processing recordings: {e}")
@@ -425,6 +449,8 @@ find_package(ament_cmake REQUIRED)
 install(
     DIRECTORY {extra_install_dirs}
     DESTINATION share/${{PROJECT_NAME}})
+
+{install_program_cmds}
 
 ament_package()
 """
@@ -958,6 +984,20 @@ mujoco.viewer.launch(model, data)
                 replay_py = generate_mujoco_playback_script(urdf_filename)
                 with open(os.path.join(package_dir, "replay_recording.py"), "w") as f:
                     f.write(replay_py)
+
+                # Generate Shell Scripts for each recording
+                for i, rec in enumerate(processed_recs):
+                    rec_name_clean = to_snake_case(rec.get('name', f'rec_{i}'))
+                    sh_filename = f"replay_{i}_{rec_name_clean}.sh"
+                    sh_path = os.path.join(package_dir, sh_filename)
+                    
+                    sh_content = f"""#!/bin/bash
+# Replay recording #{i}: {rec.get('name')}
+python3 replay_recording.py {i}
+"""
+                    with open(sh_path, "w") as f:
+                        f.write(sh_content)
+                    os.chmod(sh_path, 0o755)
                     
             except Exception as e:
                 print(f"Error processing recordings: {e}")
