@@ -161,7 +161,7 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
     };
 
     return (
-        <div className="absolute bottom-4 right-80 w-72 bg-gray-900 rounded-lg shadow-2xl border border-gray-700 overflow-hidden flex flex-col z-50 max-h-[80vh]">
+        <div className="fixed bottom-4 left-[340px] w-72 bg-gray-900 rounded-lg shadow-2xl border border-gray-700 overflow-hidden flex flex-col z-50 max-h-[80vh]">
             {/* Header */}
             <div className="bg-gray-800 p-2 px-3 flex justify-between items-center border-b border-gray-700">
                 <div className="flex items-center space-x-2">
