@@ -169,7 +169,11 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
     // Playback animation loop
     useEffect(() => {
         if (playbackState.isPlaying && playbackState.recordingId) {
-            const recording = recordings.find(r => r.id === playbackState.recordingId) || currentRecording;
+            // Prefer currentRecording if it matches the ID (actively editing), otherwise find in saved list
+            const recording = (currentRecording && currentRecording.id === playbackState.recordingId)
+                ? currentRecording
+                : recordings.find(r => r.id === playbackState.recordingId);
+
             if (!recording || recording.keyframes.length < 2) {
                 stopPlayback();
                 return;
