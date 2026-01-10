@@ -34,13 +34,14 @@ def process_recordings_for_export(recordings_raw: List[Dict], unique_joint_names
                 
                 # Extract scalar value based on joint type and axis
                 val = 0.0
-                if joint.type == JointType.PRISMATIC:
+                if joint.type == "prismatic":
                     val = values.get("displacement", 0.0)
-                elif joint.type == JointType.REVOLUTE:
+                elif joint.type == "rotational":
                     # Determine best matching Euler angle for the axis
                     axis = joint.axis
+                    if not axis: axis = [1.0, 0.0, 0.0]
+                    
                     # Simple heuristic for cardinal axes
-                    # (Frontend usually aligns sliders to R/P/Y)
                     if abs(axis[0]) > 0.9: # X-axis
                         val = values.get("roll", 0.0) * (1.0 if axis[0] > 0 else -1.0)
                     elif abs(axis[1]) > 0.9: # Y-axis
@@ -48,10 +49,6 @@ def process_recordings_for_export(recordings_raw: List[Dict], unique_joint_names
                     elif abs(axis[2]) > 0.9: # Z-axis
                         val = values.get("yaw", 0.0) * (1.0 if axis[2] > 0 else -1.0)
                     else:
-                        # For arbitrary axis, we might default to one or take magnitude?
-                        # Frontend 'Revolute' usually maps to one of the Euler angles in the UI logic.
-                        # We'll take the one with largest magnitude if it doesn't match axis?
-                        # Fallback to Roll if unknown.
                         val = values.get("roll", 0.0)
                 
                 clean_kf["joints"][joint_name] = val
