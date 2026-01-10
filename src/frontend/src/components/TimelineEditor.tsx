@@ -123,7 +123,7 @@ const TimelineEditor: React.FC<TimelineEditorProps> = ({
 
                 <div className="relative h-full mt-10" style={{ width: Math.max(2000, msToPx(recording.duration + 5000)) }}>
                     {/* Base Line */}
-                    <div className="absolute bottom-6 left-0 right-0 h-0.5 bg-gray-700" />
+                    <div className="absolute bottom-10 left-0 right-0 h-0.5 bg-gray-700" />
 
                     {recording.keyframes.map((kf, i) => {
                         const nextKf = recording.keyframes[i + 1];
@@ -145,7 +145,7 @@ const TimelineEditor: React.FC<TimelineEditorProps> = ({
                                     <>
                                         {/* Wait Time Indicator (Base) */}
                                         <div
-                                            className="absolute bottom-6 h-1 bg-gray-800"
+                                            className="absolute bottom-10 h-1 bg-gray-800"
                                             style={{ left: x, width: nextX - x }}
                                         />
 
@@ -155,7 +155,7 @@ const TimelineEditor: React.FC<TimelineEditorProps> = ({
                                             style={{
                                                 left: x,
                                                 width: msToPx(duration),
-                                                bottom: 24 + height, // Base 24px + Variable Height
+                                                bottom: 28 + height, // Base 28px (lifted from 24) + Variable Height
                                                 transition: velocityDragId === kf.id ? 'none' : 'bottom 0.2s'
                                             }}
                                             onMouseDown={(e) => {
@@ -174,7 +174,7 @@ const TimelineEditor: React.FC<TimelineEditorProps> = ({
 
                                 {/* Keyframe Node */}
                                 <div
-                                    className={`absolute bottom-4 w-4 h-4 -ml-2 rounded-full border-2 cursor-pointer transition-colors z-20 ${draggingId === kf.id ? 'bg-blue-500 border-white scale-110' : 'bg-gray-800 border-blue-400 hover:bg-blue-400'
+                                    className={`absolute bottom-8 w-4 h-4 -ml-2 rounded-full border-2 cursor-pointer transition-colors z-20 ${draggingId === kf.id ? 'bg-blue-500 border-white scale-110' : 'bg-gray-800 border-blue-400 hover:bg-blue-400'
                                         }`}
                                     style={{ left: x }}
                                     onMouseDown={(e) => {
