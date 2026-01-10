@@ -13,8 +13,7 @@ import {
     Trash2,
     Plus,
     X,
-    Clock,
-    Save
+    Clock
 } from 'lucide-react';
 
 interface RecordingPanelProps {
@@ -28,6 +27,7 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         currentRecording,
         recordings,
         playbackState,
+        joints,
         setRecordingMode,
         startRecording,
         stopRecording,
@@ -39,10 +39,67 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         stopPlayback,
         seekPlayback,
         deleteRecording,
+        updateJoint,
     } = useRobotStore();
 
     const [recordingName, setRecordingName] = useState('');
     const playbackRef = useRef<number | null>(null);
+
+    // Catmull-Rom Spline Interpolation
+    const catmullRom = (p0: number, p1: number, p2: number, p3: number, t: number): number => {
+        const t2 = t * t;
+        const t3 = t2 * t;
+        return 0.5 * (
+            (2 * p1) +
+            (-p0 + p2) * t +
+            (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+            (-p0 + 3 * p1 - 3 * p2 + p3) * t3
+        );
+    };
+
+    const interpolateJointValues = (recording: typeof currentRecording, timeMs: number) => {
+        if (!recording || recording.keyframes.length < 2) return;
+
+        const keyframes = recording.keyframes;
+
+        // Find surrounding keyframes
+        let idx = 0;
+        for (let i = 0; i < keyframes.length - 1; i++) {
+            if (timeMs >= keyframes[i].timestamp && timeMs <= keyframes[i + 1].timestamp) {
+                idx = i;
+                break;
+            }
+        }
+
+        const kf0 = keyframes[Math.max(0, idx - 1)];
+        const kf1 = keyframes[idx];
+        const kf2 = keyframes[Math.min(keyframes.length - 1, idx + 1)];
+        const kf3 = keyframes[Math.min(keyframes.length - 1, idx + 2)];
+
+        const segmentDuration = kf2.timestamp - kf1.timestamp;
+        const t = segmentDuration > 0 ? (timeMs - kf1.timestamp) / segmentDuration : 0;
+
+        // Apply interpolated values to each joint
+        Object.keys(joints).forEach(jointId => {
+            const v0 = kf0.jointValues[jointId];
+            const v1 = kf1.jointValues[jointId];
+            const v2 = kf2.jointValues[jointId];
+            const v3 = kf3.jointValues[jointId];
+
+            if (!v1 || !v2) return;
+
+            // Interpolate each DOF
+            ['roll', 'pitch', 'yaw', 'displacement'].forEach(dof => {
+                const p0 = v0?.[dof as keyof typeof v0] ?? v1[dof as keyof typeof v1];
+                const p1 = v1[dof as keyof typeof v1];
+                const p2 = v2[dof as keyof typeof v2];
+                const p3 = v3?.[dof as keyof typeof v3] ?? v2[dof as keyof typeof v2];
+
+                const interpolated = catmullRom(p0, p1, p2, p3, Math.max(0, Math.min(1, t)));
+                updateJoint(jointId, `currentValues.${dof}`, interpolated);
+            });
+        });
+    };
 
     // Playback animation loop
     useEffect(() => {
@@ -61,12 +118,14 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
                 const newTime = initialTime + elapsed;
 
                 if (newTime >= recording.duration) {
+                    // Apply final keyframe
+                    interpolateJointValues(recording, recording.duration);
                     stopPlayback();
                     return;
                 }
 
                 seekPlayback(newTime);
-                // TODO: Apply interpolated joint values here
+                interpolateJointValues(recording, newTime);
 
                 playbackRef.current = requestAnimationFrame(animate);
             };
@@ -102,7 +161,7 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
     };
 
     return (
-        <div className="absolute bottom-4 left-4 w-80 bg-gray-900 rounded-lg shadow-2xl border border-gray-700 overflow-hidden flex flex-col z-50 max-h-[80vh]">
+        <div className="absolute bottom-4 right-80 w-72 bg-gray-900 rounded-lg shadow-2xl border border-gray-700 overflow-hidden flex flex-col z-50 max-h-[80vh]">
             {/* Header */}
             <div className="bg-gray-800 p-2 px-3 flex justify-between items-center border-b border-gray-700">
                 <div className="flex items-center space-x-2">
@@ -124,10 +183,10 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
                             onClick={() => !mode.disabled && setRecordingMode(mode.id)}
                             disabled={mode.disabled || isRecording}
                             className={`flex-1 py-2 px-3 rounded text-xs flex flex-col items-center space-y-1 transition-colors ${recordingMode === mode.id
-                                    ? 'bg-blue-600 text-white'
-                                    : mode.disabled
-                                        ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                ? 'bg-blue-600 text-white'
+                                : mode.disabled
+                                    ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                                    : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                 }`}
                         >
                             <mode.icon size={16} />
