@@ -478,7 +478,8 @@ def generate_launch_description():
                     
                     sh_content = f"""#!/bin/bash
 # Replay recording #{i}: {rec.get('name')}
-# Uses replay.launch.py to avoid conflict with joint_state_publisher
+# Runs the Replay Node ONLY.
+# Ensure you are running 'visualize_passive.sh' in another terminal!
 
 if [ -f "install/setup.bash" ]; then
     source install/setup.bash
@@ -488,13 +489,15 @@ else
     echo "Warning: setup.bash not found. Attempting to run anyway..."
 fi
 
-echo "Launching Replay for Recording #{i}..."
-# Use ros2 launch to start everything properly (without GUI slider conflict)
-ros2 launch {sanitized_robot_name} replay.launch.py recording_index:={i}
+echo "Launching Replay Node for Recording #{i}..."
+ros2 run {sanitized_robot_name} replay_node.py --ros-args -p recording_index:={i}
 """
                     with open(sh_path, "w") as f:
                         f.write(sh_content)
                     os.chmod(sh_path, 0o755)
+                
+                # Install visualize_passive.sh script as regular program (optional but good)
+                install_program_cmds += f"install(PROGRAMS visualize_passive.sh DESTINATION lib/${{PROJECT_NAME}})\n"
                 
             except Exception as e:
                 print(f"Error processing recordings: {e}")
@@ -524,7 +527,7 @@ ament_package()
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument
-from launch.substitutions import LaunchConfiguration
+from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
 from launch.conditions import IfCondition, UnlessCondition
 
@@ -532,6 +535,7 @@ def generate_launch_description():
 
     use_sim_time = LaunchConfiguration('use_sim_time', default='false')
     use_gui = LaunchConfiguration('use_gui', default='true')
+    use_jsp = LaunchConfiguration('use_jsp', default='true')
 
     urdf_file_name = '{sanitized_robot_name}.urdf'
     urdf = os.path.join(
@@ -556,6 +560,11 @@ def generate_launch_description():
             'use_gui',
             default_value='true',
             description='Whether to use the joint state publisher GUI'),
+        DeclareLaunchArgument(
+            'use_jsp',
+            default_value='true',
+            description='Whether to enable joint_state_publisher (gui or non-gui)'),
+
         Node(
             package='robot_state_publisher',
             executable='robot_state_publisher',
@@ -567,13 +576,13 @@ def generate_launch_description():
             executable='joint_state_publisher',
             name='joint_state_publisher',
             output='screen',
-            condition=UnlessCondition(use_gui)),
+            condition=IfCondition(PythonExpression(["'", use_jsp, "' == 'true' and '", use_gui, "' == 'false'"]))),
         Node(
             package='joint_state_publisher_gui',
             executable='joint_state_publisher_gui',
             name='joint_state_publisher_gui',
             output='screen',
-            condition=IfCondition(use_gui)),
+            condition=IfCondition(PythonExpression(["'", use_jsp, "' == 'true' and '", use_gui, "' == 'true'"]))),
         Node(
             package='rviz2',
             executable='rviz2',
@@ -584,6 +593,21 @@ def generate_launch_description():
 """
         with open(os.path.join(launch_dir, "display.launch.py"), "w") as f:
             f.write(display_launch_py)
+            
+        # Generate visualize_passive.sh
+        passive_sh = f"""#!/bin/bash
+# Launch RViz without Joint State Publisher (Passive Mode)
+# This allows replay_node or other external scripts to control joints.
+source install/setup.bash
+echo "Launching RViz in Passive Mode..."
+ros2 launch {sanitized_robot_name} display.launch.py use_jsp:=false
+"""
+        with open(os.path.join(package_dir, "visualize_passive.sh"), "w") as f:
+            f.write(passive_sh)
+        os.chmod(os.path.join(package_dir, "visualize_passive.sh"), 0o755)
+
+        rviz_config = f"""Panels:
+
         rviz_config = f"""Panels:
 - Class: rviz_common/Displays
   Help Height: 78
