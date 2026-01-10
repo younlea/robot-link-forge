@@ -110,7 +110,7 @@ const TimelineEditor: React.FC<TimelineEditorProps> = ({
 
     return (
         <div
-            className="fixed bottom-4 left-4 right-4 bg-gray-900 border border-gray-700 rounded-lg shadow-xl flex flex-col z-50 h-72 select-none"
+            className="fixed bottom-4 left-[340px] right-[340px] bg-gray-900 border border-gray-700 rounded-lg shadow-xl flex flex-col z-50 h-72 select-none"
         >
             {/* Timeline Track Area */}
             <div
