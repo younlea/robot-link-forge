@@ -47,6 +47,8 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         loadKeyframePose,
         editRecording,
         saveRecording,
+        cancelEditRecording,
+        updateKeyframeTransition,
     } = useRobotStore();
 
     const [recordingName, setRecordingName] = useState('');
@@ -120,7 +122,12 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         const kf3 = keyframes[Math.min(keyframes.length - 1, idx + 2)];
 
         const segmentDuration = kf2.timestamp - kf1.timestamp;
-        const t = segmentDuration > 0 ? (timeMs - kf1.timestamp) / segmentDuration : 0;
+        const moveDuration = kf1.transitionDuration ?? segmentDuration;
+        const localTime = timeMs - kf1.timestamp;
+
+        // If we exceeded moveDuration, we hold at kf2 (t=1). 
+        // Note: For Catmull-Rom, t=1 yields p2 (end point).
+        const t = moveDuration > 0 ? Math.min(1, localTime / moveDuration) : 1;
 
         // Apply interpolated values to each joint
         Object.keys(joints).forEach(jointId => {
@@ -261,14 +268,24 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
                     {!isRecording ? (
                         <>
                             {currentRecording && (
-                                <button
-                                    onClick={saveRecording}
-                                    className="flex-1 bg-green-600 hover:bg-green-500 text-white py-2 rounded text-xs flex items-center justify-center space-x-1"
-                                    title="Save edited recording"
-                                >
-                                    <Save size={12} />
-                                    <span>Save</span>
-                                </button>
+                                <>
+                                    <button
+                                        onClick={saveRecording}
+                                        className="flex-1 bg-green-600 hover:bg-green-500 text-white py-2 rounded text-xs flex items-center justify-center space-x-1"
+                                        title="Save edited recording"
+                                    >
+                                        <Save size={12} />
+                                        <span>Save</span>
+                                    </button>
+                                    <button
+                                        onClick={cancelEditRecording}
+                                        className="flex-1 bg-gray-600 hover:bg-gray-500 text-white py-2 rounded text-xs flex items-center justify-center space-x-1"
+                                        title="Cancel Editing (Exit)"
+                                    >
+                                        <X size={12} />
+                                        <span>Exit</span>
+                                    </button>
+                                </>
                             )}
                             <button
                                 onClick={handleStartRecording}
@@ -328,6 +345,22 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
                                             />
                                             <span className="text-[10px] text-gray-500">ms</span>
                                         </div>
+                                        {/* Transition Duration (Optional) */}
+                                        {idx < currentRecording.keyframes.length - 1 && (
+                                            <div className="flex items-center space-x-1">
+                                                <span className="text-[9px] text-blue-400 w-3 text-center">Dur</span>
+                                                <input
+                                                    type="number"
+                                                    value={kf.transitionDuration ?? ''}
+                                                    placeholder="Full"
+                                                    onChange={(e) => updateKeyframeTransition(kf.id, e.target.value ? Number(e.target.value) : undefined)}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    className="w-16 bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-[10px] text-blue-200 placeholder-gray-500"
+                                                    title="Motion Duration (leave empty for full time)"
+                                                />
+                                                <span className="text-[10px] text-gray-500">ms</span>
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="flex items-center space-x-1">
                                         <button

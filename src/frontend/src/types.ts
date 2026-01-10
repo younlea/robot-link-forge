@@ -91,6 +91,7 @@ export type RecordingMode = 'slider' | 'camera' | 'input_device';
 export interface MotionKeyframe {
   id: string;
   timestamp: number;  // ms from recording start
+  transitionDuration?: number; // Optional: effective duration for movement. If < (next - curr), we wait.
   jointValues: Record<string, JointValues>;  // jointId -> values snapshot
 }
 
@@ -202,9 +203,11 @@ export interface RobotActions {
   deleteKeyframe: (keyframeId: string) => void;
   updateKeyframeTiming: (keyframeId: string, newTimestamp: number) => void;
   updateKeyframePose: (keyframeId: string) => void;
+  updateKeyframeTransition: (keyframeId: string, duration: number | undefined) => void;
   loadKeyframePose: (keyframeId: string) => void;
   editRecording: (recordingId: string) => void;
   saveRecording: () => void;
+  cancelEditRecording: () => void;
   playRecording: (recordingId?: string) => void;
   pausePlayback: () => void;
   stopPlayback: () => void;

@@ -1403,6 +1403,29 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         });
     },
 
+    updateKeyframeTransition: (keyframeId, duration) => {
+        const state = getState();
+        if (!state.currentRecording) return; // Only update if recording/editing
+
+        const kfIndex = state.currentRecording.keyframes.findIndex(k => k.id === keyframeId);
+        if (kfIndex === -1) return;
+
+        setState(state => {
+            if (!state.currentRecording) return state;
+            const newKeyframes = [...state.currentRecording.keyframes];
+            newKeyframes[kfIndex] = {
+                ...newKeyframes[kfIndex],
+                transitionDuration: duration
+            };
+            return {
+                currentRecording: {
+                    ...state.currentRecording,
+                    keyframes: newKeyframes
+                }
+            };
+        });
+    },
+
     updateKeyframeTiming: (keyframeId, newTimestamp) => {
         const state = getState();
         if (!state.currentRecording) return;
@@ -1438,6 +1461,14 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                 ...state.currentRecording,
                 keyframes: updatedKeyframes,
             },
+        });
+    },
+
+    cancelEditRecording: () => {
+        setState({
+            currentRecording: null,
+            isRecording: false,
+            recordingStartTime: null,
         });
     },
 
