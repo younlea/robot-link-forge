@@ -1,0 +1,292 @@
+import { useState, useEffect, useRef } from 'react';
+import { useRobotStore } from '../store';
+import { RecordingMode } from '../types';
+import {
+    Video,
+    Camera,
+    Gamepad2,
+    Circle,
+    Square,
+    Play,
+    Pause,
+    SkipBack,
+    Trash2,
+    Plus,
+    X,
+    Clock,
+    Save
+} from 'lucide-react';
+
+interface RecordingPanelProps {
+    onClose: () => void;
+}
+
+const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
+    const {
+        recordingMode,
+        isRecording,
+        currentRecording,
+        recordings,
+        playbackState,
+        setRecordingMode,
+        startRecording,
+        stopRecording,
+        captureKeyframe,
+        deleteKeyframe,
+        updateKeyframeTiming,
+        playRecording,
+        pausePlayback,
+        stopPlayback,
+        seekPlayback,
+        deleteRecording,
+    } = useRobotStore();
+
+    const [recordingName, setRecordingName] = useState('');
+    const playbackRef = useRef<number | null>(null);
+
+    // Playback animation loop
+    useEffect(() => {
+        if (playbackState.isPlaying && playbackState.recordingId) {
+            const recording = recordings.find(r => r.id === playbackState.recordingId) || currentRecording;
+            if (!recording || recording.keyframes.length < 2) {
+                stopPlayback();
+                return;
+            }
+
+            const startTime = Date.now();
+            const initialTime = playbackState.currentTime;
+
+            const animate = () => {
+                const elapsed = Date.now() - startTime;
+                const newTime = initialTime + elapsed;
+
+                if (newTime >= recording.duration) {
+                    stopPlayback();
+                    return;
+                }
+
+                seekPlayback(newTime);
+                // TODO: Apply interpolated joint values here
+
+                playbackRef.current = requestAnimationFrame(animate);
+            };
+
+            playbackRef.current = requestAnimationFrame(animate);
+
+            return () => {
+                if (playbackRef.current) {
+                    cancelAnimationFrame(playbackRef.current);
+                }
+            };
+        }
+    }, [playbackState.isPlaying, playbackState.recordingId]);
+
+    const modes: { id: RecordingMode; label: string; icon: any; disabled: boolean }[] = [
+        { id: 'slider', label: 'Slider', icon: Video, disabled: false },
+        { id: 'camera', label: 'Camera', icon: Camera, disabled: false },
+        { id: 'input_device', label: 'Glove', icon: Gamepad2, disabled: true },
+    ];
+
+    const handleStartRecording = () => {
+        if (!recordingMode) {
+            setRecordingMode('slider');
+        }
+        startRecording(recordingName || undefined);
+        setRecordingName('');
+    };
+
+    const formatTime = (ms: number) => {
+        const secs = Math.floor(ms / 1000);
+        const millis = ms % 1000;
+        return `${secs}.${millis.toString().padStart(3, '0')}s`;
+    };
+
+    return (
+        <div className="absolute bottom-4 left-4 w-80 bg-gray-900 rounded-lg shadow-2xl border border-gray-700 overflow-hidden flex flex-col z-50 max-h-[80vh]">
+            {/* Header */}
+            <div className="bg-gray-800 p-2 px-3 flex justify-between items-center border-b border-gray-700">
+                <div className="flex items-center space-x-2">
+                    <Video size={16} className={`${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-400'}`} />
+                    <span className="text-sm font-bold text-gray-200">Motion Recording</span>
+                </div>
+                <button onClick={onClose} className="text-gray-400 hover:text-white">
+                    <X size={16} />
+                </button>
+            </div>
+
+            {/* Mode Selection */}
+            <div className="p-3 border-b border-gray-700">
+                <div className="text-xs text-gray-500 mb-2">Recording Mode</div>
+                <div className="flex space-x-2">
+                    {modes.map(mode => (
+                        <button
+                            key={mode.id}
+                            onClick={() => !mode.disabled && setRecordingMode(mode.id)}
+                            disabled={mode.disabled || isRecording}
+                            className={`flex-1 py-2 px-3 rounded text-xs flex flex-col items-center space-y-1 transition-colors ${recordingMode === mode.id
+                                    ? 'bg-blue-600 text-white'
+                                    : mode.disabled
+                                        ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                }`}
+                        >
+                            <mode.icon size={16} />
+                            <span>{mode.label}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
+
+            {/* Recording Controls */}
+            <div className="p-3 border-b border-gray-700">
+                <div className="flex items-center space-x-2 mb-2">
+                    <input
+                        type="text"
+                        placeholder="Recording name..."
+                        value={recordingName}
+                        onChange={(e) => setRecordingName(e.target.value)}
+                        disabled={isRecording}
+                        className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-500"
+                    />
+                </div>
+                <div className="flex space-x-2">
+                    {!isRecording ? (
+                        <button
+                            onClick={handleStartRecording}
+                            disabled={!recordingMode}
+                            className="flex-1 bg-red-600 hover:bg-red-500 disabled:bg-gray-700 disabled:text-gray-500 text-white py-2 rounded text-xs flex items-center justify-center space-x-1"
+                        >
+                            <Circle size={12} fill="currentColor" />
+                            <span>Start Recording</span>
+                        </button>
+                    ) : (
+                        <>
+                            <button
+                                onClick={stopRecording}
+                                className="flex-1 bg-gray-600 hover:bg-gray-500 text-white py-2 rounded text-xs flex items-center justify-center space-x-1"
+                            >
+                                <Square size={12} fill="currentColor" />
+                                <span>Stop</span>
+                            </button>
+                            {recordingMode === 'slider' && (
+                                <button
+                                    onClick={captureKeyframe}
+                                    className="flex-1 bg-green-600 hover:bg-green-500 text-white py-2 rounded text-xs flex items-center justify-center space-x-1"
+                                >
+                                    <Plus size={12} />
+                                    <span>Capture</span>
+                                </button>
+                            )}
+                        </>
+                    )}
+                </div>
+            </div>
+
+            {/* Current Recording Keyframes */}
+            {currentRecording && currentRecording.keyframes.length > 0 && (
+                <div className="p-3 border-b border-gray-700 max-h-40 overflow-y-auto">
+                    <div className="text-xs text-gray-500 mb-2">
+                        Keyframes ({currentRecording.keyframes.length})
+                    </div>
+                    <div className="space-y-1">
+                        {currentRecording.keyframes.map((kf, idx) => (
+                            <div
+                                key={kf.id}
+                                className="flex items-center justify-between bg-gray-800 rounded px-2 py-1"
+                            >
+                                <span className="text-xs text-gray-400">#{idx + 1}</span>
+                                <div className="flex items-center space-x-2">
+                                    <Clock size={10} className="text-gray-500" />
+                                    <input
+                                        type="number"
+                                        value={kf.timestamp}
+                                        onChange={(e) => updateKeyframeTiming(kf.id, Number(e.target.value))}
+                                        className="w-20 bg-gray-700 border border-gray-600 rounded px-1 py-0.5 text-xs text-gray-200"
+                                    />
+                                    <span className="text-xs text-gray-500">ms</span>
+                                </div>
+                                <button
+                                    onClick={() => deleteKeyframe(kf.id)}
+                                    className="text-red-500 hover:text-red-400"
+                                >
+                                    <Trash2 size={12} />
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Playback Controls */}
+            {(currentRecording?.keyframes.length || 0) >= 2 && (
+                <div className="p-3 border-b border-gray-700">
+                    <div className="text-xs text-gray-500 mb-2">Preview</div>
+                    <div className="flex items-center space-x-2">
+                        <button
+                            onClick={stopPlayback}
+                            className="p-1.5 bg-gray-700 hover:bg-gray-600 rounded text-gray-300"
+                        >
+                            <SkipBack size={14} />
+                        </button>
+                        {playbackState.isPlaying ? (
+                            <button
+                                onClick={pausePlayback}
+                                className="p-1.5 bg-yellow-600 hover:bg-yellow-500 rounded text-white"
+                            >
+                                <Pause size={14} />
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => playRecording()}
+                                className="p-1.5 bg-green-600 hover:bg-green-500 rounded text-white"
+                            >
+                                <Play size={14} />
+                            </button>
+                        )}
+                        <div className="flex-1 text-xs text-gray-400 text-center">
+                            {formatTime(playbackState.currentTime)} / {formatTime(currentRecording?.duration || 0)}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Saved Recordings */}
+            {recordings.length > 0 && (
+                <div className="p-3 max-h-40 overflow-y-auto">
+                    <div className="text-xs text-gray-500 mb-2">Saved Recordings</div>
+                    <div className="space-y-1">
+                        {recordings.map(rec => (
+                            <div
+                                key={rec.id}
+                                className="flex items-center justify-between bg-gray-800 rounded px-2 py-1.5"
+                            >
+                                <div className="flex-1">
+                                    <div className="text-xs text-gray-200">{rec.name}</div>
+                                    <div className="text-[10px] text-gray-500">
+                                        {rec.keyframes.length} keyframes · {formatTime(rec.duration)}
+                                    </div>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                    <button
+                                        onClick={() => playRecording(rec.id)}
+                                        className="p-1 text-green-500 hover:text-green-400"
+                                    >
+                                        <Play size={12} />
+                                    </button>
+                                    <button
+                                        onClick={() => deleteRecording(rec.id)}
+                                        className="p-1 text-red-500 hover:text-red-400"
+                                    >
+                                        <Trash2 size={12} />
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default RecordingPanel;

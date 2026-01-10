@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import * as THREE from 'three';
-import { RobotState, RobotActions, RobotLink, RobotJoint, JointType } from './types';
+import { RobotState, RobotActions, RobotLink, RobotJoint, JointType, RecordingMode, MotionKeyframe, MotionRecording, PlaybackState, JointValues } from './types';
 import { set } from 'lodash';
 import JSZip from 'jszip'; // Needed for advanced save/load
 
@@ -26,6 +26,13 @@ const createInitialState = (): RobotState => {
         importUnit: 'm', // Default to Meters
         collisionMode: 'off', // Default collision off
         collisionBoxScale: 0.8,
+        // Motion Recording State
+        recordingMode: null,
+        isRecording: false,
+        recordingStartTime: null,
+        currentRecording: null,
+        recordings: [],
+        playbackState: { isPlaying: false, currentTime: 0, recordingId: null },
     };
 };
 
@@ -1301,6 +1308,169 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                 cameraControls: getState().cameraControls // Keep camera controls
             });
         }
+    },
+
+    // --- Motion Recording Actions ---
+
+    setRecordingMode: (mode) => {
+        setState({ recordingMode: mode });
+    },
+
+    startRecording: (name = `Recording ${Date.now()}`) => {
+        const state = getState();
+        if (state.isRecording) return;
+
+        const newRecording: MotionRecording = {
+            id: uuidv4(),
+            name,
+            mode: state.recordingMode || 'slider',
+            keyframes: [],
+            duration: 0,
+            createdAt: Date.now(),
+        };
+
+        setState({
+            isRecording: true,
+            recordingStartTime: Date.now(),
+            currentRecording: newRecording,
+        });
+    },
+
+    stopRecording: () => {
+        const state = getState();
+        if (!state.isRecording || !state.currentRecording) return;
+
+        const finalRecording = {
+            ...state.currentRecording,
+            duration: state.currentRecording.keyframes.length > 0
+                ? Math.max(...state.currentRecording.keyframes.map(k => k.timestamp))
+                : 0,
+        };
+
+        setState({
+            isRecording: false,
+            recordingStartTime: null,
+            currentRecording: null,
+            recordings: [...state.recordings, finalRecording],
+        });
+    },
+
+    captureKeyframe: () => {
+        const state = getState();
+        if (!state.isRecording || !state.currentRecording) return;
+
+        // Capture current joint values
+        const jointValues: Record<string, JointValues> = {};
+        Object.entries(state.joints).forEach(([jointId, joint]) => {
+            jointValues[jointId] = { ...joint.currentValues };
+        });
+
+        const timestamp = state.recordingStartTime
+            ? Date.now() - state.recordingStartTime
+            : 0;
+
+        const newKeyframe: MotionKeyframe = {
+            id: uuidv4(),
+            timestamp,
+            jointValues,
+        };
+
+        setState({
+            currentRecording: {
+                ...state.currentRecording,
+                keyframes: [...state.currentRecording.keyframes, newKeyframe],
+            },
+        });
+    },
+
+    deleteKeyframe: (keyframeId) => {
+        const state = getState();
+        if (!state.currentRecording) return;
+
+        setState({
+            currentRecording: {
+                ...state.currentRecording,
+                keyframes: state.currentRecording.keyframes.filter(k => k.id !== keyframeId),
+            },
+        });
+    },
+
+    updateKeyframeTiming: (keyframeId, newTimestamp) => {
+        const state = getState();
+        if (!state.currentRecording) return;
+
+        const updatedKeyframes = state.currentRecording.keyframes.map(k =>
+            k.id === keyframeId ? { ...k, timestamp: Math.max(0, newTimestamp) } : k
+        ).sort((a, b) => a.timestamp - b.timestamp);
+
+        setState({
+            currentRecording: {
+                ...state.currentRecording,
+                keyframes: updatedKeyframes,
+            },
+        });
+    },
+
+    playRecording: (recordingId) => {
+        const state = getState();
+        const recording = recordingId
+            ? state.recordings.find(r => r.id === recordingId)
+            : state.currentRecording;
+
+        if (!recording || recording.keyframes.length < 2) {
+            console.warn("Need at least 2 keyframes to play");
+            return;
+        }
+
+        setState({
+            playbackState: {
+                isPlaying: true,
+                currentTime: 0,
+                recordingId: recording.id,
+            },
+        });
+    },
+
+    pausePlayback: () => {
+        setState(state => ({
+            playbackState: {
+                ...state.playbackState,
+                isPlaying: false,
+            },
+        }));
+    },
+
+    stopPlayback: () => {
+        setState({
+            playbackState: {
+                isPlaying: false,
+                currentTime: 0,
+                recordingId: null,
+            },
+        });
+    },
+
+    seekPlayback: (timeMs) => {
+        setState(state => ({
+            playbackState: {
+                ...state.playbackState,
+                currentTime: Math.max(0, timeMs),
+            },
+        }));
+    },
+
+    deleteRecording: (id) => {
+        setState(state => ({
+            recordings: state.recordings.filter(r => r.id !== id),
+        }));
+    },
+
+    renameRecording: (id, newName) => {
+        setState(state => ({
+            recordings: state.recordings.map(r =>
+                r.id === id ? { ...r, name: newName } : r
+            ),
+        }));
     },
 
 }));

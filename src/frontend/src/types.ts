@@ -84,6 +84,31 @@ export interface RobotJoint {
   };
 }
 
+// --- Motion Recording Types ---
+
+export type RecordingMode = 'slider' | 'camera' | 'input_device';
+
+export interface MotionKeyframe {
+  id: string;
+  timestamp: number;  // ms from recording start
+  jointValues: Record<string, JointValues>;  // jointId -> values snapshot
+}
+
+export interface MotionRecording {
+  id: string;
+  name: string;
+  mode: RecordingMode;
+  keyframes: MotionKeyframe[];
+  duration: number;  // total duration in ms
+  createdAt: number;  // Date.now() when created
+}
+
+export interface PlaybackState {
+  isPlaying: boolean;
+  currentTime: number;  // ms
+  recordingId: string | null;
+}
+
 export type SelectedItem = {
   id: string | null;
   type: 'link' | 'joint' | null;
@@ -101,6 +126,14 @@ export interface RobotState {
   importUnit: 'm' | 'cm' | 'mm';
   collisionMode: 'box' | 'mesh' | 'off';
   collisionBoxScale: number;
+
+  // Motion Recording State
+  recordingMode: RecordingMode | null;
+  isRecording: boolean;
+  recordingStartTime: number | null;
+  currentRecording: MotionRecording | null;
+  recordings: MotionRecording[];
+  playbackState: PlaybackState;
 }
 
 export interface RobotActions {
@@ -160,4 +193,18 @@ export interface RobotActions {
   setImportUnit: (unit: 'm' | 'cm' | 'mm') => void;
   setCollisionMode: (mode: 'box' | 'mesh' | 'off') => void;
   setCollisionBoxScale: (scale: number) => void;
+
+  // Motion Recording Actions
+  setRecordingMode: (mode: RecordingMode | null) => void;
+  startRecording: (name?: string) => void;
+  stopRecording: () => void;
+  captureKeyframe: () => void;  // For Slider mode
+  deleteKeyframe: (keyframeId: string) => void;
+  updateKeyframeTiming: (keyframeId: string, newTimestamp: number) => void;
+  playRecording: (recordingId?: string) => void;
+  pausePlayback: () => void;
+  stopPlayback: () => void;
+  seekPlayback: (timeMs: number) => void;
+  deleteRecording: (id: string) => void;
+  renameRecording: (id: string, newName: string) => void;
 }
