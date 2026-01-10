@@ -1338,36 +1338,47 @@ const Sidebar = () => {
                 {/* File Operations */}
                 <div className="pb-4 mb-4 border-b border-gray-700">
                     <h2 className="text-xl font-bold">Robot Link Forge</h2>
-                    <div className="flex flex-wrap gap-2 mt-2">
+
+                    {/* Primary Actions (Project) */}
+                    <div className="grid grid-cols-4 gap-2 mt-2">
+                        {/* 1. New File (Reset) */}
                         <button
-                            onClick={() => { setSaveProjectName('MyRobot'); setShowSaveModal(true); }}
-                            className="flex-1 min-w-[30%] flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 p-2 rounded text-sm"
+                            onClick={resetProject}
+                            className="flex items-center justify-center bg-red-800 hover:bg-red-700 p-2 rounded text-sm transition-colors"
+                            title="New Project (Reset)"
                         >
-                            <Save className="mr-2 h-4 w-4" /> Save
+                            <FilePlus className="h-4 w-4" />
                         </button>
 
+                        {/* 2. Save */}
+                        <button
+                            onClick={() => { setSaveProjectName('MyRobot'); setShowSaveModal(true); }}
+                            className="flex items-center justify-center bg-indigo-600 hover:bg-indigo-700 p-2 rounded text-sm transition-colors"
+                            title="Save Project"
+                        >
+                            <Save className="h-4 w-4" />
+                        </button>
+
+                        {/* 3. Load */}
                         <button
                             onClick={() => { getProjectList(); setShowLoadModal(true); }}
-                            className="flex-1 min-w-[30%] flex items-center justify-center bg-gray-600 hover:bg-gray-700 p-2 rounded text-sm"
+                            className="flex items-center justify-center bg-gray-600 hover:bg-gray-700 p-2 rounded text-sm transition-colors"
+                            title="Load Project"
                         >
-                            <FolderOpen className="mr-2 h-4 w-4" /> Load
+                            <FolderOpen className="h-4 w-4" />
                         </button>
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleFileChange}
-                            className="hidden"
-                            accept=".zip,application/zip,.json,application/json"
-                        />
-                        <div className="relative flex-1 min-w-[30%]" ref={exportMenuRef}>
+
+                        {/* 4. Export */}
+                        <div className="relative" ref={exportMenuRef}>
                             <button
                                 onClick={() => setExportMenuOpen(!isExportMenuOpen)}
-                                className="w-full flex items-center justify-center bg-green-600 hover:bg-green-700 p-2 rounded text-sm"
+                                className="w-full flex items-center justify-center bg-green-600 hover:bg-green-700 p-2 rounded text-sm transition-colors"
+                                title="Export"
                             >
-                                <Upload className="mr-2 h-4 w-4" /> Export
+                                <Upload className="h-4 w-4" />
                             </button>
                             {isExportMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-56 bg-gray-700 rounded-md shadow-lg z-10">
+                                <div className="absolute right-0 mt-2 w-56 bg-gray-700 rounded-md shadow-lg z-50">
                                     <a href="#" onClick={(e) => { e.preventDefault(); openExportModal('urdf'); }} className="block px-4 py-2 text-sm text-white hover:bg-gray-600">Export as URDF (ROS1)</a>
                                     <a href="#" onClick={(e) => { e.preventDefault(); openExportModal('urdf_ros2'); }} className="block px-4 py-2 text-sm text-white hover:bg-gray-600">Export as URDF (ROS2)</a>
                                     <div className="border-t border-gray-600 my-1"></div>
@@ -1378,44 +1389,44 @@ const Sidebar = () => {
                                 </div>
                             )}
                         </div>
+                    </div>
+
+                    {/* Secondary Actions (Tools) */}
+                    <div className="grid grid-cols-4 gap-2 mt-2">
+                        {/* 5. Camera */}
                         <button
-                            onClick={resetProject}
-                            className="flex-none flex items-center justify-center bg-red-800 hover:bg-red-700 p-2 rounded text-sm"
-                            title="New Project (Reset)"
+                            onClick={() => setShowHandControl(!showHandControl)}
+                            className={`flex items-center justify-center p-2 rounded text-sm transition-colors ${showHandControl ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-600 hover:bg-gray-700'}`}
+                            title="Webcam Hand Control"
                         >
-                            <FilePlus className="h-4 w-4" />
+                            <ToyBrick className="h-4 w-4" />
                         </button>
 
+                        {/* 6. Recording */}
                         <button
-                            onClick={() => setShowHelpModal(true)}
-                            className="flex-none flex items-center justify-center bg-blue-600 hover:bg-blue-700 p-2 rounded text-sm"
-                            title="User Guide / Help"
+                            onClick={() => setShowRecordingPanel(!showRecordingPanel)}
+                            className={`flex items-center justify-center p-2 rounded text-sm transition-colors ${showRecordingPanel ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700'}`}
+                            title="Motion Recording"
                         >
-                            <HelpCircle className="h-4 w-4" />
+                            <GitCommit className="h-4 w-4" />
                         </button>
 
+                        {/* 7. Settings */}
                         <button
                             onClick={() => setShowSettingsModal(true)}
-                            className="flex-none flex items-center justify-center bg-gray-600 hover:bg-gray-700 p-2 rounded text-sm"
+                            className="flex items-center justify-center bg-gray-600 hover:bg-gray-700 p-2 rounded text-sm transition-colors"
                             title="Global Settings"
                         >
                             <Settings className="h-4 w-4" />
                         </button>
 
+                        {/* 8. Guide */}
                         <button
-                            onClick={() => setShowHandControl(!showHandControl)}
-                            className={`flex-none flex items-center justify-center p-2 rounded text-sm ${showHandControl ? 'bg-purple-600 hover:bg-purple-700' : 'bg-gray-600 hover:bg-gray-700'}`}
-                            title="Webcam Hand Control"
+                            onClick={() => setShowHelpModal(true)}
+                            className="flex items-center justify-center bg-blue-600 hover:bg-blue-700 p-2 rounded text-sm transition-colors"
+                            title="User Guide / Help"
                         >
-                            <ToyBrick className="h-4 w-4" /> {/* Fallback icon or add Camera */}
-                        </button>
-
-                        <button
-                            onClick={() => setShowRecordingPanel(!showRecordingPanel)}
-                            className={`flex-none flex items-center justify-center p-2 rounded text-sm ${showRecordingPanel ? 'bg-red-600 hover:bg-red-700' : 'bg-gray-600 hover:bg-gray-700'}`}
-                            title="Motion Recording"
-                        >
-                            <GitCommit className="h-4 w-4" />
+                            <HelpCircle className="h-4 w-4" />
                         </button>
                     </div>
                 </div>
