@@ -731,8 +731,20 @@ if [ $? -eq 0 ]; then
         echo "Warning: install/setup.bash not found. Sourcing might fail."
     fi
     
-    echo "Launching {sanitized_robot_name}..."
-    ros2 launch {sanitized_robot_name} display.launch.py
+    # Ask user for mode
+    echo ""
+    echo "Select Mode:"
+    echo "1) Standard (Enable Sliders) - Default"
+    echo "2) Passive (Disable Sliders) - Use this for Replay!"
+    read -p "Enter choice [1]: " choice
+    
+    if [ "$choice" = "2" ]; then
+        echo "Launching {sanitized_robot_name} in PASSIVE mode..."
+        ros2 launch {sanitized_robot_name} display.launch.py use_jsp:=false
+    else
+        echo "Launching {sanitized_robot_name} in STANDARD mode..."
+        ros2 launch {sanitized_robot_name} display.launch.py
+    fi
 else
     echo "Build failed!"
     exit 1
