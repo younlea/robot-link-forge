@@ -48,6 +48,42 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
     const [recordingName, setRecordingName] = useState('');
     const playbackRef = useRef<number | null>(null);
 
+    // Draggable Logic
+    const [position, setPosition] = useState({ x: 16, y: window.innerHeight - 300 }); // Default nearby bottom-left
+    const isDragging = useRef(false);
+    const dragOffset = useRef({ x: 0, y: 0 });
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        isDragging.current = true;
+        dragOffset.current = {
+            x: e.clientX - position.x,
+            y: e.clientY - position.y
+        };
+    };
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (isDragging.current) {
+                setPosition({
+                    x: e.clientX - dragOffset.current.x,
+                    y: e.clientY - dragOffset.current.y
+                });
+            }
+        };
+
+        const handleMouseUp = () => {
+            isDragging.current = false;
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, []);
+
     // Catmull-Rom Spline Interpolation
     const catmullRom = (p0: number, p1: number, p2: number, p3: number, t: number): number => {
         const t2 = t * t;
@@ -164,10 +200,16 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
     };
 
     return (
-        <div className="fixed bottom-4 left-[340px] w-72 bg-gray-900 rounded-lg shadow-2xl border border-gray-700 overflow-hidden flex flex-col z-50 max-h-[80vh]">
+        <div
+            className="fixed w-72 bg-gray-900 rounded-lg shadow-2xl border border-gray-700 overflow-hidden flex flex-col z-50 max-h-[80vh]"
+            style={{ left: position.x, top: position.y }}
+        >
             {/* Header */}
-            <div className="bg-gray-800 p-2 px-3 flex justify-between items-center border-b border-gray-700">
-                <div className="flex items-center space-x-2">
+            <div
+                className="bg-gray-800 p-2 px-3 flex justify-between items-center border-b border-gray-700 cursor-move"
+                onMouseDown={handleMouseDown}
+            >
+                <div className="flex items-center space-x-2 pointer-events-none">
                     <Video size={16} className={`${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-400'}`} />
                     <span className="text-sm font-bold text-gray-200">Motion Recording</span>
                 </div>

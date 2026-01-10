@@ -27,6 +27,42 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
     const [fps, setFps] = useState(0);
     const [logs, setLogs] = useState<string[]>(['Initializing component...']);
 
+    // Draggable Logic
+    const [position, setPosition] = useState({ x: 16, y: 80 }); // Default top-left
+    const isDragging = useRef(false);
+    const dragOffset = useRef({ x: 0, y: 0 });
+
+    const handleMouseDown = (e: React.MouseEvent) => {
+        isDragging.current = true;
+        dragOffset.current = {
+            x: e.clientX - position.x,
+            y: e.clientY - position.y
+        };
+    };
+
+    useEffect(() => {
+        const handleMouseMove = (e: MouseEvent) => {
+            if (isDragging.current) {
+                setPosition({
+                    x: e.clientX - dragOffset.current.x,
+                    y: e.clientY - dragOffset.current.y
+                });
+            }
+        };
+
+        const handleMouseUp = () => {
+            isDragging.current = false;
+        };
+
+        window.addEventListener('mousemove', handleMouseMove);
+        window.addEventListener('mouseup', handleMouseUp);
+
+        return () => {
+            window.removeEventListener('mousemove', handleMouseMove);
+            window.removeEventListener('mouseup', handleMouseUp);
+        };
+    }, []);
+
     // Store Access
     const { updateJoint, links, joints, isRecording, recordingMode, captureKeyframe } = useRobotStore();
 
@@ -414,10 +450,16 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
     };
 
     return (
-        <div className="fixed left-4 bottom-[24rem] w-72 bg-gray-900 rounded-lg shadow-2xl border border-gray-700 overflow-hidden flex flex-col z-50">
+        <div
+            className="fixed w-72 bg-gray-900 rounded-lg shadow-2xl border border-gray-700 overflow-hidden flex flex-col z-50"
+            style={{ left: position.x, top: position.y }}
+        >
             {/* Header */}
-            <div className="bg-gray-800 p-2 px-3 flex justify-between items-center border-b border-gray-700">
-                <div className="flex items-center space-x-2">
+            <div
+                className="bg-gray-800 p-2 px-3 flex justify-between items-center border-b border-gray-700 cursor-move"
+                onMouseDown={handleMouseDown}
+            >
+                <div className="flex items-center space-x-2 pointer-events-none">
                     <Video size={16} className={`${webcamRunning ? 'text-green-500' : 'text-gray-400'}`} />
                     <span className="text-sm font-bold text-gray-200">Hand Control</span>
                 </div>
