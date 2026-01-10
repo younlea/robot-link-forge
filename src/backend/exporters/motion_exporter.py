@@ -112,11 +112,24 @@ class ReplayNode(Node):
         if not self.current_recording:
             return
 
+        # Logging Counter
+        if not hasattr(self, 'log_counter'):
+             self.log_counter = 0
+
         now = time.time()
         elapsed_ms = (now - self.start_time) * 1000.0
         
         duration = self.current_recording['duration']
         if duration == 0: duration = 1000 # Safety
+        
+        # Log Progress every ~1 second (30 ticks)
+        if self.log_counter % 30 == 0:
+            pct = (elapsed_ms / duration) * 100.0
+            if pct > 100: pct = 100.0
+            self.get_logger().info(f"Progress: {{elapsed_ms/1000:.1f}}s / {{duration/1000:.1f}}s ({{pct:.1f}}%)")
+        self.log_counter += 1
+
+
         
         if elapsed_ms > duration:
             # Loop
@@ -468,10 +481,24 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         
         if current_recording:
              elapsed = (time.time() - start_time) * 1000
-             if elapsed > current_recording['duration']:
+             duration = current_recording['duration']
+             if duration == 0: duration = 1000
+             
+             if elapsed > duration:
                  start_time = time.time() # Loop
                  elapsed = 0
              
+             # Log every 1 second
+             # We use a simple counter or time check
+             if not 'log_last_time' in locals():
+                 log_last_time = time.time()
+             
+             if time.time() - log_last_time > 1.0:
+                 pct = (elapsed / duration) * 100.0
+                 if pct > 100: pct = 100.0
+                 print(f"Progress: {{elapsed/1000:.1f}}s / {{duration/1000:.1f}}s ({{pct:.1f}}%)")
+                 log_last_time = time.time()
+
              targets = interpolate(current_recording, elapsed)
              
              # Apply targets to qpos
