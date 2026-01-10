@@ -275,7 +275,9 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
                     generated_joints_info.append({
                         'name': final_joint_name,
                         'type': sub['type'],
-                        'limit': sub['limit']
+                        'limit': sub['limit'],
+                        'original_id': joint.id,
+                        'suffix': sub['suffix']
                     })
                     
                     if sub['limit']:

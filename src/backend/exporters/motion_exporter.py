@@ -4,11 +4,23 @@ import math
 from typing import List, Dict, Any
 from robot_models import RobotData
 
-def process_recordings_for_export(recordings_raw: List[Dict], unique_joint_names: Dict[str, str], robot_data: RobotData) -> List[Dict]:
+def process_recordings_for_export(recordings_raw: List[Dict], generated_joints_info: List[Dict], robot_data: RobotData) -> List[Dict]:
     """
     Converts raw UUID-based recordings into a clean Name-based format for export.
-    Also flattens {roll, pitch, yaw, displacement} into a single scalar value based on joint axis.
+    Uses 'generated_joints_info' from URDF generation to ensure 100% name matching,
+    supporting multi-DOF joints (split into _roll, _pitch, etc.).
     """
+    
+    # Build lookup: (original_id, dof_suffix) -> urdf_joint_name
+    # derived strings: 'roll', 'pitch', 'yaw', 'prism'
+    joint_map = {}
+    for info in generated_joints_info:
+        orig_id = info.get('original_id')
+        suffix = info.get('suffix')
+        name = info.get('name')
+        if orig_id and suffix and name:
+            joint_map[(orig_id, suffix)] = name
+            
     processed_recordings = []
     
     for rec in recordings_raw:
@@ -22,37 +34,28 @@ def process_recordings_for_export(recordings_raw: List[Dict], unique_joint_names
         for kf in rec.get("keyframes", []):
             clean_kf = {
                 "timestamp": kf.get("timestamp"),
-                "joints": {} # Name -> Value
+                "joints": {} # UrdfName -> Value
             }
             
             for joint_id, values in kf.get("jointValues", {}).items():
                 if joint_id not in robot_data.joints:
                     continue
                 
-                joint = robot_data.joints[joint_id]
-                joint_name = unique_joint_names.get(joint_id, joint.name)
-                
-                # Extract scalar value based on joint type and axis
-                val = 0.0
-                if joint.type == "prismatic":
-                    val = values.get("displacement", 0.0)
-                elif joint.type == "rotational":
-                    # Determine best matching Euler angle for the axis
-                    axis = joint.axis
-                    if not axis: axis = [1.0, 0.0, 0.0]
-                    
-                    # Simple heuristic for cardinal axes
-                    if abs(axis[0]) > 0.9: # X-axis
-                        val = values.get("roll", 0.0) * (1.0 if axis[0] > 0 else -1.0)
-                    elif abs(axis[1]) > 0.9: # Y-axis
-                        val = values.get("pitch", 0.0) * (1.0 if axis[1] > 0 else -1.0)
-                    elif abs(axis[2]) > 0.9: # Z-axis
-                        val = values.get("yaw", 0.0) * (1.0 if axis[2] > 0 else -1.0)
-                    else:
-                        val = values.get("roll", 0.0)
-                
-                clean_kf["joints"][joint_name] = val
-            
+                # 1. Check for Rotational DOFs (roll, pitch, yaw)
+                # Note: URDF exporter uses 'roll', 'pitch', 'yaw' as suffixes for revolute joints
+                for axis in ['roll', 'pitch', 'yaw']:
+                    if (joint_id, axis) in joint_map:
+                        urdf_name = joint_map[(joint_id, axis)]
+                        val = values.get(axis, 0.0)
+                        clean_kf["joints"][urdf_name] = val
+                        
+                # 2. Check for Prismatic DOF ('prism')
+                if (joint_id, 'prism') in joint_map:
+                    urdf_name = joint_map[(joint_id, 'prism')]
+                    # Frontend calls it 'displacement'
+                    val = values.get('displacement', 0.0)
+                    clean_kf["joints"][urdf_name] = val
+
             clean_rec["keyframes"].append(clean_kf)
         
         processed_recordings.append(clean_rec)

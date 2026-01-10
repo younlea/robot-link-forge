@@ -369,7 +369,7 @@ async def export_urdf_package_ros2(
                     mesh_files_map[link_id] = safe_filename
 
         # Generate and save URDF file
-        urdf_content, base_link_name, _ = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
+        urdf_content, base_link_name, generated_joints_info = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
         with open(os.path.join(urdf_dir, f"{sanitized_robot_name}.urdf"), "w") as f:
             f.write(urdf_content)
 
@@ -385,8 +385,7 @@ async def export_urdf_package_ros2(
         if recordings:
             try:
                 recs_raw = json.loads(recordings)
-                unique_joint_names = generate_unique_joint_names(robot)
-                processed_recs = process_recordings_for_export(recs_raw, unique_joint_names, robot)
+                processed_recs = process_recordings_for_export(recs_raw, generated_joints_info, robot)
                 
                 # 1. Save recordings.json to config/
                 config_dir = os.path.join(package_dir, "config")
@@ -973,8 +972,7 @@ mujoco.viewer.launch(model, data)
         if recordings:
             try:
                 recs_raw = json.loads(recordings)
-                unique_joint_names = generate_unique_joint_names(robot)
-                processed_recs = process_recordings_for_export(recs_raw, unique_joint_names, robot)
+                processed_recs = process_recordings_for_export(recs_raw, joint_infos, robot)
                 
                 # Save recordings.json
                 with open(os.path.join(package_dir, "recordings.json"), "w") as f:
