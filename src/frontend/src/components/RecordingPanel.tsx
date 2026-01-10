@@ -16,8 +16,10 @@ import {
     Clock,
     RefreshCw,
     Pencil,
-    Save
+    Save,
+    CalendarClock
 } from 'lucide-react';
+import TimelineEditor from './TimelineEditor';
 
 interface RecordingPanelProps {
     onClose: () => void;
@@ -53,6 +55,8 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
 
     const [recordingName, setRecordingName] = useState('');
     const playbackRef = useRef<number | null>(null);
+
+    const [showTimeline, setShowTimeline] = useState(true);
 
     // Draggable Logic
     const [position, setPosition] = useState({ x: 16, y: window.innerHeight - 300 }); // Default nearby bottom-left
@@ -278,6 +282,14 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
                                         <span>Save</span>
                                     </button>
                                     <button
+                                        onClick={() => setShowTimeline(!showTimeline)}
+                                        className={`flex-1 ${showTimeline ? 'bg-blue-600 hover:bg-blue-500' : 'bg-gray-600 hover:bg-gray-500'} text-white py-2 rounded text-xs flex items-center justify-center space-x-1`}
+                                        title="Toggle Timeline Editor"
+                                    >
+                                        <CalendarClock size={12} />
+                                        <span>Timeline</span>
+                                    </button>
+                                    <button
                                         onClick={cancelEditRecording}
                                         className="flex-1 bg-gray-600 hover:bg-gray-500 text-white py-2 rounded text-xs flex items-center justify-center space-x-1"
                                         title="Cancel Editing (Exit)"
@@ -463,6 +475,17 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
                         })}
                     </div>
                 </div>
+            )}
+            {/* Timeline Editor Overlay */}
+            {currentRecording && !isRecording && showTimeline && (
+                <TimelineEditor
+                    recording={currentRecording}
+                    onUpdateTiming={updateKeyframeTiming}
+                    onUpdateTransition={updateKeyframeTransition}
+                    onClose={() => setShowTimeline(false)}
+                    currentTime={playbackState.currentTime}
+                    onSeek={seekPlayback}
+                />
             )}
         </div>
     );
