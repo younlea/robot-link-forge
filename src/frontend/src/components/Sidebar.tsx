@@ -439,7 +439,6 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
     const { updateJoint, addChainedJoint, uploadAndSetMesh, deleteItem, joints, setHighlightedItem } = useRobotStore();
     const stlInputRef = useRef<HTMLInputElement>(null);
     const eqInputRef = useRef<HTMLTextAreaElement>(null);
-    const [targetAxis, setTargetAxis] = useState<string>('default');
 
     const handleStlUploadClick = () => stlInputRef.current?.click();
 
@@ -487,9 +486,8 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
-            // Apply mesh to the joint or specific axis
-            const dofKey = targetAxis === 'default' ? undefined : targetAxis;
-            uploadAndSetMesh(joint.id, 'joint', file, dofKey);
+            // Apply mesh to the joint's CHILD link
+            uploadAndSetMesh(joint.id, 'joint', file);
         }
         if (e.target) e.target.value = ''; // Reset input
     };
@@ -732,86 +730,54 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
             {/* --- Visuals Section (New) --- */}
             <div className="p-2 bg-gray-900/50 rounded space-y-3">
                 <p className="text-sm font-semibold">Visuals (e.g. Motor Housing)</p>
+                <div>
+                    <label className="text-xs text-gray-400">Visual Type</label>
+                    <select value={joint.visual?.type || 'none'} onChange={(e) => updateJoint(joint.id, 'visual.type', e.target.value)}
+                        className="w-full bg-gray-700 rounded p-1 mt-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+                        <option value="box">Box</option>
+                        <option value="cylinder">Cylinder</option>
+                        <option value="sphere">Sphere</option>
+                        <option value="mesh">Mesh (STL)</option>
+                        <option value="none">None (Virtual)</option>
+                    </select>
+                </div>
 
-                {(() => {
-                    const currentVisual = targetAxis === 'default'
-                        ? joint.visual
-                        : (joint.visuals?.[targetAxis] || { type: 'none' } as any);
+                {joint.visual && joint.visual.type !== 'none' && (
+                    <>
+                        <div className="flex items-center justify-between">
+                            <label className="text-xs text-gray-400">Color</label>
+                            <input
+                                type="color"
+                                value={joint.visual.color || '#888888'}
+                                onChange={(e) => updateJoint(joint.id, 'visual.color', e.target.value)}
+                                className="w-24 h-8 bg-gray-900 rounded p-0 border-2 border-gray-700 cursor-pointer"
+                            />
+                        </div>
 
-                    const basePath = targetAxis === 'default' ? 'visual' : `visuals.${targetAxis}`;
+                        {joint.visual.type !== 'mesh' && (
+                            <Vector3Input label="Dimensions" value={joint.visual.dimensions || [0.05, 0.05, 0.05]} onChange={(p, v) => updateJoint(joint.id, `visual.${p}`, v)} path="dimensions" />
+                        )}
 
-                    return (
-                        <>
-                            {joint.visual.type === 'mesh' && (
-                                <div className="flex items-center justify-between mb-2">
-                                    <label className="text-xs text-gray-400">Attach to Axis</label>
-                                    <select
-                                        className="bg-gray-700 rounded p-1 text-xs focus:outline-none"
-                                        value={targetAxis}
-                                        onChange={(e) => setTargetAxis(e.target.value)}
-                                    >
-                                        <option value="default">Default (Last DOF)</option>
-                                        {joint.dof.roll && <option value="roll">Roll Axis</option>}
-                                        {joint.dof.pitch && <option value="pitch">Pitch Axis</option>}
-                                        {joint.dof.yaw && <option value="yaw">Yaw Axis</option>}
-                                        {joint.type === 'prismatic' && <option value="displacement">Axis</option>}
-                                    </select>
+                        {/* --- STL/Mesh Controls --- */}
+                        <input type="file" ref={stlInputRef} onChange={handleFileChange} className="hidden" accept=".stl" />
+
+                        {joint.visual.type === 'mesh' && (
+                            <>
+                                <button onClick={handleStlUploadClick} className="flex items-center justify-center w-full bg-purple-600 hover:bg-purple-700 p-2 rounded text-sm">
+                                    <Upload className="mr-2 h-4 w-4" /> Upload STL for Joint
+                                </button>
+
+                                <div className="space-y-3 pt-2">
+                                    <h4 className="text-md font-semibold text-gray-300 border-t border-gray-700 pt-3">Mesh Properties</h4>
+                                    <p className="text-xs text-gray-400 truncate">URL: {joint.visual.meshUrl || 'N/A'}</p>
+                                    <Vector3Input label="Mesh Scale" value={joint.visual.meshScale || [1, 1, 1]} onChange={(p, v) => updateJoint(joint.id, `visual.meshScale${p.substring(p.indexOf('['))}`, v)} path="meshScale" />
+                                    <Vector3Input label="Mesh Origin XYZ" value={joint.visual.meshOrigin?.xyz || [0, 0, 0]} onChange={(p, v) => updateJoint(joint.id, `visual.meshOrigin.xyz${p.substring(p.indexOf('['))}`, v)} path="xyz" />
+                                    <Vector3RadianDegreeInput label="Mesh Origin RPY" value={joint.visual.meshOrigin?.rpy || [0, 0, 0]} onChange={(p, v) => updateJoint(joint.id, `visual.meshOrigin.rpy${p.substring(p.indexOf('['))}`, v)} path="rpy" />
                                 </div>
-                            )}
-
-                            <div>
-                                <label className="text-xs text-gray-400">Visual Type</label>
-                                <select
-                                    value={currentVisual.type || 'none'}
-                                    onChange={(e) => updateJoint(joint.id, `${basePath}.type`, e.target.value)}
-                                    className="w-full bg-gray-700 rounded p-1 mt-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
-                                    <option value="box">Box</option>
-                                    <option value="cylinder">Cylinder</option>
-                                    <option value="sphere">Sphere</option>
-                                    <option value="mesh">Mesh (STL)</option>
-                                    <option value="none">None (Virtual)</option>
-                                </select>
-                            </div>
-
-                            {currentVisual && currentVisual.type !== 'none' && (
-                                <>
-                                    <div className="flex items-center justify-between">
-                                        <label className="text-xs text-gray-400">Color</label>
-                                        <input
-                                            type="color"
-                                            value={currentVisual.color || '#888888'}
-                                            onChange={(e) => updateJoint(joint.id, `${basePath}.color`, e.target.value)}
-                                            className="w-24 h-8 bg-gray-900 rounded p-0 border-2 border-gray-700 cursor-pointer"
-                                        />
-                                    </div>
-
-                                    {currentVisual.type !== 'mesh' && (
-                                        <Vector3Input label="Dimensions" value={currentVisual.dimensions || [0.05, 0.05, 0.05]} onChange={(p, v) => updateJoint(joint.id, `${basePath}.${p}`, v)} path="dimensions" />
-                                    )}
-
-                                    {/* --- STL/Mesh Controls --- */}
-                                    <input type="file" ref={stlInputRef} onChange={handleFileChange} className="hidden" accept=".stl" />
-
-                                    {currentVisual.type === 'mesh' && (
-                                        <>
-                                            <button onClick={handleStlUploadClick} className="flex items-center justify-center w-full bg-purple-600 hover:bg-purple-700 p-2 rounded text-sm">
-                                                <Upload className="mr-2 h-4 w-4" /> Upload STL for {targetAxis}
-                                            </button>
-
-                                            <div className="space-y-3 pt-2">
-                                                <h4 className="text-md font-semibold text-gray-300 border-t border-gray-700 pt-3">Mesh Properties</h4>
-                                                <p className="text-xs text-gray-400 truncate">URL: {currentVisual.meshUrl || 'N/A'}</p>
-                                                <Vector3Input label="Mesh Scale" value={currentVisual.meshScale || [1, 1, 1]} onChange={(p, v) => updateJoint(joint.id, `${basePath}.meshScale${p.substring(p.indexOf('['))}`, v)} path="meshScale" />
-                                                <Vector3Input label="Mesh Origin XYZ" value={currentVisual.meshOrigin?.xyz || [0, 0, 0]} onChange={(p, v) => updateJoint(joint.id, `${basePath}.meshOrigin.xyz${p.substring(p.indexOf('['))}`, v)} path="xyz" />
-                                                <Vector3RadianDegreeInput label="Mesh Origin RPY" value={currentVisual.meshOrigin?.rpy || [0, 0, 0]} onChange={(p, v) => updateJoint(joint.id, `${basePath}.meshOrigin.rpy${p.substring(p.indexOf('['))}`, v)} path="rpy" />
-                                            </div>
-                                        </>
-                                    )}
-                                </>
-                            )}
-                        </>
-                    );
-                })()}
+                            </>
+                        )}
+                    </>
+                )}
             </div>
 
             {/* Action Buttons */}

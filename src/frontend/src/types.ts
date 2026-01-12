@@ -67,12 +67,7 @@ export interface RobotJoint {
   currentValues: JointValues;
 
   // Visual representation of the joint (e.g. motor housing)
-  // Legacy single visual (defaults to last DOF or generic)
   visual: Visual;
-
-  // New: Multiple visuals keyed by DOF ('roll', 'pitch', 'yaw', 'displacement')
-  // Allows attaching specific meshes to specific axes of rotation/motion
-  visuals?: Record<string, Visual>;
 
   // Limits for each potential degree of freedom
   limits: {
@@ -145,7 +140,7 @@ export interface RobotState {
 export interface RobotActions {
   addJoint: (parentLinkId: string) => void;
   addChainedJoint: (parentJointId: string) => void;
-  uploadAndSetMesh: (itemId: string, itemType: 'link' | 'joint', file: File, dofKey?: string) => Promise<void>;
+  uploadAndSetMesh: (itemId: string, itemType: 'link' | 'joint', file: File) => Promise<void>;
   updateMeshTransform: (
     itemId: string,
     itemType: 'link' | 'joint',

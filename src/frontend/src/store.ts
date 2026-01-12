@@ -56,7 +56,6 @@ const createDefaultJoint = (parentLinkId: string): RobotJoint => ({
         dimensions: [0.05, 0.05, 0.05], // Default small box if enabled
         color: '#888888',
     },
-    visuals: {}, // Initialize empty map
     origin: { xyz: [0, 0, 0], rpy: [0, 0, 0] },
 });
 
@@ -137,7 +136,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
     ...createInitialState(),
     cameraControls: null,
 
-    uploadAndSetMesh: async (itemId, itemType, file, dofKey) => {
+    uploadAndSetMesh: async (itemId, itemType, file) => {
         const { joints, links } = getState();
 
         // Previous logic forced joints to apply to their child link.
@@ -205,40 +204,17 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                     const jointToUpdate = state.joints[targetId];
                     if (!jointToUpdate) return {};
 
-                    if (dofKey && ['roll', 'pitch', 'yaw', 'displacement'].includes(dofKey)) {
-                        // Update specific sub-visual
-                        const newVisual = {
-                            type: 'mesh',
-                            meshUrl: meshUrl,
-                            meshScale: initialScale,
-                            meshOrigin: { xyz: [0, 0, 0], rpy: [0, 0, 0] },
-                            dimensions: [0, 0, 0],
-                            color: '#F0F0F0',
-                        };
-                        return {
-                            joints: {
-                                ...state.joints,
-                                [targetId]: {
-                                    ...jointToUpdate,
-                                    visuals: {
-                                        ...jointToUpdate.visuals,
-                                        [dofKey]: newVisual
-                                    }
-                                }
-                            }
-                        };
-                    } else {
-                        // Legacy: update main visual
-                        const updatedJoint = updateDeep(jointToUpdate, 'visual', {
-                            ...jointToUpdate.visual,
-                            type: 'mesh',
-                            meshUrl: meshUrl,
-                            meshScale: initialScale,
-                            meshOrigin: { xyz: [0, 0, 0], rpy: [0, 0, 0] },
-                            color: '#F0F0F0', // Default light gray for new meshes
-                        });
-                        return { joints: { ...state.joints, [targetId]: updatedJoint } };
-                    }
+                    const updatedJoint = updateDeep(jointToUpdate, 'visual', {
+                        ...jointToUpdate.visual,
+                        type: 'mesh',
+                        meshUrl: meshUrl,
+                        meshScale: initialScale,
+                        meshOrigin: { xyz: [0, 0, 0], rpy: [0, 0, 0] },
+                        color: '#F0F0F0', // Default light gray for new meshes
+                        // Joints don't usually need bounding box for length fitting like links do, but we can store it if we want.
+                        // The Visual type has it optional.
+                    });
+                    return { joints: { ...state.joints, [targetId]: updatedJoint } };
                 }
             });
 
