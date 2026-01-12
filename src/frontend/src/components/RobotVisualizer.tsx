@@ -126,31 +126,33 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({
     if (joint.type !== 'rotational') return null;
     const cylinders: React.ReactNode[] = [];
     const length = 0.2;
-    const radius = 0.005; // Thin cylinder
+    const radius = 0.015; // Increased radius for easier selection
+    const props = { onClick: clickHandler, userData: { isVisual: true, ownerId: jointId } };
 
     if (joint.dof.roll) {
       cylinders.push(
-        <Cylinder key="roll" args={[radius, radius, length, 8]} rotation={[0, 0, -Math.PI / 2]}>
+        <Cylinder key="roll" args={[radius, radius, length, 8]} rotation={[0, 0, -Math.PI / 2]} {...props}>
           <meshBasicMaterial color="red" transparent opacity={0.6} />
         </Cylinder>
       );
     }
     if (joint.dof.pitch) {
       cylinders.push(
-        <Cylinder key="pitch" args={[radius, radius, length, 8]} rotation={[0, 0, 0]}>
+        <Cylinder key="pitch" args={[radius, radius, length, 8]} rotation={[0, 0, 0]} {...props}>
           <meshBasicMaterial color="#00ff00" transparent opacity={0.6} />
         </Cylinder>
       );
     }
     if (joint.dof.yaw) {
       cylinders.push(
-        <Cylinder key="yaw" args={[radius, radius, length, 8]} rotation={[Math.PI / 2, 0, 0]}>
+        <Cylinder key="yaw" args={[radius, radius, length, 8]} rotation={[Math.PI / 2, 0, 0]} {...props}>
           <meshBasicMaterial color="#0000ff" transparent opacity={0.6} />
         </Cylinder>
       );
     }
     return <group>{cylinders}</group>;
-  }, [joint.dof, joint.type]);
+  }, [joint.dof, joint.type, clickHandler]);
+
 
 
   const renderVisual = () => {
