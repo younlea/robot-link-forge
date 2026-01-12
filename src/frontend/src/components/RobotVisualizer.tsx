@@ -12,6 +12,35 @@ import { Move, RotateCw } from 'lucide-react';
 import { STLMesh } from './STLMesh';
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
 
+// Popup for overlapping selection
+const SelectionPopup = ({ candidates, onClose }: { candidates: string[], onClose: () => void }) => {
+  const selectItem = useRobotStore(state => state.selectItem);
+  const getJoint = useRobotStore(state => (id: string) => state.joints[id]);
+
+  return (
+    <Html position={[0, 0, 0]} center zIndexRange={[100, 0]}>
+      <div className="bg-gray-800 text-white p-2 rounded shadow-lg border border-gray-600 min-w-[150px]">
+        <div className="text-xs font-bold mb-2">Select Joint:</div>
+        <div className="space-y-1">
+          {candidates.map(id => {
+            const joint = getJoint(id);
+            return (
+              <button
+                key={id}
+                className="block w-full text-left text-xs px-2 py-1 hover:bg-gray-700 rounded transition-colors"
+                onClick={(e) => { e.stopPropagation(); selectItem(id, 'joint'); onClose(); }}
+              >
+                {joint?.name || id}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </Html>
+  );
+};
+
+
 // Extend BufferGeometry to include BVH properties
 THREE.BufferGeometry.prototype.computeBoundsTree = computeBoundsTree;
 THREE.BufferGeometry.prototype.disposeBoundsTree = disposeBoundsTree;
@@ -67,7 +96,40 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({
     }
   });
 
+
+
   const axes = useMemo(() => new THREE.AxesHelper(0.2), []);
+
+  const AxisCylinders = useMemo(() => {
+    if (joint.type !== 'rotational') return null;
+    const cylinders: React.ReactNode[] = [];
+    const length = 0.2;
+    const radius = 0.005; // Thin cylinder
+
+    if (joint.dof.roll) {
+      cylinders.push(
+        <Cylinder key="roll" args={[radius, radius, length, 8]} rotation={[0, 0, -Math.PI / 2]}>
+          <meshBasicMaterial color="red" transparent opacity={0.6} />
+        </Cylinder>
+      );
+    }
+    if (joint.dof.pitch) {
+      cylinders.push(
+        <Cylinder key="pitch" args={[radius, radius, length, 8]} rotation={[0, 0, 0]}>
+          <meshBasicMaterial color="#00ff00" transparent opacity={0.6} />
+        </Cylinder>
+      );
+    }
+    if (joint.dof.yaw) {
+      cylinders.push(
+        <Cylinder key="yaw" args={[radius, radius, length, 8]} rotation={[Math.PI / 2, 0, 0]}>
+          <meshBasicMaterial color="#0000ff" transparent opacity={0.6} />
+        </Cylinder>
+      );
+    }
+    return <group>{cylinders}</group>;
+  }, [joint.dof, joint.type]);
+
 
   const renderVisual = () => {
     // Default small handle if no visual is set
@@ -86,7 +148,29 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({
     // Highlight logic: if highlighted, override color to Cyan/White mixer
     const displayColor = isHighlighted ? '#00FFFF' : (isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : (color || '#888888')));
 
-    const clickHandler = (e: any) => { e.stopPropagation(); selectItem(joint.id, 'joint'); };
+    const setSelectionCandidates = useRobotStore(s => s.setSelectionCandidates);
+
+    const clickHandler = (e: any) => {
+      e.stopPropagation();
+
+      // Multi-hit logic
+      // R3F events sort by distance. Intersections has array.
+      if (e.intersections.length > 0) {
+        const hits = e.intersections.filter((hit: any) => hit.object.userData?.isVisual);
+        const distinctIds = new Set<string>();
+        hits.forEach((hit: any) => {
+          if (hit.object.userData?.ownerId) distinctIds.add(hit.object.userData.ownerId);
+        });
+
+        if (distinctIds.size > 1) {
+          setSelectionCandidates(Array.from(distinctIds));
+        } else {
+          selectItem(joint.id, 'joint');
+        }
+      } else {
+        selectItem(joint.id, 'joint');
+      }
+    };
 
     if (type === 'mesh') {
       if (!meshUrl) return null;
@@ -121,6 +205,7 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({
     <group ref={originGroupRef}>
       <group ref={motionGroupRef}>
         <primitive object={axes} />
+        {AxisCylinders}
         {renderVisual()}
         {joint.childLinkId && <RecursiveLink linkId={joint.childLinkId} registerRef={registerRef} />}
       </group>
@@ -736,9 +821,14 @@ const RobotVisualizer: React.FC = () => {
   };
 
   const gizmoProps = getGizmoProps();
+  const selectionCandidates = useRobotStore(s => s.selectionCandidates);
+  const setSelectionCandidates = useRobotStore(s => s.setSelectionCandidates);
 
   return (
     <CollisionContext.Provider value={collidingLinks}>
+      {selectionCandidates.length > 0 && (
+        <SelectionPopup candidates={selectionCandidates} onClose={() => setSelectionCandidates([])} />
+      )}
       <Html position={[-4, 2, 0]} wrapperClass="w-32">
         <div className="bg-gray-800 bg-opacity-80 p-1 rounded-lg flex justify-around">
           <button onClick={() => setCameraMode("pan")} className={`p-2 rounded ${cameraMode === 'pan' ? 'bg-blue-600' : 'bg-gray-700'} hover:bg-blue-500`} title="Camera Pan"> <Move size={16} /> </button>

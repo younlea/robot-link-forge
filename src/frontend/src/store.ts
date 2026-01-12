@@ -20,6 +20,7 @@ const createInitialState = (): RobotState => {
         baseLinkId: baseLinkId,
         selectedItem: { id: baseLinkId, type: 'link' },
         highlightedItem: { id: null, type: null },
+        selectionCandidates: [],
         cameraMode: 'rotate', // Default camera mode
         cameraControls: null,
         serverProjects: [],
@@ -134,6 +135,8 @@ const API_BASE_URL = '';
 
 export const useRobotStore = create<RobotState & RobotActions>((setState, getState) => ({
     ...createInitialState(),
+    ...createInitialState(),
+    selectionCandidates: [],
     cameraControls: null,
 
     uploadAndSetMesh: async (itemId, itemType, file) => {
@@ -316,8 +319,9 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         getState().cameraControls?.dolly(0.5, true);
     },
 
-    selectItem: (id, type) => setState({ selectedItem: { id, type } }),
+    selectItem: (id, type) => setState({ selectedItem: { id, type }, selectionCandidates: [] }),
     setHighlightedItem: (id, type) => setState({ highlightedItem: { id, type } }),
+    setSelectionCandidates: (ids) => setState({ selectionCandidates: ids }),
     setCameraMode: (mode) => setState({ cameraMode: mode }),
 
     resetJointsToZero: () => {

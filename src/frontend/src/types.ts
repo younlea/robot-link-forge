@@ -121,6 +121,8 @@ export interface RobotState {
   baseLinkId: string;
   selectedItem: SelectedItem;
   highlightedItem: SelectedItem; // Visual highlight for helper UI
+  selectionCandidates: string[]; // List of IDs intersecting with click
+
   cameraMode: 'rotate' | 'pan';
   cameraControls: CameraControls | null;
   serverProjects: string[];
@@ -162,6 +164,7 @@ export interface RobotActions {
   // Selection
   selectItem: (id: string | null, type: 'link' | 'joint' | null) => void;
   setHighlightedItem: (id: string | null, type: 'link' | 'joint' | null) => void;
+  setSelectionCandidates: (ids: string[]) => void;
 
   // Camera Control
   setCameraMode: (mode: 'rotate' | 'pan') => void;
