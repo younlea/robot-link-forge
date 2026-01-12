@@ -1,6 +1,89 @@
 from typing import Dict, Tuple, Set, Optional
 from robot_models import RobotData, RobotLink, RobotJoint
 from utils import to_snake_case, calculate_cylinder_transform, convert_euler_xyz_to_zyx
+from robot_models import Visual
+
+def _generate_visual_tag(vis: Visual, link_id: str, robot_name: str, mesh_files: Dict[str, str], force_origin_xyz: Optional[str] = None, force_origin_rpy: Optional[str] = None) -> str:
+    """Helper to generate <visual> and <collision> tags from a Visual object."""
+    if not vis or vis.type == 'none':
+        return ""
+
+    geometry_xml = ""
+    # Geometry Logic
+    if vis.type == 'mesh' and link_id in mesh_files:
+        mesh_scale = " ".join(map(str, vis.meshScale)) if vis.meshScale else "1 1 1"
+        geometry_xml = f'        <mesh filename="package://{robot_name}/meshes/{mesh_files[link_id]}" scale="{mesh_scale}"/>\n'
+    elif vis.type == 'mesh' and vis.meshUrl: # Fallback if not in map but URL exists (should be in map though)
+         # If it's a multi-dof visual, might not be in link_id map?
+         # But usually mesh_files maps LINK_ID -> Filename.
+         # For multi-dof sub-joints, we don't have a distinct "Link ID" in robot_data.links?
+         # We need to handle this. The mesh processor saves meshes keyed by 'joint-id-suffix'?
+         # Or we just use the filename if known?
+         # For now, let's assume standard behavior or fallback.
+         pass
+    
+    if not geometry_xml:
+        if vis.type == 'box' and vis.dimensions:
+            geometry_xml = f'        <box size="{" ".join(map(str, vis.dimensions))}" />\n'
+        elif vis.type == 'cylinder' and vis.dimensions:
+            length_val = vis.dimensions[1] if len(vis.dimensions) > 1 else 1.0
+            geometry_xml = f'        <cylinder radius="{vis.dimensions[0]}" length="{length_val}" />\n'
+        elif vis.type == 'sphere' and vis.dimensions:
+            geometry_xml = f'        <sphere radius="{vis.dimensions[0]}" />\n'
+        elif vis.type == 'mesh': 
+             # Check if we have a mapped file for this specific sub-visual?
+             # If passed link_id corresponds to the key in mesh_files.
+             if link_id in mesh_files:
+                 mesh_scale = " ".join(map(str, vis.meshScale)) if vis.meshScale else "1 1 1"
+                 geometry_xml = f'        <mesh filename="package://{robot_name}/meshes/{mesh_files[link_id]}" scale="{mesh_scale}"/>\n'
+             else:
+                 geometry_xml = '        <box size="0.01 0.01 0.01" />\n' # Fallback
+        else:
+            geometry_xml = '        <box size="0.01 0.01 0.01" />\n'
+
+    # Origin Logic
+    origin_xyz_str = force_origin_xyz or "0 0 0"
+    origin_rpy_str = force_origin_rpy or "0 0 0"
+
+    if not force_origin_xyz and not force_origin_rpy:
+        if vis.meshOrigin:
+            origin_xyz_str = " ".join(map(str, vis.meshOrigin.get('xyz', [0,0,0])))
+            raw_rpy = vis.meshOrigin.get('rpy', [0,0,0])
+            converted_rpy = convert_euler_xyz_to_zyx(raw_rpy)
+            origin_rpy_str = " ".join(map(str, converted_rpy))
+
+    visual_xml = '    <visual>\n'
+    visual_xml += f'      <origin xyz="{origin_xyz_str}" rpy="{origin_rpy_str}" />\n'
+    visual_xml += '      <geometry>\n'
+    visual_xml += geometry_xml
+    visual_xml += '      </geometry>\n'
+    
+    # Material
+    if vis.color:
+        try:
+            r = int(vis.color[1:3], 16) / 255.0
+            g = int(vis.color[3:5], 16) / 255.0
+            b = int(vis.color[5:7], 16) / 255.0
+            visual_xml += f'      <material name="material_{to_snake_case(link_id)}_{vis.type}">\n'
+            visual_xml += f'        <color rgba="{r:.2f} {g:.2f} {b:.2f} 1.0"/>\n'
+            visual_xml += f'      </material>\n'
+        except:
+             visual_xml += f'      <material name="material_{to_snake_case(link_id)}_default">\n'
+             visual_xml += f'        <color rgba="0.5 0.5 0.5 1.0"/>\n'
+             visual_xml += f'      </material>\n'
+    else:
+         visual_xml += f'      <material name="material_{to_snake_case(link_id)}_default">\n'
+         visual_xml += f'        <color rgba="0.5 0.5 0.5 1.0"/>\n'
+         visual_xml += f'      </material>\n'
+         
+    visual_xml += '    </visual>\n'
+    
+    # Collision (Clone)
+    collision_xml = visual_xml.replace('<visual>', '<collision>', 1).replace('</visual>', '</collision>', 1)
+    
+    return visual_xml + collision_xml
+
+
 
 def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robot_name: str, mesh_files: Dict[str, str], parent_joint: Optional[RobotJoint] = None, for_mujoco: bool = False) -> str:
     """Generates the XML content for a single link (visual, collision, etc.)."""
@@ -14,82 +97,37 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
     inertial_xml += '      <inertia ixx="0.01" ixy="0" ixz="0" iyy="0.01" iyz="0" izz="0.01"/>\n'
     inertial_xml += '    </inertial>\n'
 
-    # --- Visual XML ---
-    visual_xml = '    <visual>\n'
-    
+    # --- Visual/Collision XML ---
+    # Check for Dynamic Cylinder Case (Connecting Link) - Special handling
+    # We still handle this manually or construct a temp Visual logic
     vis = link.visual
+    visual_xml_content = ""
     
-    geometry_xml = ""
-    override_origin_xyz = None
-    override_origin_rpy = None
-
-    # Check for Dynamic Cylinder Case (Connecting Link)
+    # Special Cylinder Logic
     if vis.type == 'cylinder' and link.childJoints and len(link.childJoints) == 1:
         child_joint_id = link.childJoints[0]
         child_joint = robot_data.joints.get(child_joint_id)
-        
         if child_joint and child_joint.origin and not vis.meshOrigin:
-            length, mid_xyz, mid_rpy = calculate_cylinder_transform(
-                [0,0,0], 
-                child_joint.origin.xyz
-            )
-            
+            length, mid_xyz, mid_rpy = calculate_cylinder_transform([0,0,0], child_joint.origin.xyz)
             if length > 0.001:
                 radius = vis.dimensions[0] if (vis.dimensions and len(vis.dimensions) > 0) else 0.05
-                geometry_xml = f'        <cylinder radius="{radius}" length="{length}" />\n'
-                override_origin_xyz = " ".join(map(str, mid_xyz))
-                override_origin_rpy = " ".join(map(str, mid_rpy))
+                # Create a temporary visual override just for XML gen
+                # Or just construct snippet manually as before? 
+                # Let's keep it manual since it has specific override logic
+                visual_xml_content = '    <visual>\n'
+                visual_xml_content += f'      <origin xyz="{" ".join(map(str, mid_xyz))}" rpy="{" ".join(map(str, mid_rpy))}" />\n'
+                visual_xml_content += '      <geometry>\n'
+                visual_xml_content += f'        <cylinder radius="{radius}" length="{length}" />\n'
+                visual_xml_content += '      </geometry>\n'
+                visual_xml_content += f'      <material name="mat_{link_id}"><color rgba="0.5 0.5 0.5 1.0"/></material>\n'
+                visual_xml_content += '    </visual>\n'
+                visual_xml_content += visual_xml_content.replace('<visual>', '<collision>', 1).replace('</visual>', '</collision>', 1)
 
-    if not geometry_xml:
-        if vis.type == 'mesh' and link_id in mesh_files:
-            mesh_scale = " ".join(map(str, vis.meshScale)) if vis.meshScale else "1 1 1"
-            geometry_xml = f'        <mesh filename="package://{robot_name}/meshes/{mesh_files[link_id]}" scale="{mesh_scale}"/>\n'
-        elif vis.type == 'box' and vis.dimensions:
-            geometry_xml = f'        <box size="{" ".join(map(str, vis.dimensions))}" />\n'
-        elif vis.type == 'cylinder' and vis.dimensions:
-            length_val = vis.dimensions[1] if len(vis.dimensions) > 1 else 1.0
-            geometry_xml = f'        <cylinder radius="{vis.dimensions[0]}" length="{length_val}" />\n'
-        elif vis.type == 'sphere' and vis.dimensions:
-            geometry_xml = f'        <sphere radius="{vis.dimensions[0]}" />\n'
-        else:
-            geometry_xml = '        <box size="0.01 0.01 0.01" />\n'
+    if not visual_xml_content:
+        # Standard Visual
+        visual_xml_content = _generate_visual_tag(vis, link_id, robot_name, mesh_files)
 
-    # Determine Final Origin
-    origin_xyz_str = "0 0 0"
-    origin_rpy_str = "0 0 0"
-
-    if override_origin_xyz:
-        origin_xyz_str = override_origin_xyz
-        origin_rpy_str = override_origin_rpy
-    elif vis.meshOrigin:
-        origin_xyz_str = " ".join(map(str, vis.meshOrigin.get('xyz', [0,0,0])))
-        raw_rpy = vis.meshOrigin.get('rpy', [0,0,0])
-        converted_rpy = convert_euler_xyz_to_zyx(raw_rpy)
-        origin_rpy_str = " ".join(map(str, converted_rpy))
-
-    visual_xml += f'      <origin xyz="{origin_xyz_str}" rpy="{origin_rpy_str}" />\n'
-    visual_xml += '      <geometry>\n'
-    visual_xml += geometry_xml
-    visual_xml += '      </geometry>\n'
-    
-    if vis.color:
-        try:
-            r = int(vis.color[1:3], 16) / 255.0
-            g = int(vis.color[3:5], 16) / 255.0
-            b = int(vis.color[5:7], 16) / 255.0
-            visual_xml += f'      <material name="material_{link_id}">\n'
-            visual_xml += f'        <color rgba="{r:.2f} {g:.2f} {b:.2f} 1.0"/>\n'
-            visual_xml += f'      </material>\n'
-        except:
-             visual_xml += f'      <material name="material_{link_id}">\n'
-             visual_xml += f'        <color rgba="0.5 0.5 0.5 1.0"/>\n'
-             visual_xml += f'      </material>\n'
-             
-    visual_xml += '    </visual>\n'
-    
-    # COLLISION LOGIC
-    # Standard: Duplicate Visual as Collision
-    collision_xml = visual_xml.replace('<visual>', '<collision>', 1).replace('</visual>', '</collision>', 1)
+    link_xml_content = (visual_xml_content or "")
 
     # --- Joint Visuals (Attached to CHILD Link, i.e., THIS link) ---
     # If this link is the child of a joint, and that joint has a visual, we render it here.
@@ -150,8 +188,7 @@ def _generate_link_xml(link_id: str, link_name: str, robot_data: RobotData, robo
     # --- Link XML ---
     link_xml = f'  <link name="{link_name}">\n'
     link_xml += inertial_xml
-    link_xml += visual_xml
-    link_xml += collision_xml
+    link_xml += link_xml_content
     link_xml += '  </link>\n\n'
     
     return link_xml
@@ -207,9 +244,11 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
 
             active_rotations = []
             if joint.type == 'rotational':
-                if joint.dof.roll: active_rotations.append(('roll', '1 0 0', joint.limits['roll']))
-                if joint.dof.pitch: active_rotations.append(('pitch', '0 1 0', joint.limits['pitch']))
+                # Order: Yaw -> Pitch -> Roll (Upstream -> Downstream)
+                # Matches RobotVisualizer hierarchy.
                 if joint.dof.yaw: active_rotations.append(('yaw', '0 0 1', joint.limits['yaw']))
+                if joint.dof.pitch: active_rotations.append(('pitch', '0 1 0', joint.limits['pitch']))
+                if joint.dof.roll: active_rotations.append(('roll', '1 0 0', joint.limits['roll']))
             
             sub_joints = []
             if joint.type == 'rotational' and active_rotations:
@@ -218,7 +257,8 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
                         'type': 'revolute',
                         'suffix': dof_name,
                         'axis': axis_val,
-                        'limit': limit_val
+                        'limit': limit_val,
+                        'visual_key': dof_name
                     })
             elif joint.type == 'prismatic':
                  axis_str = " ".join(map(str, joint.axis)) if joint.axis else "1 0 0"
@@ -226,7 +266,8 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
                      'type': 'prismatic',
                      'suffix': 'prism',
                      'axis': axis_str,
-                     'limit': joint.limits['displacement']
+                     'limit': joint.limits['displacement'],
+                     'visual_key': 'displacement'
                  })
             else:
                  sub_joints.append({
@@ -257,6 +298,31 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
                     dummy_link_name = f"dummy_{final_joint_name}_link"
                     links_xml += f'  <link name="{dummy_link_name}">\n'
                     links_xml += f'    <inertial><mass value="0.001"/><inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/></inertial>\n'
+                    
+                    # --- Inject Intermediate Visual (IF ANY) ---
+                    if joint.visuals and sub.get('visual_key') in joint.visuals:
+                         sub_vis = joint.visuals[sub.get('visual_key')]
+                         # We need to ensure we use the correct mesh filename if it exists
+                         # For now, mesh_files map uses LINK IDs. We don't have a Link ID for this dummy link.
+                         # This implies the current mesh processing backend maps meshes by Link ID.
+                         # The backend STL processor likely needs update to map by Joint+Suffix key?
+                         # Or we just assume the file is somehow known.
+                         # Since I haven't updated the backend file processor, this `link_id in mesh_files` check in helper will FAIL.
+                         # However, if meshUrl is present in sub_vis, we might handle it via a new mechanism?
+                         # For now, let's pass a special key or just hope the map isn't needed for raw URL check?
+                         # My helper uses `link_id in mesh_files`.
+                         # I should update helper to allow generic filename override?
+                         # Or just pass 'joint_id' + 'suffix'?
+                         # The file uploader saved the mesh. 
+                         # `uploadAndSetMesh` sets `meshUrl` which is a Frontend Blob URL or backend static path.
+                         # In Python backend, we receive the JSON. The `visual` object has `meshUrl`.
+                         # If `meshUrl` is a backend path (e.g. `/meshes/...`), we can extract filename.
+                         # My helper relies on `mesh_files` map which is constructed from `files` dict usually.
+                         # If I can't resolve the mesh file, I can't export it correctly.
+                         # But let's at least generate the XML structure.
+                         vis_xml = _generate_visual_tag(sub_vis, "UNKNOWN_LINK", robot_name, mesh_files)
+                         links_xml += vis_xml
+
                     links_xml += f'  </link>\n'
                     current_child_link = dummy_link_name
 

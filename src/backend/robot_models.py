@@ -39,6 +39,7 @@ class RobotJoint(BaseModel):
     limits: Dict[str, JointLimit]
     origin: JointOrigin
     visual: Optional[Visual] = None
+    visuals: Optional[Dict[str, Visual]] = None
 
 class RobotData(BaseModel):
     links: Dict[str, RobotLink]

@@ -5,6 +5,7 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { useRobotStore } from '../store';
+import { Visual } from '../types';
 import { Box, Cylinder, Sphere, TransformControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -23,15 +24,74 @@ const COLLISION_COLOR = '#FF0000'; // Red for collision
 type RefMap = Map<string, THREE.Object3D>;
 type RegisterRef = (id: string, ref: THREE.Object3D) => void;
 
+// --- VisualRender Component ---
+const VisualRender: React.FC<{
+  visual?: Visual;
+  jointId: string;
+  isOwnerHighlight?: boolean
+}> = ({ visual, jointId, isOwnerHighlight }) => {
+  const { selectedItem, selectItem } = useRobotStore();
+  const highlightedItemId = useRobotStore(s => s.highlightedItem.id);
+  // We use the owner joint's collision state for simplicity, or we could check specific mesh collision?
+  // Use context (assuming provided by parent scope? No, need to pass it or use hook)
+  const isColliding = useCollisionContext(jointId);
+
+  if (!visual || visual.type === 'none') {
+    // Only render default sphere for 'legacy' visual call if strictly needed, 
+    // but here we might want to skip if it's a sub-visual that is undefined.
+    // Logic: if visual is undefined, return null.
+    // If visual.type is none, return sphere only if it's the MAIN visual?
+    // Let's assume this component is only called when we WANT to render something.
+    return null;
+  }
+
+  const { type, dimensions, color, meshUrl, meshScale, meshOrigin } = visual;
+  const isSelected = selectedItem.id === jointId;
+  const isHighlighted = highlightedItemId === jointId || isOwnerHighlight;
+
+  const displayColor = isHighlighted ? '#00FFFF' : (isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : (color || '#888888')));
+  const clickHandler = (e: any) => { e.stopPropagation(); selectItem(jointId, 'joint'); };
+
+  if (type === 'mesh') {
+    if (!meshUrl) return null;
+    return (
+      <group onClick={clickHandler} userData={{ isVisual: true, ownerId: jointId }}>
+        <STLMesh
+          linkId={jointId}
+          url={meshUrl}
+          scale={meshScale}
+          origin={meshOrigin}
+          color={displayColor}
+        />
+      </group>
+    );
+  }
+
+  const props = { onClick: clickHandler, userData: { isVisual: true, ownerId: jointId } };
+  const dims = dimensions || [0.05, 0.05, 0.05];
+
+  switch (type) {
+    case 'box':
+      return <Box {...props} args={dims as [number, number, number]}><meshStandardMaterial color={displayColor} side={THREE.DoubleSide} /></Box>;
+    case 'cylinder':
+      return <Cylinder {...props} args={[dims[0], dims[0], dims[1], 16]}><meshStandardMaterial color={displayColor} side={THREE.DoubleSide} /></Cylinder>;
+    case 'sphere':
+      return <Sphere {...props} args={[dims[0], 16, 16]}><meshStandardMaterial color={displayColor} side={THREE.DoubleSide} /></Sphere>;
+    default: return null;
+  }
+};
+
 // --- JointWrapper ---
 const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({ jointId, registerRef }) => {
   const joint = useRobotStore((state) => state.joints[jointId]);
-  const { selectedItem, selectItem } = useRobotStore();
-  const highlightedItemId = useRobotStore(s => s.highlightedItem.id);
+  const { selectItem, selectedItem } = useRobotStore(); // Needed for fallback sphere click
   const isColliding = useCollisionContext(jointId);
 
   const originGroupRef = useRef<THREE.Group>(null!);
-  const motionGroupRef = useRef<THREE.Group>(null!);
+  const yawGroupRef = useRef<THREE.Group>(null!);
+  const pitchGroupRef = useRef<THREE.Group>(null!);
+  const rollGroupRef = useRef<THREE.Group>(null!);
+  const prismaticGroupRef = useRef<THREE.Group>(null!);
 
   useEffect(() => {
     const ref = originGroupRef.current;
@@ -42,87 +102,73 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({
   }, [jointId, registerRef]);
 
   useFrame(() => {
-    if (!originGroupRef.current || !motionGroupRef.current) return;
+    if (!originGroupRef.current) return;
 
+    // 1. Origin (Static relative to parent)
     originGroupRef.current.position.set(...(joint.origin?.xyz || [0, 0, 0]));
     originGroupRef.current.rotation.set(...(joint.origin?.rpy || [0, 0, 0]));
 
-    const motionGroup = motionGroupRef.current;
+    // 2. Motion
     if (joint.type === 'rotational') {
-      const euler = new THREE.Euler(
-        joint.dof.roll ? joint.currentValues.roll : 0,
-        joint.dof.pitch ? joint.currentValues.pitch : 0,
-        joint.dof.yaw ? joint.currentValues.yaw : 0,
-        'ZYX'
-      );
-      motionGroup.quaternion.setFromEuler(euler);
-      motionGroup.position.set(0, 0, 0);
+      // Apply rotations to nested groups: Yaw -> Pitch -> Roll (Intrinsic Z-Y-X / Extrinsic X-Y-Z)
+      if (yawGroupRef.current) yawGroupRef.current.rotation.z = joint.dof.yaw ? joint.currentValues.yaw : 0;
+      if (pitchGroupRef.current) pitchGroupRef.current.rotation.y = joint.dof.pitch ? joint.currentValues.pitch : 0;
+      if (rollGroupRef.current) rollGroupRef.current.rotation.x = joint.dof.roll ? joint.currentValues.roll : 0;
     } else if (joint.type === 'prismatic') {
-      const axis = new THREE.Vector3(...joint.axis).normalize();
-      motionGroup.position.copy(axis).multiplyScalar(joint.currentValues.displacement);
-      motionGroup.quaternion.set(0, 0, 0, 1);
-    } else {
-      motionGroup.position.set(0, 0, 0);
-      motionGroup.quaternion.set(0, 0, 0, 1);
+      if (prismaticGroupRef.current) {
+        const axis = new THREE.Vector3(...joint.axis).normalize();
+        prismaticGroupRef.current.position.copy(axis).multiplyScalar(joint.currentValues.displacement);
+        prismaticGroupRef.current.quaternion.set(0, 0, 0, 1);
+      }
     }
   });
 
   const axes = useMemo(() => new THREE.AxesHelper(0.2), []);
 
-  const renderVisual = () => {
-    // Default small handle if no visual is set
-    if (!joint.visual || joint.visual.type === 'none') {
-      return (
-        <Sphere args={[0.02, 16, 16]} onClick={(e) => { e.stopPropagation(); selectItem(joint.id, 'joint'); }} userData={{ isVisual: true, ownerId: jointId }}>
-          <meshStandardMaterial color={isColliding ? COLLISION_COLOR : (selectedItem.id === jointId ? HIGHLIGHT_COLOR : 'yellow')} side={THREE.DoubleSide} />
-        </Sphere>
-      );
-    }
+  // Default fallback sphere if NO visuals at all
+  const hasAnyVisual = (joint.visual && joint.visual.type !== 'none') ||
+    (joint.visuals && Object.values(joint.visuals).some(v => v.type !== 'none'));
 
-    const { type, dimensions, color, meshUrl, meshScale, meshOrigin } = joint.visual;
-    const isSelected = selectedItem.id === jointId;
-    const isHighlighted = highlightedItemId === jointId;
+  const DefaultSphere = !hasAnyVisual ? (
+    <Sphere args={[0.02, 16, 16]} onClick={(e) => { e.stopPropagation(); selectItem(joint.id, 'joint'); }} userData={{ isVisual: true, ownerId: jointId }}>
+      <meshStandardMaterial color={isColliding ? COLLISION_COLOR : 'yellow'} side={THREE.DoubleSide} />
+    </Sphere>
+  ) : null;
 
-    // Highlight logic: if highlighted, override color to Cyan/White mixer
-    const displayColor = isHighlighted ? '#00FFFF' : (isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : (color || '#888888')));
-
-    const clickHandler = (e: any) => { e.stopPropagation(); selectItem(joint.id, 'joint'); };
-
-    if (type === 'mesh') {
-      if (!meshUrl) return null;
-      return (
-        <group onClick={clickHandler} userData={{ isVisual: true, ownerId: jointId }}>
-          <STLMesh
-            linkId={jointId}
-            url={meshUrl}
-            scale={meshScale}
-            origin={meshOrigin}
-            color={displayColor}
-          />
+  if (joint.type === 'prismatic') {
+    return (
+      <group ref={originGroupRef}>
+        <group ref={prismaticGroupRef}>
+          <primitive object={axes} />
+          {joint.visuals?.displacement && <VisualRender visual={joint.visuals.displacement} jointId={jointId} />}
+          {/* Legacy visual attach to displacement */}
+          <VisualRender visual={joint.visual} jointId={jointId} />
+          {DefaultSphere}
+          {joint.childLinkId && <RecursiveLink linkId={joint.childLinkId} registerRef={registerRef} />}
         </group>
-      );
-    }
+      </group>
+    );
+  }
 
-    const props = { onClick: clickHandler, userData: { isVisual: true, ownerId: jointId } };
-    const dims = dimensions || [0.05, 0.05, 0.05];
-
-    switch (type) {
-      case 'box':
-        return <Box {...props} args={dims as [number, number, number]}><meshStandardMaterial color={displayColor} side={THREE.DoubleSide} /></Box>;
-      case 'cylinder':
-        return <Cylinder {...props} args={[dims[0], dims[0], dims[1], 16]}><meshStandardMaterial color={displayColor} side={THREE.DoubleSide} /></Cylinder>;
-      case 'sphere':
-        return <Sphere {...props} args={[dims[0], 16, 16]}><meshStandardMaterial color={displayColor} side={THREE.DoubleSide} /></Sphere>;
-      default: return null;
-    }
-  };
-
+  // Rotational
   return (
     <group ref={originGroupRef}>
-      <group ref={motionGroupRef}>
-        <primitive object={axes} />
-        {renderVisual()}
-        {joint.childLinkId && <RecursiveLink linkId={joint.childLinkId} registerRef={registerRef} />}
+      {/* Hierarchy: Yaw -> Pitch -> Roll -> Child */}
+      <group ref={yawGroupRef}>
+        {joint.visuals?.yaw && <VisualRender visual={joint.visuals.yaw} jointId={jointId} />}
+
+        <group ref={pitchGroupRef}>
+          {joint.visuals?.pitch && <VisualRender visual={joint.visuals.pitch} jointId={jointId} />}
+
+          <group ref={rollGroupRef}>
+            <primitive object={axes} />
+            {joint.visuals?.roll && <VisualRender visual={joint.visuals.roll} jointId={jointId} />}
+            {/* Legacy visual attached to final roll group */}
+            <VisualRender visual={joint.visual} jointId={jointId} />
+            {DefaultSphere}
+            {joint.childLinkId && <RecursiveLink linkId={joint.childLinkId} registerRef={registerRef} />}
+          </group>
+        </group>
       </group>
     </group>
   );
