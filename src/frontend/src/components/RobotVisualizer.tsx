@@ -58,6 +58,28 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({
   const { selectedItem, selectItem } = useRobotStore();
   const highlightedItemId = useRobotStore(s => s.highlightedItem.id);
   const isColliding = useCollisionContext(jointId);
+  const setSelectionCandidates = useRobotStore(s => s.setSelectionCandidates);
+
+  const clickHandler = (e: any) => {
+    e.stopPropagation();
+
+    // Multi-hit logic
+    if (e.intersections && e.intersections.length > 0) {
+      const hits = e.intersections.filter((hit: any) => hit.object.userData?.isVisual);
+      const distinctIds = new Set<string>();
+      hits.forEach((hit: any) => {
+        if (hit.object.userData?.ownerId) distinctIds.add(hit.object.userData.ownerId);
+      });
+
+      if (distinctIds.size > 1) {
+        setSelectionCandidates(Array.from(distinctIds));
+      } else {
+        selectItem(joint.id, 'joint');
+      }
+    } else {
+      selectItem(joint.id, 'joint');
+    }
+  };
 
   const originGroupRef = useRef<THREE.Group>(null!);
   const motionGroupRef = useRef<THREE.Group>(null!);
@@ -135,7 +157,7 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({
     // Default small handle if no visual is set
     if (!joint.visual || joint.visual.type === 'none') {
       return (
-        <Sphere args={[0.02, 16, 16]} onClick={(e) => { e.stopPropagation(); selectItem(joint.id, 'joint'); }} userData={{ isVisual: true, ownerId: jointId }}>
+        <Sphere args={[0.02, 16, 16]} onClick={clickHandler} userData={{ isVisual: true, ownerId: jointId }}>
           <meshStandardMaterial color={isColliding ? COLLISION_COLOR : (selectedItem.id === jointId ? HIGHLIGHT_COLOR : 'yellow')} side={THREE.DoubleSide} />
         </Sphere>
       );
@@ -148,29 +170,6 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({
     // Highlight logic: if highlighted, override color to Cyan/White mixer
     const displayColor = isHighlighted ? '#00FFFF' : (isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : (color || '#888888')));
 
-    const setSelectionCandidates = useRobotStore(s => s.setSelectionCandidates);
-
-    const clickHandler = (e: any) => {
-      e.stopPropagation();
-
-      // Multi-hit logic
-      // R3F events sort by distance. Intersections has array.
-      if (e.intersections.length > 0) {
-        const hits = e.intersections.filter((hit: any) => hit.object.userData?.isVisual);
-        const distinctIds = new Set<string>();
-        hits.forEach((hit: any) => {
-          if (hit.object.userData?.ownerId) distinctIds.add(hit.object.userData.ownerId);
-        });
-
-        if (distinctIds.size > 1) {
-          setSelectionCandidates(Array.from(distinctIds));
-        } else {
-          selectItem(joint.id, 'joint');
-        }
-      } else {
-        selectItem(joint.id, 'joint');
-      }
-    };
 
     if (type === 'mesh') {
       if (!meshUrl) return null;
