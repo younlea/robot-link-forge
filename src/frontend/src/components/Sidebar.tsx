@@ -295,7 +295,7 @@ const TextInput = ({ value, onChange, className }: { value: string, onChange: (v
 
 // --- Inspector for Links ---
 const LinkInspector = ({ link }: { link: RobotLink }) => {
-    const { updateLink, addJoint, uploadAndSetMesh, fitMeshToLink, deleteItem, joints, updateJoint } = useRobotStore();
+    const { updateLink, addJoint, uploadAndSetMesh, deleteItem, joints, updateJoint } = useRobotStore();
     // Find parent joint (the joint that acts on this link)
     const parentJoint = Object.values(joints).find(j => j.childLinkId === link.id);
     const stlInputRef = useRef<HTMLInputElement>(null);
@@ -416,9 +416,7 @@ const LinkInspector = ({ link }: { link: RobotLink }) => {
                         <Vector3Input label="Mesh Scale" value={link.visual.meshScale || [1, 1, 1]} onChange={(p, v) => updateLink(link.id, `visual.meshScale${p.substring(p.indexOf('['))}`, v)} path="meshScale" />
                         <Vector3Input label="Mesh Origin XYZ" value={link.visual.meshOrigin?.xyz || [0, 0, 0]} onChange={(p, v) => updateLink(link.id, `visual.meshOrigin.xyz${p.substring(p.indexOf('['))}`, v)} path="xyz" />
                         <Vector3RadianDegreeInput label="Mesh Origin RPY" value={link.visual.meshOrigin?.rpy || [0, 0, 0]} onChange={(p, v) => updateLink(link.id, `visual.meshOrigin.rpy${p.substring(p.indexOf('['))}`, v)} path="rpy" />
-                        <button onClick={() => fitMeshToLink(link.id)} title="Auto-scales the mesh to match the link's length (defined by its child joint). Assumes the mesh's main axis is Y." className="flex items-center justify-center w-full bg-teal-600 hover:bg-teal-700 p-2 rounded text-sm">
-                            <LinkIcon className="mr-2 h-4 w-4" /> Fit to Link Length
-                        </button>
+
                     </div>
                 )}
             </div>
