@@ -65,9 +65,9 @@ const createDefaultLink = (): RobotLink => ({
     id: `link-${uuidv4()}`,
     name: 'new_link',
     visual: {
-        type: 'cylinder',
-        dimensions: [0.02, 0.02, 0.2],
-        color: `#${Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0')}`,
+        type: 'none',
+        dimensions: [0.05, 0.05, 0.05],
+        color: '#888888',
     },
     childJoints: [],
 });
