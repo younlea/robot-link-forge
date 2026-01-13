@@ -49,12 +49,12 @@ const NumberInput = ({ label, value, onChange, step = 0.01 }: { label: string, v
     );
 };
 
-const Vector3Input = ({ label, value, onChange, path }: { label: string, value: [number, number, number], onChange: (path: string, val: any) => void, path: string }) => (
+const Vector3Input = ({ label, value, onChange, path, scale = 1 }: { label: string, value: [number, number, number], onChange: (path: string, val: any) => void, path: string, scale?: number }) => (
     <div className="p-2 bg-gray-900/50 rounded">
         <p className="text-sm font-semibold mb-1">{label}</p>
-        <NumberInput label="X" value={value[0]} onChange={(v) => onChange(`${path}[0]`, v)} />
-        <NumberInput label="Y" value={value[1]} onChange={(v) => onChange(`${path}[1]`, v)} />
-        <NumberInput label="Z" value={value[2]} onChange={(v) => onChange(`${path}[2]`, v)} />
+        <NumberInput label="X" value={value[0] * scale} onChange={(v) => onChange(`${path}[0]`, v / scale)} />
+        <NumberInput label="Y" value={value[1] * scale} onChange={(v) => onChange(`${path}[1]`, v / scale)} />
+        <NumberInput label="Z" value={value[2] * scale} onChange={(v) => onChange(`${path}[2]`, v / scale)} />
     </div>
 );
 
@@ -295,7 +295,8 @@ const TextInput = ({ value, onChange, className }: { value: string, onChange: (v
 
 // --- Inspector for Links ---
 const LinkInspector = ({ link }: { link: RobotLink }) => {
-    const { updateLink, addJoint, uploadAndSetMesh, deleteItem, joints, updateJoint } = useRobotStore();
+    const { updateLink, addJoint, uploadAndSetMesh, deleteItem, joints, updateJoint, importUnit } = useRobotStore();
+    const scaleFactor = importUnit === 'mm' ? 1000 : (importUnit === 'cm' ? 100 : 1);
     // Find parent joint (the joint that acts on this link)
     const parentJoint = Object.values(joints).find(j => j.childLinkId === link.id);
     const stlInputRef = useRef<HTMLInputElement>(null);
@@ -414,7 +415,7 @@ const LinkInspector = ({ link }: { link: RobotLink }) => {
                         <h4 className="text-md font-semibold text-gray-300 border-t border-gray-700 pt-3">Mesh Properties</h4>
                         <p className="text-xs text-gray-400 truncate">URL: {link.visual.meshUrl || 'N/A'}</p>
                         <Vector3Input label="Mesh Scale" value={link.visual.meshScale || [1, 1, 1]} onChange={(p, v) => updateLink(link.id, `visual.meshScale${p.substring(p.indexOf('['))}`, v)} path="meshScale" />
-                        <Vector3Input label="Mesh Origin XYZ" value={link.visual.meshOrigin?.xyz || [0, 0, 0]} onChange={(p, v) => updateLink(link.id, `visual.meshOrigin.xyz${p.substring(p.indexOf('['))}`, v)} path="xyz" />
+                        <Vector3Input label={`Mesh Origin XYZ (${importUnit})`} value={link.visual.meshOrigin?.xyz || [0, 0, 0]} onChange={(p, v) => updateLink(link.id, `visual.meshOrigin.xyz${p.substring(p.indexOf('['))}`, v)} path="xyz" scale={scaleFactor} />
                         <Vector3RadianDegreeInput label="Mesh Origin RPY" value={link.visual.meshOrigin?.rpy || [0, 0, 0]} onChange={(p, v) => updateLink(link.id, `visual.meshOrigin.rpy${p.substring(p.indexOf('['))}`, v)} path="rpy" />
 
                     </div>
@@ -434,7 +435,8 @@ const LinkInspector = ({ link }: { link: RobotLink }) => {
 
 // --- Inspector for Joints (with final workflow) ---
 const JointInspector = ({ joint }: { joint: RobotJoint }) => {
-    const { updateJoint, addChainedJoint, uploadAndSetMesh, deleteItem, joints, setHighlightedItem } = useRobotStore();
+    const { updateJoint, addChainedJoint, uploadAndSetMesh, deleteItem, joints, setHighlightedItem, importUnit } = useRobotStore();
+    const scaleFactor = importUnit === 'mm' ? 1000 : (importUnit === 'cm' ? 100 : 1);
     const stlInputRef = useRef<HTMLInputElement>(null);
     const eqInputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -620,7 +622,9 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                 </div>
             )}
 
-            <Vector3Input label="Origin XYZ" value={joint.origin?.xyz || [0, 0, 0]} onChange={(p, v) => updateJoint(joint.id, `origin.xyz${p.substring(p.indexOf('['))}`, v)} path="xyz" />
+
+
+            <Vector3Input label={`Origin XYZ (${importUnit})`} value={joint.origin?.xyz || [0, 0, 0]} onChange={(p, v) => updateJoint(joint.id, `origin.xyz${p.substring(p.indexOf('['))}`, v)} path="xyz" scale={scaleFactor} />
             <Vector3RadianDegreeInput label="Origin RPY" value={joint.origin?.rpy || [0, 0, 0]} onChange={(p, v) => updateJoint(joint.id, `origin.rpy${p.substring(p.indexOf('['))}`, v)} path="rpy" />
 
             <div>
@@ -769,7 +773,7 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                                     <h4 className="text-md font-semibold text-gray-300 border-t border-gray-700 pt-3">Mesh Properties</h4>
                                     <p className="text-xs text-gray-400 truncate">URL: {joint.visual.meshUrl || 'N/A'}</p>
                                     <Vector3Input label="Mesh Scale" value={joint.visual.meshScale || [1, 1, 1]} onChange={(p, v) => updateJoint(joint.id, `visual.meshScale${p.substring(p.indexOf('['))}`, v)} path="meshScale" />
-                                    <Vector3Input label="Mesh Origin XYZ" value={joint.visual.meshOrigin?.xyz || [0, 0, 0]} onChange={(p, v) => updateJoint(joint.id, `visual.meshOrigin.xyz${p.substring(p.indexOf('['))}`, v)} path="xyz" />
+                                    <Vector3Input label={`Mesh Origin XYZ (${importUnit})`} value={joint.visual.meshOrigin?.xyz || [0, 0, 0]} onChange={(p, v) => updateJoint(joint.id, `visual.meshOrigin.xyz${p.substring(p.indexOf('['))}`, v)} path="xyz" scale={scaleFactor} />
                                     <Vector3RadianDegreeInput label="Mesh Origin RPY" value={joint.visual.meshOrigin?.rpy || [0, 0, 0]} onChange={(p, v) => updateJoint(joint.id, `visual.meshOrigin.rpy${p.substring(p.indexOf('['))}`, v)} path="rpy" />
                                 </div>
                             </>
