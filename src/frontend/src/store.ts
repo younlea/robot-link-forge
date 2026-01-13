@@ -24,7 +24,7 @@ const createInitialState = (): RobotState => {
         cameraMode: 'rotate', // Default camera mode
         cameraControls: null,
         serverProjects: [],
-        importUnit: 'm', // Default to Meters
+        importUnit: 'cm', // Default to CM
         collisionMode: 'off', // Default collision off
         collisionBoxScale: 0.8,
         // Motion Recording State
