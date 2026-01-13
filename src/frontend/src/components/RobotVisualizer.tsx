@@ -246,54 +246,53 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
 
   if (!link) return null;
 
+  const isSelected = selectedItem.id === linkId;
+  const clickHandler = (e: any) => { e.stopPropagation(); selectItem(link.id, 'link'); };
+
+  const renderSkeleton = () => {
+    // Render a "Ghost" visual (transparent cylinder) connecting to all child joints
+    // semi-transparent cylinder to visualize the link's structure
+    const childJoints = link.childJoints.map(id => getJoint(id)).filter(j => !!j);
+
+    if (childJoints.length === 0) return null;
+
+    return (
+      <group>
+        {childJoints.map(childJoint => {
+          const start = new THREE.Vector3(0, 0, 0);
+          const end = new THREE.Vector3(...childJoint.origin.xyz);
+          const length = start.distanceTo(end);
+
+          if (length <= 0.001) return null;
+
+          // Calculate orientation
+          const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+          const orientation = new THREE.Quaternion();
+          const up = new THREE.Vector3(0, 1, 0);
+          const direction = new THREE.Vector3().subVectors(end, start).normalize();
+          orientation.setFromUnitVectors(up, direction);
+
+          const JOINT_GAP = 0.02;
+          const renderLength = Math.max(0.001, length - (JOINT_GAP * 2));
+
+          return (
+            <group key={childJoint.id} position={midPoint} quaternion={orientation} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
+              {/* Visual Aid for Link: Semi-transparent cylinder */}
+              <Cylinder args={[0.015, 0.015, renderLength, 8]}>
+                <meshBasicMaterial color={isSelected ? HIGHLIGHT_COLOR : 'gray'} transparent opacity={0.4} depthWrite={false} />
+              </Cylinder>
+            </group>
+          );
+        })}
+      </group>
+    );
+  };
+
   const renderVisual = () => {
-    const isSelected = selectedItem.id === linkId;
-    const clickHandler = (e: any) => { e.stopPropagation(); selectItem(link.id, 'link'); };
-
     if (!link.visual || link.visual.type === 'none') {
-      // Render a "Ghost" visual (transparent cylinder) connecting to all child joints
-      const childJoints = link.childJoints.map(id => getJoint(id)).filter(j => !!j);
-
-      if (childJoints.length > 0) {
-        return (
-          <group>
-            {/* Central Node */}
-            <Sphere args={[0.02, 16, 16]} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
-              <meshStandardMaterial color={isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : 'gray')} transparent opacity={0.5} />
-            </Sphere>
-
-            {childJoints.map(childJoint => {
-              const start = new THREE.Vector3(0, 0, 0);
-              const end = new THREE.Vector3(...childJoint.origin.xyz);
-              const length = start.distanceTo(end);
-
-              if (length <= 0.001) return null;
-
-              // Calculate orientation
-              const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-              const orientation = new THREE.Quaternion();
-              const up = new THREE.Vector3(0, 1, 0);
-              const direction = new THREE.Vector3().subVectors(end, start).normalize();
-              orientation.setFromUnitVectors(up, direction);
-
-              const JOINT_GAP = 0.02;
-              const renderLength = Math.max(0.001, length - (JOINT_GAP * 2));
-
-              return (
-                <group key={childJoint.id} position={midPoint} quaternion={orientation} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
-                  <Cylinder args={[0.01, 0.01, renderLength, 8]}>
-                    <meshBasicMaterial color={isSelected ? HIGHLIGHT_COLOR : 'gray'} transparent opacity={0.3} depthWrite={false} />
-                  </Cylinder>
-                </group>
-              );
-            })}
-          </group>
-        );
-      }
-
-      // Fallback if no children (leaf node without visual)
+      // Fallback Sphere Handle (always visible if type is none)
       return (
-        <Sphere args={[0.02, 16, 16]} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
+        <Sphere args={[0.025, 16, 16]} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
           <meshStandardMaterial color={isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : 'yellow')} side={THREE.DoubleSide} />
         </Sphere>
       );
@@ -351,6 +350,7 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
 
   return (
     <group ref={groupRef}>
+      {renderSkeleton()}
       {renderVisual()}
       {link.childJoints.map((jointId) => (
         <JointWrapper key={jointId} jointId={jointId} registerRef={registerRef} />
