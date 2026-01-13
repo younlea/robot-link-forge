@@ -247,81 +247,64 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
   if (!link) return null;
 
   const renderVisual = () => {
+    const isSelected = selectedItem.id === linkId;
+    const clickHandler = (e: any) => { e.stopPropagation(); selectItem(link.id, 'link'); };
+
     if (!link.visual || link.visual.type === 'none') {
-      const isSelected = selectedItem.id === linkId;
-      const clickHandler = (e: any) => { e.stopPropagation(); selectItem(link.id, 'link'); };
-      // Render a "Ghost" visual (transparent box) to allow selection
-      // If there is a child joint, visual should 'connect' to it
-      let ghost = null;
-      if (link.childJoints.length === 1) {
-        const childJoint = getJoint(link.childJoints[0]);
-        if (childJoint) {
-          const start = new THREE.Vector3(0, 0, 0);
-          const end = new THREE.Vector3(...childJoint.origin.xyz);
-          if (end.lengthSq() > 0.0001) {
-            const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-            const orientation = new THREE.Quaternion();
-            const up = new THREE.Vector3(0, 1, 0);
-            const direction = new THREE.Vector3().subVectors(end, start).normalize();
-            orientation.setFromUnitVectors(up, direction);
-            const length = start.distanceTo(end);
+      // Render a "Ghost" visual (transparent cylinder) connecting to all child joints
+      const childJoints = link.childJoints.map(id => getJoint(id)).filter(j => !!j);
 
-            // "Cylinder" ghost visual connecting joints
-            // Gap should be just enough to clear the default joint sphere (radius ~0.02)
-            const JOINT_GAP = 0.025;
-            const renderLength = Math.max(0.001, length - (JOINT_GAP * 2));
+      if (childJoints.length > 0) {
+        return (
+          <group>
+            {/* Central Node */}
+            <Sphere args={[0.02, 16, 16]} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
+              <meshStandardMaterial color={isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : 'gray')} transparent opacity={0.5} />
+            </Sphere>
 
-            // Render even if short, as long as it's positive-ish
-            if (renderLength > 0.001) {
-              ghost = (
-                <group position={midPoint} quaternion={orientation} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
-                  {/* Rotate cylinder to align with Y-axis orientation logic used above */}
-                  <div />
-                  <Cylinder args={[0.01, 0.01, renderLength, 8]} rotation={[Math.PI / 2, 0, 0]}>
-                    <meshBasicMaterial color={isSelected ? HIGHLIGHT_COLOR : 'gray'} transparent opacity={0.3} depthWrite={false} />
-                  </Cylinder>
-                </group>
-              );
-              // Note: The orientation calc above sets Y as Up. Cylinder is Y-aligned by default.
-              // Wait, typical orientation lookAt makes Z forward.
-              // My previous Box code used `orientation.setFromUnitVectors(up, direction)`.
-              // `up` was (0,1,0). `direction` is the vector from start to end.
-              // So the Y-axis of the object will point along `direction`.
-              // ThreeJS Cylinder is Y-aligned by default. So NO extra rotation is needed inside the group.
+            {childJoints.map(childJoint => {
+              const start = new THREE.Vector3(0, 0, 0);
+              const end = new THREE.Vector3(...childJoint.origin.xyz);
+              const length = start.distanceTo(end);
 
-              ghost = (
-                <group position={midPoint} quaternion={orientation} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
+              if (length <= 0.001) return null;
+
+              // Calculate orientation
+              const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+              const orientation = new THREE.Quaternion();
+              const up = new THREE.Vector3(0, 1, 0);
+              const direction = new THREE.Vector3().subVectors(end, start).normalize();
+              orientation.setFromUnitVectors(up, direction);
+
+              const JOINT_GAP = 0.02;
+              const renderLength = Math.max(0.001, length - (JOINT_GAP * 2));
+
+              return (
+                <group key={childJoint.id} position={midPoint} quaternion={orientation} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
                   <Cylinder args={[0.01, 0.01, renderLength, 8]}>
                     <meshBasicMaterial color={isSelected ? HIGHLIGHT_COLOR : 'gray'} transparent opacity={0.3} depthWrite={false} />
                   </Cylinder>
                 </group>
               );
-            }
-          }
-        }
-      }
-
-      // Fallback if no child joint or failed calc
-      if (!ghost) {
-        ghost = (
-          <Box args={[0.15, 0.15, 0.15]} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
-            <meshBasicMaterial color={isSelected ? HIGHLIGHT_COLOR : 'gray'} transparent opacity={0.2} depthWrite={false} />
-          </Box>
+            })}
+          </group>
         );
       }
-      return ghost;
-    }
-    const { type, dimensions, color, meshUrl, meshScale, meshOrigin } = link.visual;
 
-    const isSelected = selectedItem.id === linkId;
+      // Fallback if no children (leaf node without visual)
+      return (
+        <Sphere args={[0.02, 16, 16]} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
+          <meshStandardMaterial color={isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : 'yellow')} side={THREE.DoubleSide} />
+        </Sphere>
+      );
+    }
+
+    // Explicit Visuals
+    const { type, dimensions, color, meshUrl, meshScale, meshOrigin } = link.visual;
     const materialColor = isColliding ? COLLISION_COLOR : (isSelected ? HIGHLIGHT_COLOR : color);
 
-    const clickHandler = (e: any) => { e.stopPropagation(); selectItem(link.id, 'link'); };
-
-    // Handle mesh type first
     if (type === 'mesh') {
       if (!meshUrl) {
-        // Render a placeholder box if mesh is selected but no URL (prevent invisible/unselectable link)
         return (
           <Box args={[0.1, 0.1, 0.1]} onClick={clickHandler} userData={{ isVisual: true, ownerId: linkId }}>
             <meshBasicMaterial color="red" wireframe />
@@ -352,45 +335,10 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
           <meshStandardMaterial color={materialColor} side={THREE.DoubleSide} />
         </Box>;
 
-      case 'cylinder': {
-        if (link.childJoints.length === 1) {
-          const childJoint = getJoint(link.childJoints[0]);
-          if (childJoint) {
-            const start = new THREE.Vector3(0, 0, 0);
-            const end = new THREE.Vector3(...childJoint.origin.xyz);
-            if (end.lengthSq() < 0.0001) return null;
-
-            const JOINT_VISUAL_RADIUS = 0.02;
-            const GAP_OFFSET = JOINT_VISUAL_RADIUS * 1.5;
-            const originalLength = start.distanceTo(end);
-            const length = Math.max(0, originalLength - (GAP_OFFSET * 2));
-            if (length <= 0) return null;
-
-            const midPoint = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-            const orientation = new THREE.Quaternion();
-            const up = new THREE.Vector3(0, 1, 0);
-            const direction = new THREE.Vector3().subVectors(end, start).normalize();
-            orientation.setFromUnitVectors(up, direction);
-
-            const radius = dimensions[0] || 0.05;
-            const cylinderArgs: [number, number, number, number] = [radius, radius, length, 16];
-
-            return (
-              <group position={midPoint} quaternion={orientation}>
-                <Cylinder args={cylinderArgs} {...props}>
-                  <meshStandardMaterial color={materialColor} side={THREE.DoubleSide} />
-                </Cylinder>
-              </group>
-            );
-          }
-        }
-        const radius = dimensions[0] || 0.05;
-        const length = dimensions[1] || 0.5;
-        const cylinderProps: [number, number, number, number] = [radius, radius, length, 16];
-        return <Cylinder {...props} args={cylinderProps} position={[0, length / 2, 0]} >
+      case 'cylinder':
+        return <Cylinder {...props} args={[dimensions[0] || 0.05, dimensions[0] || 0.05, dimensions[1] || 0.5, 16]} position={[0, (dimensions[1] || 0.5) / 2, 0]}>
           <meshStandardMaterial color={materialColor} side={THREE.DoubleSide} />
         </Cylinder>;
-      }
 
       case 'sphere':
         return <Sphere {...props} args={[(dimensions[0] || 0.1), 32, 32]} >
