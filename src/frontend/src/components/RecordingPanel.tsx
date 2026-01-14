@@ -55,7 +55,6 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         updateKeyframePose,
         loadKeyframePose,
         editRecording,
-        saveRecording,
         cancelEditRecording,
         updateKeyframeTransition,
         updateRecordingMetadata,
