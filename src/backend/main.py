@@ -1956,6 +1956,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             # Thumb: 0 to -90 (Negative, same as others)
             # Others: 0 to -90 (Negative)
             gain = -2.0 # Consistent for all fingers (including thumb)
+            cmd = curls[fname] * gain
             
             if fname == 'general':
                 cmd = curls['general'] * -2.0 # General also negative? Assume fingers.
