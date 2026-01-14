@@ -4,6 +4,8 @@ import { RecordingMode } from '../types';
 import {
     Video,
     Camera,
+    SlidersHorizontal,
+    Hand,
     Gamepad2,
     Circle,
     Square,
@@ -440,22 +442,39 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
                 <div className="p-3 border-b border-gray-700">
                     <div className="text-xs text-gray-500 mb-2">Recording Mode</div>
                     <div className="flex space-x-2">
-                        {modes.map(mode => (
-                            <button
-                                key={mode.id}
-                                onClick={() => !mode.disabled && setRecordingMode(mode.id)}
-                                disabled={mode.disabled || isRecording}
-                                className={`flex-1 py-2 px-3 rounded text-xs flex flex-col items-center space-y-1 transition-colors ${recordingMode === mode.id
-                                    ? 'bg-blue-600 text-white'
-                                    : mode.disabled
-                                        ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                    }`}
-                            >
-                                <mode.icon size={16} />
-                                <span>{mode.label}</span>
-                            </button>
-                        ))}
+                        <button
+                            onClick={() => setRecordingMode('pose')}
+                            disabled={isRecording}
+                            className={`flex-1 py-2 px-3 rounded text-xs flex flex-col items-center space-y-1 transition-colors ${recordingMode === 'pose'
+                                ? 'bg-blue-600 text-white'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                }`}
+                        >
+                            <SlidersHorizontal size={16} />
+                            <span>Sliders</span>
+                        </button>
+                        <button
+                            onClick={() => setRecordingMode('live')}
+                            disabled={isRecording}
+                            className={`flex-1 py-2 px-3 rounded text-xs flex flex-col items-center space-y-1 transition-colors ${recordingMode === 'live'
+                                ? 'bg-red-900/50 text-red-200'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                }`}
+                        >
+                            <Camera size={16} />
+                            <span>Live</span>
+                        </button>
+                        <button
+                            onClick={() => setRecordingMode('glove')}
+                            disabled={isRecording}
+                            className={`flex-1 py-2 px-3 rounded text-xs flex flex-col items-center space-y-1 transition-colors ${recordingMode === 'glove'
+                                ? 'bg-purple-900/50 text-purple-200'
+                                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                }`}
+                        >
+                            <Hand size={16} />
+                            <span>Glove</span>
+                        </button>
                     </div>
                 </div>
 
