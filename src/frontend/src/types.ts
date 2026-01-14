@@ -214,6 +214,7 @@ export interface RobotActions {
   fetchRecordingList: () => Promise<string[]>;
   saveRecordingsToServer: (filename: string) => Promise<void>;
   loadRecordingsFromServer: (filename: string) => Promise<void>;
+  deleteRecordingFromServer: (filename: string) => Promise<void>;
   loadKeyframePose: (keyframeId: string) => void;
   updateRecordingMetadata: (updates: Partial<{ name: string; duration: number }>) => void;
   editRecording: (recordingId: string) => void;

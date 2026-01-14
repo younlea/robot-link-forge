@@ -57,6 +57,7 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         cancelEditRecording,
         updateKeyframeTransition,
         updateRecordingMetadata,
+        deleteRecordingFromServer,
 
         // Persistence
         saveRecordingsLocal,
@@ -337,13 +338,29 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
                             </div>
                             <div className="max-h-32 overflow-y-auto space-y-1">
                                 {serverFiles.length > 0 ? serverFiles.map(f => (
-                                    <button
-                                        key={f}
-                                        onClick={() => handleServerLoadConfirm(f)}
-                                        className="w-full text-left px-2 py-1 text-xs bg-gray-700 hover:bg-gray-600 rounded truncate"
-                                    >
-                                        {f}
-                                    </button>
+                                    <div key={f} className="flex items-center space-x-1 bg-gray-700 rounded pr-1">
+                                        <button
+                                            onClick={() => handleServerLoadConfirm(f)}
+                                            className="flex-1 text-left px-2 py-1 text-xs hover:bg-gray-600 rounded truncate"
+                                        >
+                                            {f}
+                                        </button>
+                                        <button
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if (confirm(`Are you sure you want to delete "${f}" from the server?`)) {
+                                                    await deleteRecordingFromServer(f);
+                                                    // Refresh list
+                                                    const list = await fetchRecordingList();
+                                                    setServerFiles(list);
+                                                }
+                                            }}
+                                            className="p-1 text-gray-400 hover:text-red-400"
+                                            title="Delete from Server"
+                                        >
+                                            <Trash2 size={12} />
+                                        </button>
+                                    </div>
                                 )) : (
                                     <div className="text-gray-500 text-xs italic text-center py-2">No files found</div>
                                 )}

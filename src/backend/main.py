@@ -83,6 +83,23 @@ def load_recordings(filename: str):
         recordings = json.load(f)
     return {"recordings": recordings}
 
+@app.delete("/api/recordings/{filename}")
+def delete_recording_file(filename: str):
+    # Sanitize
+    filename = re.sub(r'[^a-zA-Z0-9_\-\.]', '', filename)
+    if not filename.endswith(".json"):
+        filename += ".json"
+        
+    filepath = os.path.join(RECORDINGS_DIR, filename)
+    if not os.path.exists(filepath):
+        raise HTTPException(status_code=404, detail="Recording file not found")
+    
+    try:
+        os.remove(filepath)
+        return {"message": "Deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 
 @app.post("/api/export-urdf")
