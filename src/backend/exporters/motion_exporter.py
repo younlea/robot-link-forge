@@ -180,9 +180,19 @@ class ReplayNode(Node):
         ratio = (time_ms - t1) / (t2 - t1) if (t2 - t1) > 0 else 0
         
         result = {{}}
+        import math
         for jname, v1 in prev_kf['joints'].items():
             v2 = next_kf['joints'].get(jname, v1)
-            result[jname] = v1 + (v2 - v1) * ratio
+            
+            # Shortest Path Interpolation for Angles
+            # Heuristic: If jump is > PI, assume wrapping.
+            diff = v2 - v1
+            if diff > 3.14159:
+                diff -= 2 * 3.14159
+            elif diff < -3.14159:
+                diff += 2 * 3.14159
+                
+            result[jname] = v1 + diff * ratio
             
         return result
 
