@@ -83,7 +83,7 @@ class ReplayNode(Node):
     def __init__(self):
         super().__init__('replay_node_{pkg_name}')
         self.publisher_ = self.create_publisher(JointState, 'joint_states', 10)
-        self.timer = self.create_timer(0.033, self.timer_callback) # 30Hz
+        self.timer = self.create_timer(0.016, self.timer_callback) # 60Hz for smooth playback
         
         self.declare_parameter('recording_index', 0)
         
