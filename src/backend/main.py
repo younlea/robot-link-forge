@@ -1843,7 +1843,8 @@ for i in range(model.nu):
     # Assign to finger bucket
     assigned = False
     for fname in finger_names:
-        if fname in lower:
+        # Check standard name OR alias (little -> pinky)
+        if fname in lower or (fname == 'pinky' and 'little' in lower):
             actuator_map[fname].append(i)
             print(f"  [ID {{i}}] {{name}} -> {{fname.upper()}} | Range: {{range_str}}")
             assigned = True
@@ -1977,19 +1978,31 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         
         # Apply Control
         for fname, act_indices in actuator_map.items():
-            # Direction Logic:
-            # Thumb: 0 to -90 (Negative, same as others)
-            # Others: 0 to -90 (Negative)
-            # Curl is normalized 0..1 (where 1 is ~90 degrees/1.57 rad)
-            # So gain should be -1.57 to reach -90 degrees.
-            gain = -1.57 # Consistent for all fingers (including thumb)
-            cmd = curls[fname] * gain
+            # Smart Gain Direction based on Joint Limits
+            # Curl is 0..1. We want 90 degrees movement.
+            # If range is [0, pos], target is pos (curl * 1.57).
+            # If range is [neg, 0], target is neg (curl * -1.57).
+            
+            curl = curls[fname]
+            gain_base = 1.57
             
             if fname == 'general':
-                cmd = curls['general'] * -2.0 # General also negative? Assume fingers.
-                
+                cmd_val = curls['general'] * -1.57 # Default general to neg?
+                for idx in act_indices:
+                    data.ctrl[idx] = cmd_val
+                continue
+
             for idx in act_indices:
-                data.ctrl[idx] = cmd
+                # Per-Joint Direction Logic
+                jid = model.actuator_trnid[idx, 0]
+                min_val, max_val = model.jnt_range[jid]
+                
+                sign = -1.0
+                if min_val >= 0: sign = 1.0
+                elif max_val <= 0: sign = -1.0
+                
+                # Apply
+                data.ctrl[idx] = curl * gain_base * sign
                 
         cv2.imshow('Hand Control (Right Hand)', frame)
         if cv2.waitKey(1) & 0xFF == 27: break

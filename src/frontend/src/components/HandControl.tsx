@@ -375,6 +375,9 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
         Object.values(joints).forEach(joint => {
             const lowerName = joint.name.toLowerCase();
             let matchedFinger = fingers.find(f => lowerName.includes(f));
+            if (!matchedFinger) {
+                if (lowerName.includes('little')) matchedFinger = 'pinky';
+            }
 
             // Debug: Periodic log of un-matched joints?
             // if (fpsCountRef.current % 120 === 0 && !matchedFinger) {
@@ -385,8 +388,31 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
 
             const isFirst = lowerName.includes('1st');
             const curl = curls[matchedFinger];
-            const gain = -1.57; // Target -90 degrees (1.57 rad)
+
+            // Smart Gain Direction based on Limits
+            // Default to -1.57 (-90 deg) if limit is negative-biased or symmetric
+            // If limit is strictly positive (e.g. 0 to 2.09), use +1.57 (+90 deg)
+            let dir = -1.0;
+            if (joint.limits) {
+                // Determine active axis
+                let limit = null;
+                if (joint.dof.pitch) limit = joint.limits.pitch;
+                else if (joint.dof.yaw) limit = joint.limits.yaw;
+                else if (joint.dof.roll) limit = joint.limits.roll;
+
+                if (limit) {
+                    if (limit.lower >= 0) dir = 1.0;
+                    else if (limit.upper <= 0) dir = -1.0;
+                }
+            }
+
+            const gain = 1.57 * dir;
             const targetAngle = curl * gain;
+
+            // Debug Thumb Glitches
+            if (matchedFinger === 'thumb' && fpsCountRef.current % 30 === 0) {
+                // console.log(`Thumb ${joint.name}: Curl=${curl.toFixed(2)} Dir=${dir} Tgt=${targetAngle.toFixed(2)}`);
+            }
 
             if (joint.type === 'rotational') {
                 if (joint.dof.pitch) {
