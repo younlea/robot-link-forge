@@ -1360,7 +1360,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         // Start capture loop for Live/Glove modes
         if (mode === 'live' || mode === 'glove') {
             intervalId = setInterval(() => {
-                const currentState = get();
+                const currentState = getState();
                 if (!currentState.isRecording || !currentState.currentRecording) {
                     if (intervalId) clearInterval(intervalId);
                     return;
