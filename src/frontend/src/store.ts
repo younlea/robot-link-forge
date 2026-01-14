@@ -1731,4 +1731,20 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         }
     },
 
+    deleteRecordingFromServer: async (filename: string) => {
+        try {
+            const res = await fetch(`${API_BASE_URL}/api/recordings/${filename}`, {
+                method: 'DELETE',
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.detail || 'Failed to delete');
+            }
+            alert('File deleted from server.');
+        } catch (e: any) {
+            console.error("deleteRecordingFromServer error:", e);
+            alert('Error failing to delete: ' + e.message);
+        }
+    },
+
 }));
