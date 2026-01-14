@@ -49,14 +49,19 @@ const NumberInput = ({ label, value, onChange, step = 0.01 }: { label: string, v
     );
 };
 
-const Vector3Input = ({ label, value, onChange, path, scale = 1 }: { label: string, value: [number, number, number], onChange: (path: string, val: any) => void, path: string, scale?: number }) => (
-    <div className="p-2 bg-gray-900/50 rounded">
-        <p className="text-sm font-semibold mb-1">{label}</p>
-        <NumberInput label="X" value={value[0] * scale} onChange={(v) => onChange(`${path}[0]`, v / scale)} />
-        <NumberInput label="Y" value={value[1] * scale} onChange={(v) => onChange(`${path}[1]`, v / scale)} />
-        <NumberInput label="Z" value={value[2] * scale} onChange={(v) => onChange(`${path}[2]`, v / scale)} />
-    </div>
-);
+const Vector3Input = ({ label, value, onChange, path, scale = 1 }: { label: string, value: [number, number, number], onChange: (path: string, val: any) => void, path: string, scale?: number }) => {
+    // Helper to fix floating point display issues (e.g. 3.500000004 -> 3.5)
+    const fix = (v: number) => parseFloat((v * scale).toFixed(6));
+
+    return (
+        <div className="p-2 bg-gray-900/50 rounded">
+            <p className="text-sm font-semibold mb-1">{label}</p>
+            <NumberInput label="X" value={fix(value[0])} onChange={(v) => onChange(`${path}[0]`, v / scale)} />
+            <NumberInput label="Y" value={fix(value[1])} onChange={(v) => onChange(`${path}[1]`, v / scale)} />
+            <NumberInput label="Z" value={fix(value[2])} onChange={(v) => onChange(`${path}[2]`, v / scale)} />
+        </div>
+    );
+};
 
 const Vector3RadianDegreeInput = ({ label, value, onChange, path }: { label: string, value: [number, number, number], onChange: (path: string, val: any) => void, path: string }) => (
     <div className="p-2 bg-gray-900/50 rounded">

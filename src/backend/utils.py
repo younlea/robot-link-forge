@@ -7,8 +7,8 @@ def to_snake_case(name: str) -> str:
     """Converts a string to snake_case and ensures it's a valid identifier."""
     name = str(name).strip()
     name = name.replace(' ', '_')
-    s = re.sub('(.)([A-Z][a-z]+)', r'\\1_\\2', name)
-    s = re.sub('([a-z0-9])([A-Z])', r'\\1_\\2', s).lower()
+    s = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    s = re.sub('([a-z0-9])([A-Z])', r'\1_\2', s).lower()
     s = re.sub(r'\\W+', '_', s)
     s = re.sub(r'_+', '_', s)
     s = re.sub(r'^_|_$', '', s)
