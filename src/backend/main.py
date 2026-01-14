@@ -1953,14 +1953,9 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         # Apply Control
         for fname, act_indices in actuator_map.items():
             # Direction Logic:
-            # Thumb: 0 to +90 (Positive)
+            # Thumb: 0 to -90 (Negative, same as others)
             # Others: 0 to -90 (Negative)
-            if fname == 'thumb':
-                gain = 2.0
-            else:
-                gain = -2.0 # Invert for fingers
-                
-            cmd = curls[fname] * gain
+            gain = -2.0 # Consistent for all fingers (including thumb)
             
             if fname == 'general':
                 cmd = curls['general'] * -2.0 # General also negative? Assume fingers.
@@ -2004,7 +1999,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
              print("-" * 60)
              print(f"[Frame {{frame_count}}] MP Status:")
              for fname in finger_names:
-                 print(f"  {{fname.upper():<8}} | MP: {{curls[fname]:.2f}} | Cmd: {{curls[fname]* (2.0 if fname=='thumb' else -2.0):.2f}}")
+                 print(f"  {fname.upper():<8} | MP: {curls[fname]:.2f} | Cmd: {curls[fname]* -2.0:.2f}")
                  
              print("  Robot Joints:")
              any_act = False
