@@ -1332,8 +1332,9 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         const state = getState();
         if (state.isRecording) return;
 
+        const id = uuidv4();
         const newRecording: MotionRecording = {
-            id: uuidv4(),
+            id,
             name,
             mode: state.recordingMode || 'slider',
             keyframes: [],
@@ -1341,16 +1342,60 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             createdAt: Date.now(),
         };
 
+        const mode = state.recordingMode;
+        let intervalId: ReturnType<typeof setInterval> | null = null;
+        const startTime = Date.now();
+
+        // Start capture loop for Live/Glove modes
+        if (mode === 'live' || mode === 'glove') {
+            intervalId = setInterval(() => {
+                const currentState = get();
+                if (!currentState.isRecording || !currentState.currentRecording) {
+                    if (intervalId) clearInterval(intervalId);
+                    return;
+                }
+
+                // Create snapshot of current joints
+                const elapsed = Date.now() - startTime;
+                const jointValues: Record<string, JointValues> = {};
+                Object.entries(currentState.joints).forEach(([jid, j]) => {
+                    jointValues[jid] = { ...j.currentValues };
+                });
+
+                const snapshot: MotionKeyframe = {
+                    id: uuidv4(),
+                    timestamp: elapsed,
+                    jointValues,
+                };
+
+                // Efficiently append
+                setState(prev => ({
+                    currentRecording: prev.currentRecording ? {
+                        ...prev.currentRecording,
+                        keyframes: [...prev.currentRecording.keyframes, snapshot],
+                        duration: elapsed,
+                    } : null
+                }));
+
+            }, 50); // 20 FPS
+        }
+
         setState({
             isRecording: true,
-            recordingStartTime: Date.now(),
+            recordingStartTime: startTime,
             currentRecording: newRecording,
+            recordingInterval: intervalId,
         });
     },
 
     stopRecording: () => {
         const state = getState();
         if (!state.isRecording || !state.currentRecording) return;
+
+        // Clear interval if exists
+        if (state.recordingInterval) {
+            clearInterval(state.recordingInterval);
+        }
 
         const finalRecording: MotionRecording = {
             ...state.currentRecording,
@@ -1372,6 +1417,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             recordingStartTime: null,
             currentRecording: null,
             recordings: newRecordings,
+            recordingInterval: null,
         });
     },
 
