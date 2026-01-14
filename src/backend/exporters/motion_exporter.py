@@ -317,7 +317,7 @@ import math
 class ReplayNode(Node):
     def __init__(self):
         super().__init__('replay_node_{pkg_name}')
-        self.publisher_ = self.create_publisher(JointState, 'joint_states', 10)
+        self.publisher_ = self.create_publisher(JointState, 'replay_joint_states', 10)
         self.timer = self.create_timer(0.033, self.timer_callback) # 30Hz
         
         # Load recordings.json from share/config

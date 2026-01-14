@@ -576,6 +576,7 @@ def generate_launch_description():
             executable='joint_state_publisher',
             name='joint_state_publisher',
             output='screen',
+            parameters=[{'source_list': ['replay_joint_states']}],
             condition=IfCondition(PythonExpression(["'", use_jsp, "' == 'true' and '", use_gui, "' == 'false'"]))),
         Node(
             package='joint_state_publisher_gui',
