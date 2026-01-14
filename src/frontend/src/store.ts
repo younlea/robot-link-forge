@@ -131,7 +131,7 @@ const createRobotZip = async (state: RobotState) => {
 
 // Define API Base URL dynamically to support remote access
 // Use relative path for API calls to support remote access via Vite Proxy
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = '';
 
 export const useRobotStore = create<RobotState & RobotActions>((setState, getState) => ({
     ...createInitialState(),
@@ -1664,12 +1664,17 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
     fetchRecordingList: async () => {
         try {
+            console.log("Fetching recording list from:", `${API_BASE_URL}/api/recordings`);
             const res = await fetch(`${API_BASE_URL}/api/recordings`);
-            if (!res.ok) throw new Error('Failed to fetch list');
+            if (!res.ok) {
+                console.error("Fetch failed:", res.status, res.statusText);
+                throw new Error('Failed to fetch list');
+            }
             const data = await res.json();
+            console.log("Fetched recordings:", data);
             return data.files || [];
         } catch (e) {
-            console.error(e);
+            console.error("fetchRecordingList Error:", e);
             return [];
         }
     },
