@@ -1399,6 +1399,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             currentRecording: {
                 ...state.currentRecording,
                 keyframes: [...state.currentRecording.keyframes, newKeyframe],
+                duration: Math.max(state.currentRecording.duration, timestamp),
             },
         });
     },
@@ -1407,10 +1408,17 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         const state = getState();
         if (!state.currentRecording) return;
 
+        const newKeyframes = state.currentRecording.keyframes.filter(k => k.id !== keyframeId);
+        // Auto-Trim: Recalculate duration based on new last keyframe
+        const newDuration = newKeyframes.length > 0
+            ? Math.max(...newKeyframes.map(k => k.timestamp))
+            : 0;
+
         setState({
             currentRecording: {
                 ...state.currentRecording,
-                keyframes: state.currentRecording.keyframes.filter(k => k.id !== keyframeId),
+                keyframes: newKeyframes,
+                duration: newDuration,
             },
         });
     },
@@ -1446,10 +1454,16 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             k.id === keyframeId ? { ...k, timestamp: Math.max(0, newTimestamp) } : k
         ).sort((a, b) => a.timestamp - b.timestamp);
 
+        // Auto-Trim: Recalculate duration
+        const newDuration = updatedKeyframes.length > 0
+            ? Math.max(...updatedKeyframes.map(k => k.timestamp))
+            : 0;
+
         setState({
             currentRecording: {
                 ...state.currentRecording,
                 keyframes: updatedKeyframes,
+                duration: newDuration,
             },
         });
     },
@@ -1526,7 +1540,10 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         // Recalculate duration if needed? For editing, we might keep duration or update based on max timestamp
         if (finalRecording.keyframes.length > 0) {
             const maxTime = Math.max(...finalRecording.keyframes.map(k => k.timestamp));
-            finalRecording.duration = Math.max(finalRecording.duration, maxTime);
+            // Auto-Trim: Force duration to match content (allow shrinking)
+            finalRecording.duration = maxTime;
+        } else {
+            finalRecording.duration = 0;
         }
 
         const existingIdx = state.recordings.findIndex(r => r.id === finalRecording.id);
