@@ -576,6 +576,17 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
     setCollisionMode: (mode) => setState({ collisionMode: mode }),
     setCollisionBoxScale: (scale) => setState({ collisionBoxScale: scale }),
 
+    // Add initialization for recordingInterval if missing in createInitialState, 
+    // but since this is a store action file, I need to find createInitialState function.
+    // Wait, the previous view 550-600 did NOT show createInitialState. 
+    // It showed actions. explicit initialization might be in a different block.
+    // I will skip this for a moment and focus on startRecording which is more critical.
+    // Actually, I should check where state is initialized. 
+    // If I can't find it easily, I'll just rely on the fact that undefined property is fine in JS/TS often if typed optionally, 
+    // but I added it to the type definition earlier.
+
+    // Let's stick to fixing startRecording first.
+
     deleteProjectFromServer: async (filename: string) => {
         try {
             const encodedFilename = encodeURIComponent(filename);
