@@ -1208,18 +1208,7 @@ python3 replay_recording.py [index]
 
         with open(os.path.join(package_dir, "README.md"), "w") as f:
             f.write(readme_content)
-## Motion Playback
-This package includes exported motion recordings.
 
-To replay the recorded motions:
-```bash
-python replay_recording.py
-```
-This script loads `recordings.json` and animates the robot.
-"""
-
-        with open(os.path.join(package_dir, "README_MUJOCO.md"), "w") as f:
-            f.write(readme_content)
 
         # Zip it
         shutil.make_archive(package_dir, 'zip', root_dir=tmpdir, base_dir=sanitized_robot_name)
