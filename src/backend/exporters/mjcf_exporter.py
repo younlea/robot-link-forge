@@ -1,5 +1,5 @@
 import os
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple, List
 from robot_models import RobotData
 from utils import to_snake_case
 
