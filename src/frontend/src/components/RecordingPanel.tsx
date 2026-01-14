@@ -294,6 +294,18 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         }
     };
 
+    const saveRecording = () => {
+        if (!currentRecording || !currentRecording.name.trim()) return;
+
+        const exists = recordings.find(r => r.id === currentRecording.id);
+        if (exists) {
+            updateRecording(currentRecording.id, currentRecording);
+        } else {
+            addRecording(currentRecording);
+        }
+        setCurrentRecording(null);
+    };
+
     return (
         <>
             {/* Unified Server Dialog Overlay */}
