@@ -1100,21 +1100,7 @@ mujoco.viewer.launch(model, data)
                 with open(os.path.join(package_dir, "replay_recording.py"), "w") as f:
                     f.write(replay_py)
 
-                # Generate Bash Scripts for convenience
-                for i, rec in enumerate(processed_recs):
-                    # sanitize recording name for filename
-                    rec_name_safe = "".join([c if c.isalnum() else "_" for c in rec.get("name", f"rec_{i}")])
-                    bash_filename = f"replay_{i}_{rec_name_safe}.sh"
-                    bash_path = os.path.join(package_dir, bash_filename)
-                    
-                    with open(bash_path, "w") as f:
-                        f.write("#!/bin/bash\n")
-                        f.write(f"echo 'Playing recording: {rec.get('name')}'\n")
-                        f.write(f"python3 replay_recording.py {i}\n")
-                    
-                    os.chmod(bash_path, 0o755)
-
-                # Generate Shell Scripts for each recording
+                # Generate Shell Scripts for each recording (Bash)
                 for i, rec in enumerate(processed_recs):
                     rec_name_clean = to_snake_case(rec.get('name', f'rec_{i}'))
                     sh_filename = f"replay_{i}_{rec_name_clean}.sh"
@@ -1127,7 +1113,7 @@ python3 replay_recording.py {i}
                     with open(sh_path, "w") as f:
                         f.write(sh_content)
                     os.chmod(sh_path, 0o755)
-                    
+
             except Exception as e:
                 print(f"Error processing recordings: {e}")
 
@@ -1176,11 +1162,15 @@ Run the visualization script:
 ```bash
 python visualize_urdf.py
 ```
+Or use the convenience scripts:
+```bash
+./launch.sh
+```
 
 ### Kinematic Mode (No Gravity)
 To run without gravity (e.g., to check joint limits or move joints manually without them falling):
 ```bash
-python visualize_urdf.py --kinematic
+./launch_kinematic.sh
 ```
 
 ### Setting Joint Positions (CLI)
@@ -1198,6 +1188,26 @@ Or drag and drop `{urdf_filename}` into the standalone MuJoCo simulator.
 """
         if recordings:
             readme_content += """
+## Motion Replay
+This package includes exported motion recordings.
+
+### How to Replay
+We have generated convenient bash scripts for each recording.
+Simply run the script corresponding to the recording you want to play:
+
+```bash
+./replay_0_recording_name.sh
+```
+
+Alternatively, you can run the python script directly:
+```bash
+python3 replay_recording.py [index]
+```
+(Where [index] is 0, 1, 2...)
+"""
+
+        with open(os.path.join(package_dir, "README.md"), "w") as f:
+            f.write(readme_content)
 ## Motion Playback
 This package includes exported motion recordings.
 
