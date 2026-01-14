@@ -350,10 +350,10 @@ class ReplayNode(Node):
         duration = self.current_recording['duration']
         if duration == 0: duration = 1000 # Safety
         
-        if elapsed_ms > duration:
-            # Loop
-            self.start_time = now
-            elapsed_ms = 0
+        if elapsed_ms >= duration:
+            # Stop at end
+            elapsed_ms = duration
+            # Optional: Stop publishing if you want to save resources, but holding final pose is good.
             
         joint_positions = self.interpolate(self.current_recording, elapsed_ms)
         
@@ -489,9 +489,9 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
              duration = current_recording['duration']
              if duration == 0: duration = 1000
              
-             if elapsed > duration:
-                 start_time = time.time() # Loop
-                 elapsed = 0
+             if elapsed >= duration:
+                 # Stop at end
+                 elapsed = duration
              
              # Log every 1 second
              # We use a simple counter or time check

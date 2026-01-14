@@ -601,7 +601,7 @@ def generate_launch_description():
 # This allows replay_node or other external scripts to control joints.
 source install/setup.bash
 echo "Launching RViz in Passive Mode..."
-ros2 launch {sanitized_robot_name} display.launch.py use_jsp:=false
+ros2 launch {sanitized_robot_name} display.launch.py use_jsp:=true use_gui:=false
 """
         with open(os.path.join(package_dir, "visualize_passive.sh"), "w") as f:
             f.write(passive_sh)
@@ -740,7 +740,8 @@ if [ $? -eq 0 ]; then
     
     if [ "$choice" = "2" ]; then
         echo "Launching {sanitized_robot_name} in PASSIVE mode..."
-        ros2 launch {sanitized_robot_name} display.launch.py use_jsp:=false
+        # We enable JSP but disable GUI, so it bridges replay_joint_states -> joint_states
+        ros2 launch {sanitized_robot_name} display.launch.py use_jsp:=true use_gui:=false
     else
         echo "Launching {sanitized_robot_name} in STANDARD mode..."
         ros2 launch {sanitized_robot_name} display.launch.py
@@ -1603,7 +1604,8 @@ async def export_mujoco_mjcf(
     robot_data: str = Form(...),
     robot_name: str = Form(...),
     files: Optional[List[UploadFile]] = File(None),
-    mesh_collision: bool = Form(False)
+    mesh_collision: bool = Form(False),
+    recordings: str = Form(None)
 ):
     try:
         try:
@@ -1649,8 +1651,8 @@ async def export_mujoco_mjcf(
                         if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
                      mesh_files_map[link_id] = safe_filename
 
-        # Generate MJCF XML
-        mjcf_content = generate_mjcf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names, use_mesh_collision=mesh_collision)
+        # Generate MJCF XML and get joint info
+        mjcf_content, generated_joints_info = generate_mjcf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names, use_mesh_collision=mesh_collision)
         mjcf_filename = f"{sanitized_robot_name}.xml"
         with open(os.path.join(package_dir, mjcf_filename), "w") as f:
             f.write(mjcf_content)
@@ -1684,6 +1686,38 @@ python3 visualize_mjcf.py "$@"
         with open(os.path.join(package_dir, "launch.sh"), "w") as f:
             f.write(launch_sh)
         os.chmod(os.path.join(package_dir, "launch.sh"), 0o755)
+
+        # Process Recordings for MuJoCo
+        if recordings:
+            try:
+                 recs_raw = json.loads(recordings)
+                 processed_recs = process_recordings_for_export(recs_raw, generated_joints_info, robot)
+                 
+                 # 1. Save recordings.json
+                 with open(os.path.join(package_dir, "recordings.json"), "w") as f:
+                     json.dump(processed_recs, f, indent=2)
+                     
+                 # 2. Generate Replay Script
+                 replay_script = generate_mujoco_playback_script(mjcf_filename)
+                 with open(os.path.join(package_dir, "replay_mujoco.py"), "w") as f:
+                     f.write(replay_script)
+                 
+                 # 3. Generate Replay Shell Scripts
+                 for i, rec in enumerate(processed_recs):
+                     rec_name_clean = to_snake_case(rec.get('name', f'rec_{i}'))
+                     sh_filename = f"replay_{i}_{rec_name_clean}.sh"
+                     sh_path = os.path.join(package_dir, sh_filename)
+                     
+                     sh_content = f"""#!/bin/bash
+# Replay recording #{i}: {rec.get('name')}
+python3 replay_mujoco.py {i}
+"""
+                     with open(sh_path, "w") as f:
+                         f.write(sh_content)
+                     os.chmod(sh_path, 0o755)
+
+            except Exception as e:
+                 print(f"Error processing MuJoCo recordings: {e}")
 
         launch_bat = f"""@echo off
 python visualize_mjcf.py %*

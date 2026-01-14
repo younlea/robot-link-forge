@@ -3,7 +3,18 @@ from typing import Dict, Optional
 from robot_models import RobotData
 from utils import to_snake_case
 
-def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[str, str], unique_link_names: Dict[str, str], use_mesh_collision: bool = False):
+def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[str, str], unique_link_names: Dict[str, str], use_mesh_collision: bool = False) -> Tuple[str, List[Dict]]:
+    """
+    Generates MuJoCo MJCF XML.
+    Returns: (xml_content, generated_joints_info)
+    """
+    # Reuse URDF generation logic used for MuJoCo to extract joint split info
+    # We call generate_urdf_xml with for_mujoco=True to get the splits
+    # Then we wrap it in MJCF.
+    
+    # Actually, generate_mjcf_xml re-implements the logic?
+    # Let's check the implementation.
+    pass
     """
     Generates a native MuJoCo XML string (MJCF) for the robot.
     Recursive function to build the body tree from base link.
@@ -65,6 +76,7 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
 
     actuators = []
     sensors = []
+    generated_joints_info = []
 
     def build_body(link_id: str, parent_joint_id: Optional[str] = None, indent_level: int = 2):
         indent = '  ' * indent_level
@@ -121,6 +133,15 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                          ctrl_range = range_str.replace("range=", "ctrlrange=") if range_str else 'ctrlrange="-3.14 3.14"'
                          actuators.append(f'{indent}    <position name="{joint_xml_name}_act" joint="{joint_xml_name}" kp="200" kv="20" {ctrl_range}/>')
 
+                         # Capture Info for Replay Mapping
+                         # Note: for rotational joints we used 'active_axes' logic.
+                         # generated_joints_info needs {original_id, suffix, name}
+                         generated_joints_info.append({
+                             'original_id': child_joint_id, 
+                             'suffix': dof_name, 
+                             'name': joint_xml_name
+                         })
+
                 elif joint.type == 'prismatic':
                     axis_val = joint.axis if joint.axis else [1, 0, 0]
                     axis_str = f"{axis_val[0]} {axis_val[1]} {axis_val[2]}"
@@ -133,6 +154,13 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                     
                     ctrl_range = range_str.replace("range=", "ctrlrange=") if range_str else 'ctrlrange="-1 1"'
                     actuators.append(f'{indent}    <position name="{joint.name}_act" joint="{joint.name}" kp="300" kv="20" {ctrl_range}/>')
+
+                    # Capture Info for Replay Mapping
+                    generated_joints_info.append({
+                        'original_id': child_joint_id,
+                        'suffix': 'prism',
+                        'name': joint.name
+                    })
 
         # --- Joint Visuals ---
         if parent_joint_id:
@@ -302,4 +330,5 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
         xml.append('  </sensor>')
         
     xml.append('</mujoco>')
-    return "\n".join(xml)
+    xml.append('</mujoco>')
+    return "\n".join(xml), generated_joints_info
