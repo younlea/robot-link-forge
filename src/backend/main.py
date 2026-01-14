@@ -1999,7 +1999,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
              print("-" * 60)
              print(f"[Frame {{frame_count}}] MP Status:")
              for fname in finger_names:
-                 print(f"  {fname.upper():<8} | MP: {curls[fname]:.2f} | Cmd: {curls[fname]* -2.0:.2f}")
+                 print(f"  {{fname.upper():<8}} | MP: {{curls[fname]:.2f}} | Cmd: {{curls[fname]* -2.0:.2f}}")
                  
              print("  Robot Joints:")
              any_act = False
