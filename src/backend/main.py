@@ -2196,6 +2196,26 @@ python visualize_mjcf.py
 - `setup_venv.sh`: Helper to create venv.
 - `run_demo.sh`: Helper to run demo in venv.
 """
+        if recordings:
+            readme_content += """
+## Motion Replay
+This package includes exported motion recordings.
+
+### How to Replay
+We have generated convenient bash scripts for each recording.
+Simply run the script corresponding to the recording you want to play:
+
+```bash
+./replay_0_recording_name.sh
+```
+
+Alternatively, you can run the python script directly:
+```bash
+python3 replay_mujoco.py [index]
+```
+(Where [index] is 0, 1, 2...)
+"""
+
         with open(os.path.join(package_dir, "README_MUJOCO.md"), "w") as f:
             f.write(readme_content)
 
