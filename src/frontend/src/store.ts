@@ -1034,6 +1034,11 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             formData.append('robot_name', robotName);
             formData.append('mesh_collision', useMeshCollision.toString());
 
+            const state = getState();
+            if (state.recordings && state.recordings.length > 0) {
+                formData.append('recordings', JSON.stringify(state.recordings));
+            }
+
             for (const meshData of meshDatas) {
                 if (meshData) {
                     formData.append(`files`, meshData.blob, `mesh_${meshData.id}`);

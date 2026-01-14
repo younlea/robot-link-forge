@@ -136,6 +136,7 @@ export interface RobotState {
   recordingStartTime: number | null;
   currentRecording: MotionRecording | null;
   recordings: MotionRecording[];
+  recordingInterval: any | null;
   playbackState: PlaybackState;
 }
 
