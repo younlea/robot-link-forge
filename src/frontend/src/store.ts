@@ -1537,13 +1537,16 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         if (!state.currentRecording) return;
 
         const finalRecording = { ...state.currentRecording };
-        // Recalculate duration if needed? For editing, we might keep duration or update based on max timestamp
+        // Validating duration: ensure it's at least as long as the last keyframe?
+        // User requested ability to set max time manually.
+        // So we only enforce that duration >= maxKeyframeTime IF duration is 0?
+        // Or just let user responsibility? 
+        // Let's ensure it covers at least the keyframes if it's currently smaller than maxTime?
+        // No, user might want to crop? No, cropping without deleting keyframes is weird.
+        // Let's basic sanity check: duration = max(duration, maxKeyframeTime)
         if (finalRecording.keyframes.length > 0) {
             const maxTime = Math.max(...finalRecording.keyframes.map(k => k.timestamp));
-            // Auto-Trim: Force duration to match content (allow shrinking)
-            finalRecording.duration = maxTime;
-        } else {
-            finalRecording.duration = 0;
+            finalRecording.duration = Math.max(finalRecording.duration, maxTime);
         }
 
         const existingIdx = state.recordings.findIndex(r => r.id === finalRecording.id);
@@ -1559,6 +1562,19 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             currentRecording: null, // Exit editing mode
         });
     },
+
+    updateRecordingMetadata: (updates) => {
+        const state = getState();
+        if (!state.currentRecording) return;
+        setState({
+            currentRecording: {
+                ...state.currentRecording,
+                ...updates
+            }
+        });
+    },
+
+
 
     playRecording: (recordingId) => {
         const state = getState();

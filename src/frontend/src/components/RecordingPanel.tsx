@@ -48,6 +48,7 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         stopPlayback,
         seekPlayback,
         deleteRecording,
+        renameRecording,
         updateJoint,
         updateKeyframePose,
         loadKeyframePose,
@@ -55,6 +56,7 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         saveRecording,
         cancelEditRecording,
         updateKeyframeTransition,
+        updateRecordingMetadata,
 
         // Persistence
         saveRecordingsLocal,
@@ -65,6 +67,7 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
     } = useRobotStore();
 
     const [recordingName, setRecordingName] = useState('');
+    const [renamingId, setRenamingId] = useState<string | null>(null);
     const playbackRef = useRef<number | null>(null);
 
     const [showTimeline, setShowTimeline] = useState(true);
@@ -375,16 +378,52 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
 
             {/* Recording Controls */}
             <div className="p-3 border-b border-gray-700">
-                <div className="flex items-center space-x-2 mb-2">
+                <div className="flex flex-col space-y-2 mb-2">
+                    {/* Name Input */}
                     <input
                         type="text"
                         placeholder="Recording name..."
                         value={recordingName}
-                        onChange={(e) => setRecordingName(e.target.value)}
+                        onChange={(e) => {
+                            setRecordingName(e.target.value);
+                            // Sync with store immediately if editing
+                            if (currentRecording) {
+                                updateRecordingMetadata({ name: e.target.value });
+                            }
+                        }}
                         disabled={isRecording}
-                        className="flex-1 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-500"
+                        className="w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200 placeholder-gray-500"
                     />
+
+                    {/* Duration Controls (Only when editing/stopped) */}
+                    {!isRecording && currentRecording && (
+                        <div className="flex items-center space-x-2">
+                            <label className="text-xs text-gray-400">Duration (ms):</label>
+                            <input
+                                type="number"
+                                value={Math.round(currentRecording.duration || 0)}
+                                onChange={(e) => {
+                                    const val = Math.max(0, parseInt(e.target.value) || 0);
+                                    updateRecordingMetadata({ duration: val });
+                                }}
+                                className="w-20 bg-gray-800 border border-gray-600 rounded px-2 py-1 text-xs text-gray-200"
+                            />
+                            <button
+                                onClick={() => {
+                                    if (currentRecording.keyframes.length > 0) {
+                                        const maxTime = Math.max(...currentRecording.keyframes.map(k => k.timestamp));
+                                        updateRecordingMetadata({ duration: maxTime });
+                                    }
+                                }}
+                                className="bg-gray-700 hover:bg-gray-600 text-white px-2 py-1 rounded text-xs"
+                                title="Trim duration to end at the last keyframe"
+                            >
+                                Trim to End
+                            </button>
+                        </div>
+                    )}
                 </div>
+
                 <div className="flex space-x-2">
                     {!isRecording ? (
                         <>
@@ -394,6 +433,7 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
                                         onClick={saveRecording}
                                         className="flex-1 bg-green-600 hover:bg-green-500 text-white py-2 rounded text-xs flex items-center justify-center space-x-1"
                                         title="Save edited recording"
+                                        disabled={!currentRecording.name.trim()}
                                     >
                                         <Save size={12} />
                                         <span>Save</span>
@@ -559,10 +599,38 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
                                     className="flex items-center justify-between bg-gray-800 rounded px-2 py-1.5"
                                 >
                                     <div className="flex-1">
-                                        <div className="text-xs text-gray-200">{rec.name}</div>
-                                        <div className="text-[10px] text-gray-500">
-                                            {rec.keyframes.length} keyframes · {formatTime(rec.duration)}
-                                        </div>
+                                        {renamingId === rec.id ? (
+                                            <div className="flex items-center space-x-1 mr-2">
+                                                <input
+                                                    type="text"
+                                                    autoFocus
+                                                    className="w-full bg-gray-700 border border-blue-500 rounded px-1 py-0.5 text-xs text-white"
+                                                    defaultValue={rec.name}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            renameRecording(rec.id, e.currentTarget.value);
+                                                            setRenamingId(null);
+                                                        } else if (e.key === 'Escape') {
+                                                            setRenamingId(null);
+                                                        }
+                                                    }}
+                                                    onBlur={() => setRenamingId(null)}
+                                                />
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <div
+                                                    className="text-xs text-gray-200 cursor-pointer hover:text-blue-400 truncate"
+                                                    onDoubleClick={() => setRenamingId(rec.id)}
+                                                    title="Double-click to rename"
+                                                >
+                                                    {rec.name}
+                                                </div>
+                                                <div className="text-[10px] text-gray-500">
+                                                    {rec.keyframes.length} keyframes · {formatTime(rec.duration)}
+                                                </div>
+                                            </>
+                                        )}
                                     </div>
                                     <div className="flex items-center space-x-1">
                                         <button
