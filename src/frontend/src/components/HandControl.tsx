@@ -325,22 +325,22 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
         const dist = (p1: any, p2: any) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
 
         if (fingerName === 'thumb') {
-            // Geometric Angle Calculation (CMC-MCP vs MCP-IP)
+            // Geometric Angle Calculation (2D Projection - Ignore Z for stability)
             const cmc = landmarks[THUMB_CMC];
             const mcp = landmarks[THUMB_MCP];
             const ip = landmarks[THUMB_IP];
 
-            // Vec 1: CMC -> MCP
-            const v1 = { x: mcp.x - cmc.x, y: mcp.y - cmc.y, z: (mcp.z || 0) - (cmc.z || 0) };
-            // Vec 2: MCP -> IP
-            const v2 = { x: ip.x - mcp.x, y: ip.y - mcp.y, z: (ip.z || 0) - (mcp.z || 0) };
+            // Vec 1: CMC -> MCP (XY only)
+            const v1 = { x: mcp.x - cmc.x, y: mcp.y - cmc.y };
+            // Vec 2: MCP -> IP (XY only)
+            const v2 = { x: ip.x - mcp.x, y: ip.y - mcp.y };
 
-            const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
-            const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y + v1.z * v1.z);
-            const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y + v2.z * v2.z);
+            const dot = v1.x * v2.x + v1.y * v2.y;
+            const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y);
+            const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y);
 
             const cos = Math.min(Math.max(dot / (mag1 * mag2), -1), 1);
-            const angle = Math.acos(cos); // Radians. 0 = straight, PI/2 = 90 deg bend
+            const angle = Math.acos(cos); // Radians
 
             // Normalize 0..PI/2 -> 0..1
             return Math.min(Math.max(angle / (Math.PI / 2), 0.0), 1.0);
@@ -390,13 +390,21 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
             const curl = curls[matchedFinger];
 
             // Smart Gain Direction based on Limits
-            // Default to -1.57 (-90 deg) if limit is negative-biased or symmetric
-            // If limit is strictly positive (e.g. 0 to 2.09), use +1.57 (+90 deg)
             let dir = -1.0;
             if (joint.limits) {
                 // Determine active axis
                 let limit = null;
-                if (joint.dof.pitch) limit = joint.limits.pitch;
+                if (joint.dof.pitch) {
+                    limit = joint.limits.pitch;
+                    // Fallback: If Pitch limits are default symmetric [-PI, PI], 
+                    // but joint is physically Yaw (axis Z) with restricted Yaw limits, use Yaw.
+                    if (limit.lower < -3 && limit.upper > 3 && joint.limits.yaw.upper !== undefined) {
+                        // Check if Yaw is restricted
+                        if (Math.abs(joint.limits.yaw.lower) < 3 || Math.abs(joint.limits.yaw.upper) < 3) {
+                            limit = joint.limits.yaw;
+                        }
+                    }
+                }
                 else if (joint.dof.yaw) limit = joint.limits.yaw;
                 else if (joint.dof.roll) limit = joint.limits.roll;
 
