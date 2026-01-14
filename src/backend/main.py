@@ -1867,11 +1867,11 @@ def calculate_finger_curl(landmarks, finger_name):
         mcp = landmarks.landmark[mp_hands.HandLandmark.THUMB_MCP]
         ip  = landmarks.landmark[mp_hands.HandLandmark.THUMB_IP]
         
-        # 2. Vectors
+        # 2. Vectors (XY Only - Ignore Z for stability)
         # v1: CMC -> MCP
-        v1 = np.array([mcp.x - cmc.x, mcp.y - cmc.y, mcp.z - cmc.z])
+        v1 = np.array([mcp.x - cmc.x, mcp.y - cmc.y])
         # v2: MCP -> IP
-        v2 = np.array([ip.x - mcp.x, ip.y - mcp.y, ip.z - mcp.z])
+        v2 = np.array([ip.x - mcp.x, ip.y - mcp.y])
         
         # 3. Angle
         # dot product
@@ -1885,10 +1885,6 @@ def calculate_finger_curl(landmarks, finger_name):
         angle_rad = np.arccos(cos_angle)
         
         # 4. Normalize
-        # Straight thumb ~ 0 angle deviation?
-        # WAIT: These vectors are consecutive. If straight, angle is 0.
-        # If bent 90 deg, angle is pi/2.
-        
         # Map 0..PI/2 to 0..1
         curl = np.clip(angle_rad / (np.pi / 2), 0.0, 1.0)
         return curl
@@ -1916,7 +1912,12 @@ def calculate_finger_curl(landmarks, finger_name):
         dist_mcp = np.sqrt((mcp.x - wrist.x)**2 + (mcp.y - wrist.y)**2)
         
         ratio = dist_tip / (dist_mcp + 1e-6)
-        curl = np.clip((1.8 - ratio) / 1.0, 0.0, 1.0)
+        
+        # Tuned Sensitivity
+        max_ratio = 1.8
+        if finger_name == 'pinky': max_ratio = 1.6
+        
+        curl = np.clip((max_ratio - ratio) / 1.0, 0.0, 1.0)
         return curl
 
 # --- Matplotlib Setup ---
@@ -2002,7 +2003,10 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                 elif max_val <= 0: sign = -1.0
                 
                 # Apply
-                data.ctrl[idx] = curl * gain_base * sign
+                val = curl * gain_base * sign
+                # Clamp to limits
+                val = max(min_val, min(max_val, val))
+                data.ctrl[idx] = val
                 
         cv2.imshow('Hand Control (Right Hand)', frame)
         if cv2.waitKey(1) & 0xFF == 27: break

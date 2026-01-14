@@ -358,7 +358,12 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
             const dist_mcp = dist(mcp, wrist);
 
             const ratio = dist_tip / (dist_mcp + 1e-6);
-            return Math.min(Math.max((1.8 - ratio) / 1.0, 0.0), 1.0);
+
+            // Tuned Sensitivity for Pinky vs Others
+            let maxRatio = 1.8;
+            if (fingerName === 'pinky') maxRatio = 1.6; // Pinky is shorter, simpler ratio?
+
+            return Math.min(Math.max((maxRatio - ratio) / 1.0, 0.0), 1.0);
         }
     };
 
@@ -391,31 +396,38 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
 
             // Smart Gain Direction based on Limits
             let dir = -1.0;
+            let currentLimit = null; // Store active limit for clamping
+
             if (joint.limits) {
                 // Determine active axis
-                let limit = null;
+                // let limit = null; // Replaced by currentLimit
                 if (joint.dof.pitch) {
-                    limit = joint.limits.pitch;
+                    currentLimit = joint.limits.pitch;
                     // Fallback: If Pitch limits are default symmetric [-PI, PI], 
                     // but joint is physically Yaw (axis Z) with restricted Yaw limits, use Yaw.
-                    if (limit.lower < -3 && limit.upper > 3 && joint.limits.yaw.upper !== undefined) {
+                    if (currentLimit.lower < -3 && currentLimit.upper > 3 && joint.limits.yaw.upper !== undefined) {
                         // Check if Yaw is restricted
                         if (Math.abs(joint.limits.yaw.lower) < 3 || Math.abs(joint.limits.yaw.upper) < 3) {
-                            limit = joint.limits.yaw;
+                            currentLimit = joint.limits.yaw;
                         }
                     }
                 }
-                else if (joint.dof.yaw) limit = joint.limits.yaw;
-                else if (joint.dof.roll) limit = joint.limits.roll;
+                else if (joint.dof.yaw) currentLimit = joint.limits.yaw;
+                else if (joint.dof.roll) currentLimit = joint.limits.roll;
 
-                if (limit) {
-                    if (limit.lower >= 0) dir = 1.0;
-                    else if (limit.upper <= 0) dir = -1.0;
+                if (currentLimit) {
+                    if (currentLimit.lower >= 0) dir = 1.0;
+                    else if (currentLimit.upper <= 0) dir = -1.0;
                 }
             }
 
             const gain = 1.57 * dir;
-            const targetAngle = curl * gain;
+            let targetAngle = curl * gain;
+
+            // Explicit Clamping to Limits
+            if (currentLimit) {
+                targetAngle = Math.max(currentLimit.lower, Math.min(currentLimit.upper, targetAngle));
+            }
 
             // Debug Thumb Glitches
             if (matchedFinger === 'thumb' && fpsCountRef.current % 30 === 0) {
