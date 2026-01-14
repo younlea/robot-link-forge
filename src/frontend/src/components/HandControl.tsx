@@ -370,7 +370,7 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
 
             const isFirst = lowerName.includes('1st');
             const curl = curls[matchedFinger];
-            const gain = (matchedFinger === 'thumb') ? 2.0 : -2.0;
+            const gain = -2.0; // Consistent for all fingers (including thumb)
             const targetAngle = curl * gain;
 
             if (joint.type === 'rotational') {

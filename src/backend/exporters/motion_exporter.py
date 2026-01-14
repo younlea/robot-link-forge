@@ -23,6 +23,12 @@ def process_recordings_for_export(recordings_raw: List[Dict], generated_joints_i
             
     processed_recordings = []
     
+    # Collect ALL target URDF joint names to ensure complete state
+    all_urdf_joints = set()
+    for info in generated_joints_info:
+        if info.get('name'):
+            all_urdf_joints.add(info['name'])
+
     for rec in recordings_raw:
         clean_rec = {
             "id": rec.get("id"),
@@ -34,7 +40,7 @@ def process_recordings_for_export(recordings_raw: List[Dict], generated_joints_i
         for kf in rec.get("keyframes", []):
             clean_kf = {
                 "timestamp": kf.get("timestamp"),
-                "joints": {} # UrdfName -> Value
+                "joints": {name: 0.0 for name in all_urdf_joints} # Backfill default 0.0
             }
             
             for joint_id, values in kf.get("jointValues", {}).items():
@@ -42,7 +48,6 @@ def process_recordings_for_export(recordings_raw: List[Dict], generated_joints_i
                     continue
                 
                 # 1. Check for Rotational DOFs (roll, pitch, yaw)
-                # Note: URDF exporter uses 'roll', 'pitch', 'yaw' as suffixes for revolute joints
                 for axis in ['roll', 'pitch', 'yaw']:
                     if (joint_id, axis) in joint_map:
                         urdf_name = joint_map[(joint_id, axis)]
