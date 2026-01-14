@@ -82,7 +82,9 @@ import math
 class ReplayNode(Node):
     def __init__(self):
         super().__init__('replay_node_{pkg_name}')
-        self.publisher_ = self.create_publisher(JointState, 'joint_states', 10)
+        # Publish to 'replay_joint_states' so joint_state_publisher (in display.launch) can aggregate it
+        # and avoid conflict (z-fighting) with default 0-values.
+        self.publisher_ = self.create_publisher(JointState, 'replay_joint_states', 10)
         self.timer = self.create_timer(0.016, self.timer_callback) # 60Hz for smooth playback
         
         self.declare_parameter('recording_index', 0)
