@@ -1097,6 +1097,7 @@ mujoco.viewer.launch(model, data)
                     json.dump(processed_recs, f, indent=2)
                 
                 # Generate Replay Script
+                replay_py = generate_mujoco_playback_script(urdf_filename)
                 with open(os.path.join(package_dir, "replay_recording.py"), "w") as f:
                     f.write(replay_py)
 
