@@ -86,7 +86,7 @@ export interface RobotJoint {
 
 // --- Motion Recording Types ---
 
-export type RecordingMode = 'slider' | 'camera' | 'input_device';
+export type RecordingMode = 'slider' | 'live' | 'glove';
 
 export interface MotionKeyframe {
   id: string;
