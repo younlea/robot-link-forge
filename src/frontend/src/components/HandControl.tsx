@@ -325,10 +325,25 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
         const dist = (p1: any, p2: any) => Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
 
         if (fingerName === 'thumb') {
-            const tip = landmarks[THUMB_TIP];
-            const mcp = landmarks[INDEX_MCP]; // Distance to Index MCP
-            const d = dist(tip, mcp);
-            return Math.min(Math.max((0.2 - d) / 0.15, 0.0), 1.0);
+            // Geometric Angle Calculation (CMC-MCP vs MCP-IP)
+            const cmc = landmarks[THUMB_CMC];
+            const mcp = landmarks[THUMB_MCP];
+            const ip = landmarks[THUMB_IP];
+
+            // Vec 1: CMC -> MCP
+            const v1 = { x: mcp.x - cmc.x, y: mcp.y - cmc.y, z: (mcp.z || 0) - (cmc.z || 0) };
+            // Vec 2: MCP -> IP
+            const v2 = { x: ip.x - mcp.x, y: ip.y - mcp.y, z: (ip.z || 0) - (mcp.z || 0) };
+
+            const dot = v1.x * v2.x + v1.y * v2.y + v1.z * v2.z;
+            const mag1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y + v1.z * v1.z);
+            const mag2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y + v2.z * v2.z);
+
+            const cos = Math.min(Math.max(dot / (mag1 * mag2), -1), 1);
+            const angle = Math.acos(cos); // Radians. 0 = straight, PI/2 = 90 deg bend
+
+            // Normalize 0..PI/2 -> 0..1
+            return Math.min(Math.max(angle / (Math.PI / 2), 0.0), 1.0);
         } else {
             let tipId, mcpId;
             if (fingerName === 'index') { tipId = INDEX_TIP; mcpId = INDEX_MCP; }
@@ -370,7 +385,7 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
 
             const isFirst = lowerName.includes('1st');
             const curl = curls[matchedFinger];
-            const gain = -2.0; // Consistent for all fingers (including thumb)
+            const gain = -1.57; // Target -90 degrees (1.57 rad)
             const targetAngle = curl * gain;
 
             if (joint.type === 'rotational') {

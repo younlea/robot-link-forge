@@ -1860,11 +1860,36 @@ def calculate_finger_curl(landmarks, finger_name):
     wrist = landmarks.landmark[mp_hands.HandLandmark.WRIST]
     
     if finger_name == 'thumb':
-        # Thumb heuristic
-        tip = landmarks.landmark[mp_hands.HandLandmark.THUMB_TIP]
-        mcp = landmarks.landmark[mp_hands.HandLandmark.INDEX_FINGER_MCP]
-        dist = np.sqrt((tip.x - mcp.x)**2 + (tip.y - mcp.y)**2)
-        curl = np.clip((0.2 - dist) / 0.15, 0.0, 1.0)
+        # Geometric Angle Calculation (CMC-MCP vs MCP-IP)
+        # 1. Get Landmarks
+        cmc = landmarks.landmark[mp_hands.HandLandmark.THUMB_CMC]
+        mcp = landmarks.landmark[mp_hands.HandLandmark.THUMB_MCP]
+        ip  = landmarks.landmark[mp_hands.HandLandmark.THUMB_IP]
+        
+        # 2. Vectors
+        # v1: CMC -> MCP
+        v1 = np.array([mcp.x - cmc.x, mcp.y - cmc.y, mcp.z - cmc.z])
+        # v2: MCP -> IP
+        v2 = np.array([ip.x - mcp.x, ip.y - mcp.y, ip.z - mcp.z])
+        
+        # 3. Angle
+        # dot product
+        dot = np.dot(v1, v2)
+        # magnitudes
+        norm_v1 = np.linalg.norm(v1)
+        norm_v2 = np.linalg.norm(v2)
+        
+        # cos theta, clip for safety
+        cos_angle = np.clip(dot / (norm_v1 * norm_v2 + 1e-6), -1.0, 1.0)
+        angle_rad = np.arccos(cos_angle)
+        
+        # 4. Normalize
+        # Straight thumb ~ 0 angle deviation?
+        # WAIT: These vectors are consecutive. If straight, angle is 0.
+        # If bent 90 deg, angle is pi/2.
+        
+        # Map 0..PI/2 to 0..1
+        curl = np.clip(angle_rad / (np.pi / 2), 0.0, 1.0)
         return curl
     else:
         # Standard fingers
@@ -1955,7 +1980,9 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             # Direction Logic:
             # Thumb: 0 to -90 (Negative, same as others)
             # Others: 0 to -90 (Negative)
-            gain = -2.0 # Consistent for all fingers (including thumb)
+            # Curl is normalized 0..1 (where 1 is ~90 degrees/1.57 rad)
+            # So gain should be -1.57 to reach -90 degrees.
+            gain = -1.57 # Consistent for all fingers (including thumb)
             cmd = curls[fname] * gain
             
             if fname == 'general':
