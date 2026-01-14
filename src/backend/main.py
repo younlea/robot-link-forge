@@ -1913,9 +1913,8 @@ def calculate_finger_curl(landmarks, finger_name):
         
         ratio = dist_tip / (dist_mcp + 1e-6)
         
-        # Tuned Sensitivity
+        # Uniform Sensitivity (Reverted Pinky tuning)
         max_ratio = 1.8
-        if finger_name == 'pinky': max_ratio = 1.6
         
         curl = np.clip((max_ratio - ratio) / 1.0, 0.0, 1.0)
         return curl

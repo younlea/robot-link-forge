@@ -359,14 +359,13 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
 
             const ratio = dist_tip / (dist_mcp + 1e-6);
 
-            // Tuned Sensitivity for Pinky vs Others
-            let maxRatio = 1.8;
-            if (fingerName === 'pinky') maxRatio = 1.6; // Pinky is shorter, simpler ratio?
+            // Uniform Sensitivity for all non-thumb fingers (User reported mismatch)
+            // Previously tuned to 1.6 for pinky, reverting to 1.8 to match others.
+            const maxRatio = 1.8;
 
             return Math.min(Math.max((maxRatio - ratio) / 1.0, 0.0), 1.0);
         }
     };
-
 
     // --- 5. Robot Store Update ---
     const updateRobotControl = (landmarks: any[], handedness: any) => {
@@ -400,7 +399,6 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
 
             if (joint.limits) {
                 // Determine active axis
-                // let limit = null; // Replaced by currentLimit
                 if (joint.dof.pitch) {
                     currentLimit = joint.limits.pitch;
                     // Fallback: If Pitch limits are default symmetric [-PI, PI], 
@@ -429,6 +427,12 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
                 targetAngle = Math.max(currentLimit.lower, Math.min(currentLimit.upper, targetAngle));
             }
 
+            // STRICT Direction Clamping (Safety Net for "Jumping")
+            // If we decided direction is Negative, NEVER allow Positive.
+            // If Positive, NEVER allow Negative.
+            if (dir < 0) targetAngle = Math.min(0, targetAngle);
+            if (dir > 0) targetAngle = Math.max(0, targetAngle);
+
             // Debug Thumb Glitches
             if (matchedFinger === 'thumb' && fpsCountRef.current % 30 === 0) {
                 // console.log(`Thumb ${joint.name}: Curl=${curl.toFixed(2)} Dir=${dir} Tgt=${targetAngle.toFixed(2)}`);
@@ -439,9 +443,6 @@ const HandControl = ({ onClose }: { onClose: () => void }) => {
                     const currentPitch = (joint.currentValues as any).pitch || 0;
                     // Optimization: Only update if change is significant (> 0.05 rad ~ 3 deg)
                     if (Math.abs(currentPitch - targetAngle) > 0.05) {
-                        if (matchedFinger === 'index' && isFirst && fpsCountRef.current % 60 === 0) {
-                            addLog(`Ctrl: ${joint.name} -> ${targetAngle.toFixed(2)}`);
-                        }
                         updateJoint(joint.id, 'currentValues.pitch', targetAngle);
                     }
                 }
