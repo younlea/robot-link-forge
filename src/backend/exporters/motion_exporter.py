@@ -383,7 +383,7 @@ else:
 """
 
 def generate_mujoco_interactive_script(model_filename: str) -> str:
-    """Generates MuJoCo python script for interactive control + LIVE sensor plotting with Checkboxes."""
+    """Generates MuJoCo python script for interactive control + LIVE sensor plotting with HIERARCHICAL UI."""
     return f"""
 import time
 import mujoco
@@ -395,7 +395,7 @@ import collections
 
 # Try to import matplotlib for sensor graphing
 import matplotlib.pyplot as plt
-from matplotlib.widgets import CheckButtons
+from matplotlib.widgets import CheckButtons, Button
 
 # --- Configuration ---
 MODEL_XML = "{model_filename}"
@@ -410,9 +410,9 @@ data = mujoco.MjData(model)
 
 print("\\n=== Interactive Mode ===")
 print("Use the MuJoCo viewer controls to move joints.")
-print("Real-time sensor graph is active.")
-print("Sensor groupings are available via checkboxes.")
-print("On exit, data will be saved to 'sensor_log.csv'.\\n")
+print("Right window: Real-time sensor graph system.")
+print("Select a FINGER category to see its sensors.")
+print("Press 'C' in view to see collision geoms.")
 
 start_time = time.time()
 
@@ -421,59 +421,136 @@ sensor_history = []
 sensor_names = []
 timestamps = []
 
-# --- Detect Sensors ---
+# --- Detect Sensors and Group ---
 sensor_indices_by_finger = collections.defaultdict(list)
+# Ensure order: Thumb, Index, Middle, Ring, Little, Other
+finger_categories = ['Thumb', 'Index', 'Middle', 'Ring', 'Little', 'Other']
+
 if model.nsensor > 0:
     for i in range(model.nsensor):
         fullname = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SENSOR, i)
         name = fullname if fullname else f"Sensor_{{i}}"
         sensor_names.append(name)
         
-        # Heuristic Grouping
-        lower_name = name.lower()
-        if 'thumb' in lower_name: sensor_indices_by_finger['Thumb'].append(i)
-        elif 'index' in lower_name: sensor_indices_by_finger['Index'].append(i)
-        elif 'middle' in lower_name: sensor_indices_by_finger['Middle'].append(i)
-        elif 'ring' in lower_name: sensor_indices_by_finger['Ring'].append(i)
-        elif 'little' in lower_name or 'pinky' in lower_name: sensor_indices_by_finger['Little'].append(i)
+        low = name.lower()
+        if 'thumb' in low: sensor_indices_by_finger['Thumb'].append(i)
+        elif 'index' in low: sensor_indices_by_finger['Index'].append(i)
+        elif 'middle' in low: sensor_indices_by_finger['Middle'].append(i)
+        elif 'ring' in low: sensor_indices_by_finger['Ring'].append(i)
+        elif 'little' in low or 'pinky' in low: sensor_indices_by_finger['Little'].append(i)
         else: sensor_indices_by_finger['Other'].append(i)
 else:
-    print("No sensors find in model.")
+    print("No sensors found in model.")
+
+# --- UI State ---
+current_view = "HOME" # HOME or DETAIL
+current_finger = None
 
 # --- Setup Real-time Plot ---
 plt.ion()
-fig, ax = plt.subplots(figsize=(12, 6))
-plt.subplots_adjust(left=0.2) # Make room for checkboxes
+fig, ax = plt.subplots(figsize=(14, 7))
+plt.subplots_adjust(left=0.3) # Make lots of room for UI
 
+# Initially create ALL lines but hide them
 lines = []
-# Create line objects for all sensors
 for i, name in enumerate(sensor_names):
-    ln, = ax.plot([], [], label=name)
+    ln, = ax.plot([], [], label=name, visible=False) # Start hidden
     lines.append(ln)
 
 ax.set_title("Real-time Sensor Data")
 ax.set_xlabel("Time (s)")
 ax.set_ylabel("Force")
-# ax.legend(loc='upper right', fontsize='small', ncol=2)
+ax.set_ylim(-0.1, 5.0) # Approx range, will autoscale
 
-# Checkbox UI
-finger_labels = list(sensor_indices_by_finger.keys())
-visibility = [True] * len(finger_labels)
-rax = plt.axes([0.02, 0.4, 0.15, 0.5]) # Left side panel
-check = CheckButtons(rax, finger_labels, visibility)
+# --- UI Elements ---
+# We will dynamically clear/rebuild the widgets axes
 
-def func(label):
-    # Toggle visibility for all lines in this group
-    indices = sensor_indices_by_finger[label]
-    for idx in indices:
-        lines[idx].set_visible(not lines[idx].get_visible())
+ui_axes = [] # Track axes to clear them
+
+def clear_ui():
+    global ui_axes, buttons, checkbuttons
+    for a in ui_axes:
+        a.remove()
+    ui_axes = []
+    buttons = {{}} # Keep references
+    checkbuttons = None
     plt.draw()
 
-check.on_clicked(func)
+buttons = {{}}
+checkbuttons = None
+
+def show_home_menu(event=None):
+    global current_view
+    current_view = "HOME"
+    clear_ui()
+    ax.set_title("Select a Finger Group")
+    
+    # Create Buttons for each non-empty category
+    y_pos = 0.8
+    for cat in finger_categories:
+        if not sensor_indices_by_finger[cat]: continue
+        
+        # Axis for button
+        b_ax = plt.axes([0.05, y_pos, 0.2, 0.08]) # Left panel
+        btn = Button(b_ax, f"{{cat}} ({{len(sensor_indices_by_finger[cat])}})")
+        # Closure to capture category
+        def make_callback(c):
+            return lambda event: show_detail_menu(c)
+        btn.on_clicked(make_callback(cat))
+        
+        buttons[cat] = btn # Store ref
+        ui_axes.append(b_ax)
+        y_pos -= 0.1
+
+def show_detail_menu(finger):
+    global current_view, current_finger, checkbuttons
+    current_view = "DETAIL"
+    current_finger = finger
+    clear_ui()
+    ax.set_title(f"Sensors for {{finger}}")
+    
+    # Back Button
+    b_ax = plt.axes([0.05, 0.85, 0.2, 0.08])
+    btn = Button(b_ax, "< BACK")
+    btn.on_clicked(show_home_menu)
+    buttons['back'] = btn
+    ui_axes.append(b_ax)
+    
+    # Checkboxes for sensors in this group
+    indices = sensor_indices_by_finger[finger]
+    labels = [sensor_names[i] for i in indices]
+    # Check visibility state
+    actives = [lines[i].get_visible() for i in indices]
+    
+    # Scrollable? No, just squeeze them in for now. 18 sensors is a lot for 80% height.
+    # We might need small font.
+    c_ax = plt.axes([0.05, 0.1, 0.2, 0.7]) # large vertical area
+    checkbuttons = CheckButtons(c_ax, labels, actives)
+    
+    def on_check(label):
+        # Find index 
+        # CAUTION: label is non-unique if we removed prefix? No, names are unique.
+        idx = -1
+        for i in indices:
+            if sensor_names[i] == label:
+                idx = i
+                break
+        if idx != -1:
+            lines[idx].set_visible(not lines[idx].get_visible())
+            plt.draw()
+            
+    checkbuttons.on_clicked(on_check)
+    ui_axes.append(c_ax)
+    
+    # Force initial visibility update (if needed)
+    plt.draw()
+
+# Start at Home
+show_home_menu()
 
 plt.show()
 
-# Launch Viewer
+# --- Launch Viewer ---
 with mujoco.viewer.launch_passive(model, data) as viewer:
     print("Starting simulation loop...")
     
@@ -493,26 +570,48 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             sensor_history.append(current_vals)
             timestamps.append(t_now)
             
-            # Update Plot at 10Hz to avoid lagging sim
+            # Update Plot at 10Hz
             if time.time() - last_plot_time > 0.1:
-                # Update X/Y data
-                # Performance: Just plot last 500 points
                 limit = 500
                 x_data = timestamps[-limit:]
                 
-                # Update visible lines
-                for i, ln in enumerate(lines):
-                    if ln.get_visible():
-                        y_data = [h[i] for h in sensor_history[-limit:]]
-                        ln.set_data(x_data, y_data)
+                # Only update lines that are visible (optimization)
+                # But we also need to update data for lines that might become visible? 
+                # Yes, update data for all, but drawing only happens for visible.
                 
-                ax.relim()
-                ax.autoscale_view()
-                fig.canvas.draw()
-                fig.canvas.flush_events()
+                # Check for autoscale
+                max_val = 0
+                has_visible = False
+                
+                raw_history = np.array(sensor_history[-limit:])
+                
+                for i, ln in enumerate(lines):
+                    # Always set data so it's ready when checked
+                    y_data = raw_history[:, i]
+                    ln.set_data(x_data, y_data)
+                    
+                    if ln.get_visible():
+                        has_visible = True
+                        m = np.max(y_data) if len(y_data) > 0 else 0
+                        if m > max_val: max_val = m
+                
+                ax.set_xlim(x_data[0], x_data[-1] + 1)
+                
+                # Dynamic Y-scale if visible
+                if has_visible:
+                    # Smoothing scale
+                    cur_ylim = ax.get_ylim()[1]
+                    target_ylim = max(0.5, max_val * 1.2)
+                    # Simple interpolation or set
+                    ax.set_ylim(-0.1, target_ylim)
+                
+                # fig.canvas.draw() # Expensive
+                # fig.canvas.flush_events()
+                # Use blit if possible, but flush_events is safer for UI
+                plt.pause(0.001) 
+                
                 last_plot_time = time.time()
 
-        # Frame rate control
         time_until_next_step = model.opt.timestep - (time.time() - step_start)
         if time_until_next_step > 0:
             time.sleep(time_until_next_step)
@@ -525,9 +624,7 @@ if sensor_names and sensor_history:
         for t, row in zip(timestamps, sensor_history):
             writer.writerow([t] + list(row))
     print("Saved.")
-else:
-    print("No data to save.")
 
 plt.ioff()
-plt.show() # Keep graph open after exit
+plt.show() 
 """
