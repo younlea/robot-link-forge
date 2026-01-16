@@ -263,7 +263,6 @@ else:
 
 start_time = time.time()
 
-
 # Sensor Data Storage
 sensor_history = []
 sensor_names = []
@@ -384,22 +383,19 @@ else:
 """
 
 def generate_mujoco_interactive_script(model_filename: str) -> str:
-    """Generates MuJoCo python script for interactive control + sensor plotting."""
+    """Generates MuJoCo python script for interactive control + LIVE sensor plotting with Checkboxes."""
     return f"""
 import time
 import mujoco
 import mujoco.viewer
 import numpy as np
 import os
-import argparse
+import csv
+import collections
 
 # Try to import matplotlib for sensor graphing
-try:
-    import matplotlib.pyplot as plt
-    HAS_MATPLOTLIB = True
-except ImportError:
-    print("Warning: matplotlib not found. Sensor graphs will not be displayed.")
-    HAS_MATPLOTLIB = False
+import matplotlib.pyplot as plt
+from matplotlib.widgets import CheckButtons
 
 # --- Configuration ---
 MODEL_XML = "{model_filename}"
@@ -414,8 +410,9 @@ data = mujoco.MjData(model)
 
 print("\\n=== Interactive Mode ===")
 print("Use the MuJoCo viewer controls to move joints.")
-print("Sensor data is being recorded in background.")
-print("Close the viewer to see the sensor plot (if matplotlib is installed).\\n")
+print("Real-time sensor graph is active.")
+print("Sensor groupings are available via checkboxes.")
+print("On exit, data will be saved to 'sensor_log.csv'.\\n")
 
 start_time = time.time()
 
@@ -424,55 +421,113 @@ sensor_history = []
 sensor_names = []
 timestamps = []
 
+# --- Detect Sensors ---
+sensor_indices_by_finger = collections.defaultdict(list)
+if model.nsensor > 0:
+    for i in range(model.nsensor):
+        fullname = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SENSOR, i)
+        name = fullname if fullname else f"Sensor_{{i}}"
+        sensor_names.append(name)
+        
+        # Heuristic Grouping
+        lower_name = name.lower()
+        if 'thumb' in lower_name: sensor_indices_by_finger['Thumb'].append(i)
+        elif 'index' in lower_name: sensor_indices_by_finger['Index'].append(i)
+        elif 'middle' in lower_name: sensor_indices_by_finger['Middle'].append(i)
+        elif 'ring' in lower_name: sensor_indices_by_finger['Ring'].append(i)
+        elif 'little' in lower_name or 'pinky' in lower_name: sensor_indices_by_finger['Little'].append(i)
+        else: sensor_indices_by_finger['Other'].append(i)
+else:
+    print("No sensors find in model.")
+
+# --- Setup Real-time Plot ---
+plt.ion()
+fig, ax = plt.subplots(figsize=(12, 6))
+plt.subplots_adjust(left=0.2) # Make room for checkboxes
+
+lines = []
+# Create line objects for all sensors
+for i, name in enumerate(sensor_names):
+    ln, = ax.plot([], [], label=name)
+    lines.append(ln)
+
+ax.set_title("Real-time Sensor Data")
+ax.set_xlabel("Time (s)")
+ax.set_ylabel("Force")
+# ax.legend(loc='upper right', fontsize='small', ncol=2)
+
+# Checkbox UI
+finger_labels = list(sensor_indices_by_finger.keys())
+visibility = [True] * len(finger_labels)
+rax = plt.axes([0.02, 0.4, 0.15, 0.5]) # Left side panel
+check = CheckButtons(rax, finger_labels, visibility)
+
+def func(label):
+    # Toggle visibility for all lines in this group
+    indices = sensor_indices_by_finger[label]
+    for idx in indices:
+        lines[idx].set_visible(not lines[idx].get_visible())
+    plt.draw()
+
+check.on_clicked(func)
+
+plt.show()
+
 # Launch Viewer
 with mujoco.viewer.launch_passive(model, data) as viewer:
     print("Starting simulation loop...")
+    
+    last_plot_time = time.time()
+    
     while viewer.is_running():
         step_start = time.time()
-        
-        # In passive mode, we just step. User interacts via GUI "Control" panel.
-        # We don't overwrite qpos here, we let the viewer/user handle logic or just physics.
-        # Actually in launch_passive, the viewer syncs user inputs to data.ctrl or data.qpos depending on actuators.
-        # If position actuators are defined (which they are), user sliders control them.
         
         mujoco.mj_step(model, data)
         viewer.sync()
         
         # Capture Sensor Data
         if model.nsensor > 0:
-            if not sensor_names:
-                for i in range(model.nsensor):
-                    fullname = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SENSOR, i)
-                    sensor_names.append(fullname if fullname else f"Sensor {{i}}")
-            
-            # Read sensordata
             current_vals = data.sensordata.copy()
+            t_now = time.time() - start_time
+            
             sensor_history.append(current_vals)
+            timestamps.append(t_now)
+            
+            # Update Plot at 10Hz to avoid lagging sim
+            if time.time() - last_plot_time > 0.1:
+                # Update X/Y data
+                # Performance: Just plot last 500 points
+                limit = 500
+                x_data = timestamps[-limit:]
+                
+                # Update visible lines
+                for i, ln in enumerate(lines):
+                    if ln.get_visible():
+                        y_data = [h[i] for h in sensor_history[-limit:]]
+                        ln.set_data(x_data, y_data)
+                
+                ax.relim()
+                ax.autoscale_view()
+                fig.canvas.draw()
+                fig.canvas.flush_events()
+                last_plot_time = time.time()
 
         # Frame rate control
         time_until_next_step = model.opt.timestep - (time.time() - step_start)
         if time_until_next_step > 0:
             time.sleep(time_until_next_step)
 
-# --- Plotting Sensor Data ---
-if HAS_MATPLOTLIB and sensor_history:
-    print("\\nGenerating sensor plot...")
-    hist_arr = np.array(sensor_history)
-    
-    plt.figure(figsize=(10, 6))
-    # hist_arr shape: (steps, n_sensors)
-    for i in range(hist_arr.shape[1]):
-        label = sensor_names[i] if i < len(sensor_names) else f"Sensor {{i}}"
-        plt.plot(hist_arr[:, i], label=label)
-    
-    plt.title("Sensor Data over Time (Interactive Session)")
-    plt.xlabel("Simulation Steps")
-    plt.ylabel("Sensor Output")
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.tight_layout()
-    plt.show()
+print("Saving data to sensor_log.csv...")
+if sensor_names and sensor_history:
+    with open('sensor_log.csv', 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Time'] + sensor_names)
+        for t, row in zip(timestamps, sensor_history):
+            writer.writerow([t] + list(row))
+    print("Saved.")
 else:
-    if not sensor_history and model.nsensor > 0:
-        print("No sensor data captured.")
-"""
+    print("No data to save.")
 
+plt.ioff()
+plt.show() # Keep graph open after exit
+"""
