@@ -295,8 +295,24 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
         
         # Add sensor if leaf or specifically named, AND it has some visual (otherwise it's a dummy frame)
         # Actually, dummy frames are fine for sites.
-        if is_leaf or is_target_name:
-            if direct_hand:
+        # Check if we should add sensors
+        # For direct_hand, we correspond strictly to "last" links (leaves) or explicit "tip"
+        # For standard, we use the broader heuristic
+        
+        apply_standard_sensor = False
+        apply_direct_sensor = False
+        
+        if direct_hand:
+            # User requirement: "very last" (leaf)
+            # Also accept "tip" explicitly in name just in case it's not strictly a leaf in tree but logic implies it
+            if is_leaf or "tip" in name_lower:
+                apply_direct_sensor = True
+        else:
+             if is_leaf or is_target_name:
+                 apply_standard_sensor = True
+
+        if apply_direct_sensor or apply_standard_sensor:
+            if apply_direct_sensor:
                  # --- Direct Hand Sensor Logic (Hardcoded Grid) ---
                  # Coordinates from mjcf_sample.xml
                  
@@ -365,19 +381,24 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                  
                  if found_config:
                      for suffix, pos in found_config:
-                         # For sites: name="{finger_prefix}_sensor_{suffix}"
-                         # For sensors: name="{sensor_prefix}_{finger_prefix}_{suffix}" -> Actually sample uses "sensor_Little_1_1"
+                         # Use body_name prefix to avoid collision if multiple hands/fingers exist
+                         # e.g. "Right_Index_Tip_sensor_0_1"
+                         site_name = f"{body_name}_sensor_{suffix}"
                          
-                         site_name = f"{finger_prefix}_sensor_{suffix}"
                          # Sample uses size="0.01" for all
                          xml.append(f'{indent}  <site name="{site_name}" pos="{pos}" size="0.01" rgba="1 0 0 1"/>')
                          
                          # Add sensor
-                         # Sample naming is a bit inconsistent: "sensor_Little_1_1" for site "Little_sensor_1_1"
-                         # Let's standardize: sensor_name = "sensor_{site_name}"
                          sensor_name = f"sensor_{site_name}"
                          sensors.append(f'    <touch name="{sensor_name}" site="{site_name}" />')
-            else:
+            
+            # Fallback: If direct_hand is ON but we didn't find a matching finger config (e.g. wrist?), 
+            # do we add a standard sensor? User said "delete the old ones". 
+            # So if it IS a leaf but matches no finger, maybe we just don't add anything or add standard?
+            # User said "The ones I made before are inside the link... delete them". 
+            # Safest is: If direct_hand is True, ONLY add the specialized grid. If no grid matches, add NOTHING.
+            
+            elif apply_standard_sensor:
                 # Add site for sensor
                 site_name = f"site_{body_name}"
                 # Make site visible as a "pad" sensor on the surface
