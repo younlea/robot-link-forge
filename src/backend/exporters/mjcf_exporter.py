@@ -3,7 +3,7 @@ from typing import Dict, Optional, Tuple, List
 from robot_models import RobotData
 from utils import to_snake_case
 
-def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[str, str], unique_link_names: Dict[str, str], use_mesh_collision: bool = False) -> Tuple[str, List[Dict]]:
+def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[str, str], unique_link_names: Dict[str, str], use_mesh_collision: bool = False, direct_hand: bool = False) -> Tuple[str, List[Dict]]:
     """
     Generates MuJoCo MJCF XML.
     Returns: (xml_content, generated_joints_info)
@@ -296,15 +296,97 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
         # Add sensor if leaf or specifically named, AND it has some visual (otherwise it's a dummy frame)
         # Actually, dummy frames are fine for sites.
         if is_leaf or is_target_name:
-            # Add site for sensor
-            site_name = f"site_{body_name}"
-            # Make site visible as a "pad" sensor on the surface
-            # Heuristic: Thin box, offset significantly (4.5cm) to try and reach the fingertip surface
-            xml.append(f'{indent}  <site name="{site_name}" type="box" pos="0.045 0 0" size="0.008 0.015 0.002" rgba="0 1 0 0.5" />')
-            
-            # Add sensor definition
-            sensor_name = f"sensor_{body_name}"
-            sensors.append(f'    <touch name="{sensor_name}" site="{site_name}" />')
+            if direct_hand:
+                 # --- Direct Hand Sensor Logic (Hardcoded Grid) ---
+                 # Coordinates from mjcf_sample.xml
+                 
+                 # Common Grid for Little, Ring, Middle, Index
+                 # Note: The usage in sample implies local frame coordinates.
+                 # The sample bodies are named like "new_link_12", "new_link_13" but the sensors are named "Little_..."
+                 pass
+                 
+                 sensor_configs = {
+                     'little': [
+                         ('0_1', '0.03   0.03   0.275'), ('0_2', '0.03   0      0.28 '), ('0_3', '0.03   -0.03  0.275'),
+                         ('1_1', '0      0.03   0.275'), ('1_2', '0      0      0.275'), ('1_3', '0      -0.03  0.275'),
+                         ('2_1', '-0.03  0.03   0.26'),  ('2_2', '-0.03  0      0.26'),  ('2_3', '-0.03  -0.03  0.26'),
+                         ('3_1', '-0.045 0.03   0.23'),  ('3_2', '-0.045 0      0.23'),  ('3_3', '-0.045 -0.03  0.23'),
+                         ('4_1', '-0.05  0.03   0.2'),   ('4_2', '-0.05  0      0.2'),   ('4_3', '-0.05  -0.03  0.2'),
+                         ('5_1', '-0.06  0.03   0.17'),  ('5_2', '-0.06  0      0.17'),  ('5_3', '-0.06  -0.03  0.17'),
+                         ('6_1', '-0.065 0.03   0.14'),  ('6_2', '-0.065 0      0.14'),  ('6_3', '-0.065 -0.03  0.14')
+                     ],
+                     'ring': [
+                         ('0_1', '0.03   0.03   0.275'), ('0_2', '0.03   0      0.28 '), ('0_3', '0.03   -0.03  0.275'),
+                         ('1_1', '0      0.03   0.275'), ('1_2', '0      0      0.275'), ('1_3', '0      -0.03  0.275'),
+                         ('2_1', '-0.03  0.03   0.26'),  ('2_2', '-0.03  0      0.26'),  ('2_3', '-0.03  -0.03  0.26'),
+                         ('3_1', '-0.045 0.03   0.23'),  ('3_2', '-0.045 0      0.23'),  ('3_3', '-0.045 -0.03  0.23'),
+                         ('4_1', '-0.05  0.03   0.2'),   ('4_2', '-0.05  0      0.2'),   ('4_3', '-0.05  -0.03  0.2'),
+                         ('5_1', '-0.06  0.03   0.17'),  ('5_2', '-0.06  0      0.17'),  ('5_3', '-0.06  -0.03  0.17'),
+                         ('6_1', '-0.065 0.03   0.14'),  ('6_2', '-0.065 0      0.14'),  ('6_3', '-0.065 -0.03  0.14')
+                     ],
+                     'middle': [
+                         ('0_1', '0.03   0.03   0.275'), ('0_2', '0.03   0      0.28 '), ('0_3', '0.03   -0.03  0.275'),
+                         ('1_1', '0      0.03   0.275'), ('1_2', '0      0      0.275'), ('1_3', '0      -0.03  0.275'),
+                         ('2_1', '-0.03  0.03   0.26'),  ('2_2', '-0.03  0      0.26'),  ('2_3', '-0.03  -0.03  0.26'),
+                         ('3_1', '-0.045 0.03   0.23'),  ('3_2', '-0.045 0      0.23'),  ('3_3', '-0.045 -0.03  0.23'),
+                         ('4_1', '-0.05  0.03   0.2'),   ('4_2', '-0.05  0      0.2'),   ('4_3', '-0.05  -0.03  0.2'),
+                         ('5_1', '-0.06  0.03   0.17'),  ('5_2', '-0.06  0      0.17'),  ('5_3', '-0.06  -0.03  0.17'),
+                         ('6_1', '-0.065 0.03   0.14'),  ('6_2', '-0.065 0      0.14'),  ('6_3', '-0.065 -0.03  0.14')
+                     ],
+                     'index': [
+                         ('0_1', '0.03   0.03   0.275'), ('0_2', '0.03   0      0.28 '), ('0_3', '0.03   -0.03  0.275'),
+                         ('1_1', '0      0.03   0.275'), ('1_2', '0      0      0.275'), ('1_3', '0      -0.03  0.275'),
+                         ('2_1', '-0.03  0.03   0.26'),  ('2_2', '-0.03  0      0.26'),  ('2_3', '-0.03  -0.03  0.26'),
+                         ('3_1', '-0.045 0.03   0.23'),  ('3_2', '-0.045 0      0.23'),  ('3_3', '-0.045 -0.03  0.23'),
+                         ('4_1', '-0.05  0.03   0.2'),   ('4_2', '-0.05  0      0.2'),   ('4_3', '-0.05  -0.03  0.2'),
+                         ('5_1', '-0.06  0.03   0.17'),  ('5_2', '-0.06  0      0.17'),  ('5_3', '-0.06  -0.03  0.17'),
+                         ('6_1', '-0.065 0.03   0.14'),  ('6_2', '-0.065 0      0.14'),  ('6_3', '-0.065 -0.03  0.14')
+                     ],
+                     'thumb': [
+                         ('0_1', '0.275 0.03   -0.03'), ('0_2', '0.28     0   -0.03'), ('0_3', '0.275 -0.03  -0.03'),
+                         ('1_1', '0.275 0.03   0'),     ('1_2', '0.275 0      0'),     ('1_3', '0.275 -0.03  0'),
+                         ('2_1', '0.26 0.03   0.03'),   ('2_2', '0.26 0      0.03'),   ('2_3', '0.26 -0.03  0.03'),
+                         ('3_1', '0.23 0.03   0.045'),  ('3_2', '0.23 0      0.045'),  ('3_3', '0.23 -0.03   0.045'),
+                         ('4_1', '0.2 0.03   0.05'),    ('4_2', '0.2 0      0.05'),    ('4_3', '0.2 -0.03  0.05'),
+                         ('5_1', '0.17 0.03  0.06'),    ('5_2', '0.17 0     0.06'),    ('5_3', '0.17 -0.03 0.06'),
+                         ('6_1', '0.14 0.03  0.065'),   ('6_2', '0.14 0     0.065'),   ('6_3', '0.14 -0.03 0.065')
+                     ]
+                 }
+                 
+                 found_config = None
+                 finger_prefix = "sensor"
+                 
+                 nm = body_name.lower()
+                 if 'little' in nm: found_config, finger_prefix = sensor_configs['little'], 'Little'
+                 elif 'ring' in nm: found_config, finger_prefix = sensor_configs['ring'], 'Ring'
+                 elif 'middle' in nm: found_config, finger_prefix = sensor_configs['middle'], 'Middle'
+                 elif 'index' in nm: found_config, finger_prefix = sensor_configs['index'], 'index'
+                 elif 'thumb' in nm: found_config, finger_prefix = sensor_configs['thumb'], 'thumb'
+                 
+                 if found_config:
+                     for suffix, pos in found_config:
+                         # For sites: name="{finger_prefix}_sensor_{suffix}"
+                         # For sensors: name="{sensor_prefix}_{finger_prefix}_{suffix}" -> Actually sample uses "sensor_Little_1_1"
+                         
+                         site_name = f"{finger_prefix}_sensor_{suffix}"
+                         # Sample uses size="0.01" for all
+                         xml.append(f'{indent}  <site name="{site_name}" pos="{pos}" size="0.01" rgba="1 0 0 1"/>')
+                         
+                         # Add sensor
+                         # Sample naming is a bit inconsistent: "sensor_Little_1_1" for site "Little_sensor_1_1"
+                         # Let's standardize: sensor_name = "sensor_{site_name}"
+                         sensor_name = f"sensor_{site_name}"
+                         sensors.append(f'    <touch name="{sensor_name}" site="{site_name}" />')
+            else:
+                # Add site for sensor
+                site_name = f"site_{body_name}"
+                # Make site visible as a "pad" sensor on the surface
+                # Heuristic: Thin box, offset significantly (4.5cm) to try and reach the fingertip surface
+                xml.append(f'{indent}  <site name="{site_name}" type="box" pos="0.045 0 0" size="0.008 0.015 0.002" rgba="0 1 0 0.5" />')
+                
+                # Add sensor definition
+                sensor_name = f"sensor_{body_name}"
+                sensors.append(f'    <touch name="{sensor_name}" site="{site_name}" />')
 
         for child_joint_id in link.childJoints:
             child_joint = robot.joints.get(child_joint_id)
