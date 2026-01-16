@@ -136,8 +136,6 @@ class ReplayNode(Node):
             self.get_logger().info(f"Progress: {{elapsed_ms/1000:.1f}}s / {{duration/1000:.1f}}s ({{pct:.1f}}%)")
         self.log_counter += 1
 
-
-        
         if elapsed_ms > duration:
             # Loop
             self.start_time = now
@@ -220,12 +218,20 @@ import numpy as np
 import os
 import argparse
 
+# Try to import matplotlib for sensor graphing
+try:
+    import matplotlib.pyplot as plt
+    HAS_MATPLOTLIB = True
+except ImportError:
+    print("Warning: matplotlib not found. Sensor graphs will not be displayed.")
+    HAS_MATPLOTLIB = False
+
 parser = argparse.ArgumentParser(description='Play back exported recordings in MuJoCo.')
 parser.add_argument('index', type=int, nargs='?', default=0, help='Index of the recording to play (default: 0)')
 args = parser.parse_args()
 
 # --- Configuration ---
-MODEL_XML = "{model_filename}"
+MODEL_XML = "{model_filename}" # Assumed to be in same directory
 RECORDINGS_JSON = "recordings.json"
 
 if not os.path.exists(MODEL_XML):
@@ -257,206 +263,16 @@ else:
 
 start_time = time.time()
 
-def interpolate(recording, elapsed_ms):
-    if not recording: return {{}}
-    keyframes = recording['keyframes']
-    if not keyframes: return {{}}
-    
-    prev_kf = keyframes[0]
-    next_kf = keyframes[-1]
-    
-    for i in range(len(keyframes)-1):
-        if keyframes[i]['timestamp'] <= elapsed_ms < keyframes[i+1]['timestamp']:
-            prev_kf = keyframes[i]
-            next_kf = keyframes[i+1]
-            break
-            
-    if elapsed_ms >= keyframes[-1]['timestamp']:
-        prev_kf = keyframes[-1]
-        next_kf = keyframes[-1]
+# Sensor Data Storage
+sensor_history = []
+sensor_names = []
+timestamps = []
 
-    if prev_kf == next_kf:
-        return prev_kf['joints']
-
-    t1 = prev_kf['timestamp']
-    t2 = next_kf['timestamp']
-    ratio = (elapsed_ms - t1) / (t2 - t1) if (t2 - t1) > 0 else 0
-    
-    result = {{}}
-    for jname, v1 in prev_kf['joints'].items():
-        v2 = next_kf['joints'].get(jname, v1)
-        result[jname] = v1 + (v2 - v1) * ratio
-    return result
-
-# Launch Viewer
-with mujoco.viewer.launch_passive(model, data) as viewer:
-    print("Starting simulation loop...")
-    while viewer.is_running():
-        step_start = time.time()
-        
-        if current_recording:
-             elapsed = (time.time() - start_time) * 1000
-             if elapsed > current_recording['duration']:
-                 start_time = time.time() # Loop
-                 elapsed = 0
-             
-             targets = interpolate(current_recording, elapsed)
-             
-             for jname, val in targets.items():
-                 jid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, jname)
-                 if jid != -1:
-                     qadr = model.jnt_qposadr[jid]
-                     data.qpos[qadr] = val
-        
-        mujoco.mj_step(model, data)
-        viewer.sync()
-        
-        time_until_next_step = model.opt.timestep - (time.time() - step_start)
-        if time_until_next_step > 0:
-            time.sleep(time_until_next_step)
-"""
-    """Generates ROS 2 python node for playback."""
-    return f"""#!/usr/bin/env python3
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import JointState
-import json
-import time
-import os
-from ament_index_python.packages import get_package_share_directory
-import math
-
-class ReplayNode(Node):
-    def __init__(self):
-        super().__init__('replay_node_{pkg_name}')
-        self.publisher_ = self.create_publisher(JointState, 'replay_joint_states', 10)
-        self.timer = self.create_timer(0.033, self.timer_callback) # 30Hz
-        
-        # Load recordings.json from share/config
-        try:
-            pkg_share = get_package_share_directory('{pkg_name}')
-            json_path = os.path.join(pkg_share, 'config', 'recordings.json')
-            self.get_logger().info(f"Loading recordings from: {{json_path}}")
-            with open(json_path, 'r') as f:
-                self.recordings = json.load(f)
-        except Exception as e:
-            self.get_logger().error(f"Failed to load recordings: {{e}}")
-            self.recordings = []
-
-        self.start_time = time.time()
-        self.current_recording = None
-        
-        if self.recordings:
-            self.current_recording = self.recordings[0] # Default to first
-            self.get_logger().info(f"Auto-playing: {{self.current_recording['name']}}")
-        
-        # You can add logic to switch recordings via service/topic here
-
-    def timer_callback(self):
-        if not self.current_recording:
-            return
-
-        now = time.time()
-        elapsed_ms = (now - self.start_time) * 1000.0
-        
-        duration = self.current_recording['duration']
-        if duration == 0: duration = 1000 # Safety
-        
-        if elapsed_ms >= duration:
-            # Stop at end
-            elapsed_ms = duration
-            # Optional: Stop publishing if you want to save resources, but holding final pose is good.
-            
-        joint_positions = self.interpolate(self.current_recording, elapsed_ms)
-        
-        msg = JointState()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.name = []
-        msg.position = []
-        
-        for name, pos in joint_positions.items():
-            msg.name.append(name)
-            msg.position.append(pos)
-            
-        self.publisher_.publish(msg)
-
-    def interpolate(self, recording, time_ms):
-        keyframes = recording['keyframes']
-        if not keyframes: return {{}}
-        
-        # Binary search or simple scan
-        prev_kf = keyframes[0]
-        next_kf = keyframes[-1]
-        
-        # Basic scan (optimize if needed)
-        for i in range(len(keyframes)-1):
-            if keyframes[i]['timestamp'] <= time_ms < keyframes[i+1]['timestamp']:
-                prev_kf = keyframes[i]
-                next_kf = keyframes[i+1]
-                break
-        
-        if time_ms >= keyframes[-1]['timestamp']:
-            prev_kf = keyframes[-1]
-            next_kf = keyframes[-1]
-            
-        if prev_kf == next_kf:
-            return prev_kf['joints']
-            
-        t1 = prev_kf['timestamp']
-        t2 = next_kf['timestamp']
-        ratio = (time_ms - t1) / (t2 - t1) if (t2 - t1) > 0 else 0
-        
-        result = {{}}
-        for jname, v1 in prev_kf['joints'].items():
-            v2 = next_kf['joints'].get(jname, v1)
-            # Linear interpolation
-            result[jname] = v1 + (v2 - v1) * ratio
-            
-        return result
-
-def main(args=None):
-    rclpy.init(args=args)
-    node = ReplayNode()
-    rclpy.spin(node)
-    node.destroy_node()
-    rclpy.shutdown()
-
-if __name__ == '__main__':
-    main()
-"""
-
-def generate_mujoco_playback_script(model_filename: str) -> str:
-    """Generates MuJoCo python script."""
-    return f"""
-import time
-import json
-import mujoco
-import mujoco.viewer
-import numpy as np
-import os
-
-# --- Configuration ---
-MODEL_XML = "{model_filename}" # Assumed to be in same directory
-RECORDINGS_JSON = "recordings.json"
-
-if not os.path.exists(MODEL_XML):
-    print(f"Error: Model file {{MODEL_XML}} not found.")
-    exit(1)
-
-print(f"Loading model: {{MODEL_XML}}")
-model = mujoco.MjModel.from_xml_path(MODEL_XML)
-data = mujoco.MjData(model)
-
-recordings = []
-if os.path.exists(RECORDINGS_JSON):
-    with open(RECORDINGS_JSON, "r") as f:
-        recordings = json.load(f)
-    print(f"Loaded {{len(recordings)}} recordings.")
-else:
-    print("Warning: recordings.json not found.")
-
-current_recording = recordings[0] if recordings else None
-start_time = time.time()
+# DEBUG: Print controlled joints to help user debug thumb issues
+if current_recording and current_recording.get('keyframes'):
+    controlled_joints = list(current_recording['keyframes'][0]['joints'].keys())
+    print(f"\\n[DEBUG] Controlled Joints in Recording: {{controlled_joints}}")
+    print(f"[DEBUG] If your thumb joint is not in this list, the recording does not contain data for it.\\n")
 
 def interpolate(recording, elapsed_ms):
     if not recording: return {{}}
@@ -506,7 +322,6 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                  elapsed = duration
              
              # Log every 1 second
-             # We use a simple counter or time check
              if not 'log_last_time' in locals():
                  log_last_time = time.time()
              
@@ -523,16 +338,46 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                  # Find joint ID by name
                  jid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, jname)
                  if jid != -1:
-                     # For simple Revolve/Prismatic, qpos index is usually jid + ...
-                     # More robust: use qpos address
                      qadr = model.jnt_qposadr[jid]
                      data.qpos[qadr] = val
         
         mujoco.mj_step(model, data)
         viewer.sync()
         
+        # Capture Sensor Data
+        if model.nsensor > 0:
+            if not sensor_names:
+                for i in range(model.nsensor):
+                    fullname = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SENSOR, i)
+                    sensor_names.append(fullname if fullname else f"Sensor {{i}}")
+            
+            # Read sensordata
+            current_vals = data.sensordata.copy()
+            sensor_history.append(current_vals)
+
         # Frame rate control
         time_until_next_step = model.opt.timestep - (time.time() - step_start)
         if time_until_next_step > 0:
             time.sleep(time_until_next_step)
+
+# --- Plotting Sensor Data ---
+if HAS_MATPLOTLIB and sensor_history:
+    print("\\nGenerating sensor plot...")
+    hist_arr = np.array(sensor_history)
+    
+    plt.figure(figsize=(10, 6))
+    # hist_arr shape: (steps, n_sensors)
+    for i in range(hist_arr.shape[1]):
+        label = sensor_names[i] if i < len(sensor_names) else f"Sensor {{i}}"
+        plt.plot(hist_arr[:, i], label=label)
+    
+    plt.title("Sensor Data over Time")
+    plt.xlabel("Simulation Steps")
+    plt.ylabel("Sensor Output")
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    plt.show()
+else:
+    if not sensor_history and model.nsensor > 0:
+        print("No sensor data captured.")
 """
