@@ -263,6 +263,7 @@ else:
 
 start_time = time.time()
 
+
 # Sensor Data Storage
 sensor_history = []
 sensor_names = []
@@ -381,3 +382,97 @@ else:
     if not sensor_history and model.nsensor > 0:
         print("No sensor data captured.")
 """
+
+def generate_mujoco_interactive_script(model_filename: str) -> str:
+    """Generates MuJoCo python script for interactive control + sensor plotting."""
+    return f"""
+import time
+import mujoco
+import mujoco.viewer
+import numpy as np
+import os
+import argparse
+
+# Try to import matplotlib for sensor graphing
+try:
+    import matplotlib.pyplot as plt
+    HAS_MATPLOTLIB = True
+except ImportError:
+    print("Warning: matplotlib not found. Sensor graphs will not be displayed.")
+    HAS_MATPLOTLIB = False
+
+# --- Configuration ---
+MODEL_XML = "{model_filename}"
+
+if not os.path.exists(MODEL_XML):
+    print(f"Error: Model file {{MODEL_XML}} not found.")
+    exit(1)
+
+print(f"Loading model: {{MODEL_XML}}")
+model = mujoco.MjModel.from_xml_path(MODEL_XML)
+data = mujoco.MjData(model)
+
+print("\\n=== Interactive Mode ===")
+print("Use the MuJoCo viewer controls to move joints.")
+print("Sensor data is being recorded in background.")
+print("Close the viewer to see the sensor plot (if matplotlib is installed).\\n")
+
+start_time = time.time()
+
+# Sensor Data Storage
+sensor_history = []
+sensor_names = []
+timestamps = []
+
+# Launch Viewer
+with mujoco.viewer.launch_passive(model, data) as viewer:
+    print("Starting simulation loop...")
+    while viewer.is_running():
+        step_start = time.time()
+        
+        # In passive mode, we just step. User interacts via GUI "Control" panel.
+        # We don't overwrite qpos here, we let the viewer/user handle logic or just physics.
+        # Actually in launch_passive, the viewer syncs user inputs to data.ctrl or data.qpos depending on actuators.
+        # If position actuators are defined (which they are), user sliders control them.
+        
+        mujoco.mj_step(model, data)
+        viewer.sync()
+        
+        # Capture Sensor Data
+        if model.nsensor > 0:
+            if not sensor_names:
+                for i in range(model.nsensor):
+                    fullname = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SENSOR, i)
+                    sensor_names.append(fullname if fullname else f"Sensor {{i}}")
+            
+            # Read sensordata
+            current_vals = data.sensordata.copy()
+            sensor_history.append(current_vals)
+
+        # Frame rate control
+        time_until_next_step = model.opt.timestep - (time.time() - step_start)
+        if time_until_next_step > 0:
+            time.sleep(time_until_next_step)
+
+# --- Plotting Sensor Data ---
+if HAS_MATPLOTLIB and sensor_history:
+    print("\\nGenerating sensor plot...")
+    hist_arr = np.array(sensor_history)
+    
+    plt.figure(figsize=(10, 6))
+    # hist_arr shape: (steps, n_sensors)
+    for i in range(hist_arr.shape[1]):
+        label = sensor_names[i] if i < len(sensor_names) else f"Sensor {{i}}"
+        plt.plot(hist_arr[:, i], label=label)
+    
+    plt.title("Sensor Data over Time (Interactive Session)")
+    plt.xlabel("Simulation Steps")
+    plt.ylabel("Sensor Output")
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
+    plt.show()
+else:
+    if not sensor_history and model.nsensor > 0:
+        print("No sensor data captured.")
+"""
+
