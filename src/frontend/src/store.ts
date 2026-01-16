@@ -999,7 +999,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
         }
     },
 
-    exportMujocoMJCF: async (robotName: string, useMeshCollision: boolean = false) => {
+    exportMujocoMJCF: async (robotName: string, useMeshCollision: boolean = false, directHand: boolean = false) => {
         try {
             const { links, joints, baseLinkId } = getState();
             const robotData = JSON.parse(JSON.stringify({ links, joints, baseLinkId }));
@@ -1033,6 +1033,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             formData.append('robot_data', JSON.stringify(robotData));
             formData.append('robot_name', robotName);
             formData.append('mesh_collision', useMeshCollision.toString());
+            formData.append('direct_hand', directHand.toString());
 
             const state = getState();
             if (state.recordings && state.recordings.length > 0) {

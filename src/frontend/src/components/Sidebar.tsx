@@ -969,6 +969,7 @@ const Sidebar = () => {
     const [exportFormat, setExportFormat] = useState<'urdf' | 'urdf_ros2' | 'mujoco_urdf' | 'mujoco_mjcf' | 'gazebo' | 'gazebo_ros2' | null>(null);
     const [robotName, setRobotName] = useState('MyRobot');
     const [useMeshCollision, setUseMeshCollision] = useState(false);
+    const [directHand, setDirectHand] = useState(false);
 
     // State for Save/Load Modals
     const [showSaveModal, setShowSaveModal] = useState(false);
@@ -994,6 +995,9 @@ const Sidebar = () => {
         const defaultName = links[baseLinkId]?.name || 'my_robot';
         setRobotName(defaultName);
         setExportFormat(format);
+        // Reset options
+        setUseMeshCollision(false);
+        setDirectHand(false);
         setShowExportModal(true);
         setExportMenuOpen(false);
     };
@@ -1009,7 +1013,7 @@ const Sidebar = () => {
         } else if (exportFormat === 'mujoco_urdf') {
             useRobotStore.getState().exportMujocoURDF(robotName);
         } else if (exportFormat === 'mujoco_mjcf') {
-            useRobotStore.getState().exportMujocoMJCF(robotName, useMeshCollision);
+            useRobotStore.getState().exportMujocoMJCF(robotName, useMeshCollision, directHand);
         } else if (exportFormat === 'gazebo') {
             useRobotStore.getState().exportGazebo(robotName);
         } else if (exportFormat === 'gazebo_ros2') {
@@ -1200,20 +1204,34 @@ const Sidebar = () => {
                             onFocus={e => e.target.select()}
                             className="w-full bg-gray-900 rounded p-2 text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500"
                         />
-                        <div className="flex items-center space-x-2 mt-4">
+                        <div className="flex flex-col space-y-2 mt-4">
                             {exportFormat === 'mujoco_mjcf' && (
-                                <label className="flex items-center space-x-2 cursor-pointer bg-gray-900 p-2 rounded w-full">
-                                    <input
-                                        type="checkbox"
-                                        checked={useMeshCollision}
-                                        onChange={(e) => setUseMeshCollision(e.target.checked)}
-                                        className="form-checkbox text-blue-500 rounded focus:ring-blue-500"
-                                    />
-                                    <div className="text-sm">
-                                        <span className="text-gray-300 font-semibold">Use STL Collision (Experimental)</span>
-                                        <p className="text-xs text-gray-500">More accurate but may cause instability.</p>
-                                    </div>
-                                </label>
+                                <>
+                                    <label className="flex items-center space-x-2 cursor-pointer bg-gray-900 p-2 rounded w-full">
+                                        <input
+                                            type="checkbox"
+                                            checked={useMeshCollision}
+                                            onChange={(e) => setUseMeshCollision(e.target.checked)}
+                                            className="form-checkbox text-blue-500 rounded focus:ring-blue-500"
+                                        />
+                                        <div className="text-sm">
+                                            <span className="text-gray-300 font-semibold">Use STL Collision (Experimental)</span>
+                                            <p className="text-xs text-gray-500">More accurate but may cause instability.</p>
+                                        </div>
+                                    </label>
+                                    <label className="flex items-center space-x-2 cursor-pointer bg-gray-900 p-2 rounded w-full">
+                                        <input
+                                            type="checkbox"
+                                            checked={directHand}
+                                            onChange={(e) => setDirectHand(e.target.checked)}
+                                            className="form-checkbox text-blue-500 rounded focus:ring-blue-500"
+                                        />
+                                        <div className="text-sm">
+                                            <span className="text-gray-300 font-semibold">Use Direct Hand (Grid Sensors)</span>
+                                            <p className="text-xs text-gray-500">Inject high-density sensors for force graph.</p>
+                                        </div>
+                                    </label>
+                                </>
                             )}
                         </div>
                         <div className="flex justify-end space-x-2 mt-6">
