@@ -304,8 +304,8 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
         
         if direct_hand:
             # User requirement: "very last" (leaf)
-            # Also accept "tip" explicitly in name just in case it's not strictly a leaf in tree but logic implies it
-            if is_leaf or "tip" in name_lower:
+            # Also accept "tip", "distal", "end" explicitly in name just in case it's not strictly a leaf in tree but logic implies it
+            if is_leaf or any(k in name_lower for k in ["tip", "distal", "end"]):
                 apply_direct_sensor = True
         else:
              if is_leaf or is_target_name:
@@ -373,7 +373,7 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                  finger_prefix = "sensor"
                  
                  nm = body_name.lower()
-                 if 'little' in nm: found_config, finger_prefix = sensor_configs['little'], 'Little'
+                 if 'little' in nm or 'pinky' in nm: found_config, finger_prefix = sensor_configs['little'], 'Little'
                  elif 'ring' in nm: found_config, finger_prefix = sensor_configs['ring'], 'Ring'
                  elif 'middle' in nm: found_config, finger_prefix = sensor_configs['middle'], 'Middle'
                  elif 'index' in nm: found_config, finger_prefix = sensor_configs['index'], 'index'
