@@ -246,16 +246,16 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                      if not is_first_link:
                          use_cylinder = False # Use MESH for Base/Distal/Middle if requested
                  
-                if use_cylinder:
-                    # Primitive Cylinder
-                    # Heuristic: Radius 12mm, Length 40mm, Oriented along X
-                    # Added contact parameters: condim=3 (friction), solref/solimp (stiffness), margin
-                    coll_geom = 'type="cylinder" size="0.012 0.02" pos="0.02 0 0" euler="0 1.5708 0" group="0" rgba="0 0 1 0.4" condim="3" solref="0.01 1" solimp="0.9 0.95 0.001" margin="0.001"'
-                    xml.append(f'{indent}  <geom {coll_geom} />')
-                else:
-                    # Detailed Mesh 
-                    coll_geom = f'type="mesh" mesh="{asset_name}" group="0" rgba="1 0 0 0" condim="3" solref="0.01 1" solimp="0.9 0.95 0.001" margin="0.001"'
-                    xml.append(f'{indent}  <geom {coll_geom} pos="{v_pos}" euler="{v_euler}" />')
+                 if use_cylinder:
+                     # Primitive Cylinder
+                     # Heuristic: Radius 12mm, Length 40mm, Oriented along X
+                     # Added contact parameters: condim=3 (friction), solref/solimp (stiffness), margin
+                     coll_geom = 'type="cylinder" size="0.012 0.02" pos="0.02 0 0" euler="0 1.5708 0" group="0" rgba="0 0 1 0.4" condim="3" solref="0.01 1" solimp="0.9 0.95 0.001" margin="0.001"'
+                     xml.append(f'{indent}  <geom {coll_geom} />')
+                 else:
+                     # Detailed Mesh 
+                     coll_geom = f'type="mesh" mesh="{asset_name}" group="0" rgba="1 0 0 0" condim="3" solref="0.01 1" solimp="0.9 0.95 0.001" margin="0.001"'
+                     xml.append(f'{indent}  <geom {coll_geom} pos="{v_pos}" euler="{v_euler}" />')
 
 
             elif v.type != 'none' and v.type != 'mesh':
