@@ -370,11 +370,33 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                  finger_prefix = "sensor"
                  
                  nm = body_name.lower()
-                 if 'little' in nm or 'pinky' in nm: found_config, finger_prefix = sensor_configs['little'], 'Little'
-                 elif 'ring' in nm: found_config, finger_prefix = sensor_configs['ring'], 'Ring'
-                 elif 'middle' in nm: found_config, finger_prefix = sensor_configs['middle'], 'Middle'
-                 elif 'index' in nm: found_config, finger_prefix = sensor_configs['index'], 'index'
-                 elif 'thumb' in nm: found_config, finger_prefix = sensor_configs['thumb'], 'thumb'
+                 
+                 # FALLBACK: If body name is generic "new_link...", check the MESH NAME if available.
+                 # 'asset_name' is defined in the block above (Link Visuals) if it's a mesh.
+                 # Variable 'asset_name' scope is inside "if v.type == 'mesh'..." block.
+                 # We need to capture it.
+                 # Let's inspect 'link.visual.meshUrl' or similar if available here?
+                 # Actually, we can just look at 'mesh_files_map' again if needed or save it earlier.
+                 
+                 # Better approach: check 'asset_name' variable from earlier scope? 
+                 # Python variable scoping in function: 'asset_name' might be defined if we entered that block.
+                 # But safer to re-derive or check 'link' visual properties.
+                 
+                 mesh_name_hint = ""
+                 if link.visual and link.visual.type == 'mesh' and link_id in mesh_files_map:
+                      # We can try to guess from the filename in mesh_files_map
+                      fpath = mesh_files_map[link_id]
+                      mesh_name_hint = os.path.basename(fpath).lower()
+                 
+                 target_name = nm
+                 if mesh_name_hint:
+                     target_name = nm + " " + mesh_name_hint # Search both
+                 
+                 if 'little' in target_name or 'pinky' in target_name: found_config, finger_prefix = sensor_configs['little'], 'Little'
+                 elif 'ring' in target_name: found_config, finger_prefix = sensor_configs['ring'], 'Ring'
+                 elif 'middle' in target_name: found_config, finger_prefix = sensor_configs['middle'], 'Middle'
+                 elif 'index' in target_name: found_config, finger_prefix = sensor_configs['index'], 'index'
+                 elif 'thumb' in target_name: found_config, finger_prefix = sensor_configs['thumb'], 'thumb'
                  
                  if found_config:
                      print(f"[DEBUG_MJCF]   -> Config FOUND for {finger_prefix}")
