@@ -66,6 +66,8 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         fetchRecordingList,
         saveRecordingsToServer,
         loadRecordingsFromServer,
+
+        saveRecording, // Added the missing action
     } = useRobotStore();
 
     const [recordingName, setRecordingName] = useState('');
@@ -293,17 +295,7 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
         }
     };
 
-    const saveRecording = () => {
-        if (!currentRecording || !currentRecording.name.trim()) return;
-
-        const exists = recordings.find(r => r.id === currentRecording.id);
-        if (exists) {
-            updateRecording(currentRecording.id, currentRecording);
-        } else {
-            addRecording(currentRecording);
-        }
-        setCurrentRecording(null);
-    };
+    // Local saveRecording removed in favor of store action
 
     return (
         <>

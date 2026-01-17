@@ -579,7 +579,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                          viewer.has_warned_zero = True
                 else:
                      if hasattr(viewer, 'has_warned_zero'):
-                         print(f"[DEBUG] Sensor data detected! Max: {current_vals.max():.4f}")
+                         print(f"[DEBUG] Sensor data detected! Max: {{current_vals.max():.4f}}")
                          del viewer.has_warned_zero # Reset warning
 
                 limit = 500
