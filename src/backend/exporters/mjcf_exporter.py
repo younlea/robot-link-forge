@@ -197,8 +197,8 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                              r, g, b = int(jv.color[1:3], 16)/255, int(jv.color[3:5], 16)/255, int(jv.color[5:7], 16)/255
                              rgb_str = f"{r:.3f} {g:.3f} {b:.3f} 1.0"
                          except: pass
-                     xml.append(f'{indent}  <geom {j_geom_str} pos="{jv_pos}" euler="{jv_euler}" rgba="{rgb_str}" group="1" />')
-                     xml.append(f'{indent}  <geom {j_geom_str} pos="{jv_pos}" euler="{jv_euler}" group="0" rgba="1 0 0 0" />')
+                     xml.append(f'{indent}  <geom {j_geom_str} pos="{jv_pos}" euler="{jv_euler}" rgba="{rgb_str}" group="1" contype="0" conaffinity="0" />')
+                     # REMOVED: Duplicate collision geom for joint visual (user requested clean up)
 
         # --- Link Visuals ---
         if link.visual and link.visual.type != 'none':
