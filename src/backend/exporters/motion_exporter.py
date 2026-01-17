@@ -602,6 +602,17 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                         has_visible = True
                         m = np.max(y_data) if len(y_data) > 0 else 0
                         if m > max_val: max_val = m
+
+                ax.relim()
+                ax.autoscale_view(True,True,True)
+                
+                # Do NOT use plt.pause() as it steals focus.
+                # Use canvas.draw_idle() and flush_events().
+                fig.canvas.draw_idle()
+                try:
+                    fig.canvas.flush_events()
+                except NotImplementedError:
+                    plt.pause(0.001) # Fallback if backend doesn't support flush_events
                 
                 ax.set_xlim(x_data[0], x_data[-1] + 1)
                 

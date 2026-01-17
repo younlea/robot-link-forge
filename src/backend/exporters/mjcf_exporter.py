@@ -217,7 +217,21 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                  asset_name = get_mesh_asset_name(link_id, mesh_files_map[link_id], v.meshScale)
                  
                  # NO scale attribute here
-                 vis_geom = f'type="mesh" mesh="{asset_name}" group="1" contype="0" conaffinity="0"'
+                 # Determine collision properties based on body name (Selective Collision)
+                 # Logic from mjcf_sample.xml: Tips (-end) get collision, others do not.
+                 is_collidable = False
+                 nm_low = body_name.lower()
+                 # Expanded keyword list for tips
+                 if body_name.endswith('-end'):
+                     is_collidable = True
+                 elif any(k in nm_low for k in ["tip", "distal", "end", "3rd"]):
+                      is_collidable = True
+                 
+                 c_val = "1" if is_collidable else "0"
+
+                 # Create Single Mesh Geom (Visual + Collision)
+                 # group="1" is standard for visual. In MJCF sample, group="1" is also used for collision mesh.
+                 vis_geom = f'type="mesh" mesh="{asset_name}" group="1" contype="{c_val}" conaffinity="{c_val}" condim="3" margin="0.002"'
                  
                  rgb_str = "0.5 0.5 0.5 1"
                  if v.color:
@@ -229,44 +243,7 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
 
                  xml.append(f'{indent}  <geom {vis_geom} pos="{v_pos}" euler="{v_euler}" {color_attr} />')
                  
-                 # Collision Geometry Logic
-                 # If 'use_mesh_collision' is TRUE: Use Hybrid (Cyl for 1st, Mesh for others).
-                 # If 'use_mesh_collision' is FALSE: Use Primitive Cylinder for ALL (Simplest).
-                 
-                 use_cylinder = True # Default for simpliciy
-                 
-                 if use_mesh_collision:
-                     # Check if it's the 1st joint (Proximal) which needs Cylinder anyway to avoid twisting
-                     is_first_link = False
-                     if parent_joint_id:
-                         p_joint = robot.joints.get(parent_joint_id)
-                         if p_joint and "1st" in p_joint.name.lower():
-                             is_first_link = True
-                     
-                     if not is_first_link:
-                         use_cylinder = False # Use MESH for Base/Distal/Middle if requested
-                 
-                 # Determine collision properties based on body name (Selective Collision)
-                 # Logic from mjcf_sample.xml: Tips (-end) get collision, others do not.
-                 is_collidable = False
-                 if body_name.endswith('-end'):
-                     is_collidable = True
-                 elif "tip" in body_name.lower() or "distal" in body_name.lower():
-                      is_collidable = True
-                 
-                 # if is_collidable: contype=1, conaffinity=1
-                 # else: contype=0, conaffinity=0
-                 c_val = "1" if is_collidable else "0"
-
-                 if use_cylinder:
-                     # Primitive Cylinder
-                     # Heuristic: Radius 15mm, Length 40mm, Oriented along X
-                     coll_geom = f'type="cylinder" size="0.015 0.02" pos="0.02 0 0" euler="0 1.5708 0" group="0" rgba="0 0 1 0.4" condim="3" contype="{c_val}" conaffinity="{c_val}" margin="0.002"'
-                     xml.append(f'{indent}  <geom {coll_geom} />')
-                 else:
-                     # Detailed Mesh 
-                     coll_geom = f'type="mesh" mesh="{asset_name}" group="0" rgba="1 0 0 0" condim="3" contype="{c_val}" conaffinity="{c_val}" margin="0.002"'
-                     xml.append(f'{indent}  <geom {coll_geom} pos="{v_pos}" euler="{v_euler}" />')
+                 # REMOVED: Duplicate primitive cylinder generation. User explicitly requested removal.
 
 
 
@@ -320,8 +297,8 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
         
         if direct_hand:
             # User requirement: "very last" (leaf)
-            # Also accept "tip", "distal", "end" explicitly in name just in case it's not strictly a leaf in tree but logic implies it
-            if is_leaf or any(k in name_lower for k in ["tip", "distal", "end"]):
+            # Also accept "tip", "distal", "end", "3rd" explicitly in name just in case it's not strictly a leaf in tree but logic implies it
+            if is_leaf or any(k in name_lower for k in ["tip", "distal", "end", "3rd"]):
                 apply_direct_sensor = True
         else:
              if is_leaf or is_target_name:
