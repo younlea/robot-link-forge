@@ -572,10 +572,18 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             
             # Update Plot at 10Hz
             if time.time() - last_plot_time > 0.1:
+                # DEBUG: Verify sensor data is non-zero
+                if current_vals.max() == 0 and current_vals.min() == 0:
+                     if not hasattr(viewer, 'has_warned_zero'):
+                         print("[DEBUG] Warning: All sensor values are 0.0. Check collision contacts!")
+                         viewer.has_warned_zero = True
+                else:
+                     if hasattr(viewer, 'has_warned_zero'):
+                         print(f"[DEBUG] Sensor data detected! Max: {current_vals.max():.4f}")
+                         del viewer.has_warned_zero # Reset warning
+
                 limit = 500
                 x_data = timestamps[-limit:]
-                
-                # Only update lines that are visible (optimization)
                 # But we also need to update data for lines that might become visible? 
                 # Yes, update data for all, but drawing only happens for visible.
                 
