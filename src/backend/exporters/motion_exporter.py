@@ -548,7 +548,7 @@ def show_detail_menu(finger):
 # Start at Home
 show_home_menu()
 
-plt.show()
+plt.show(block=False)
 
 # --- Launch Viewer ---
 with mujoco.viewer.launch_passive(model, data) as viewer:
@@ -627,7 +627,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                 # fig.canvas.draw() # Expensive
                 # fig.canvas.flush_events()
                 # Use blit if possible, but flush_events is safer for UI
-                plt.pause(0.001) 
+                # plt.pause(0.001) # REMOVED: This steals focus. We already flushed events above. 
                 
                 last_plot_time = time.time()
 
