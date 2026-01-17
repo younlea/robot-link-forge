@@ -304,6 +304,10 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
              if is_leaf or is_target_name:
                  apply_standard_sensor = True
 
+        # Debug Print for User Feedback
+        if "tip" in name_lower or "end" in name_lower or "thumb" in name_lower:
+            print(f"[DEBUG_MJCF] Body: {body_name} | Leaf: {is_leaf} | Direct: {apply_direct_sensor} | Standard: {apply_standard_sensor}")
+
         if apply_direct_sensor or apply_standard_sensor:
             if apply_direct_sensor:
                  # --- Direct Hand Sensor Logic (Hardcoded Grid) ---
@@ -373,6 +377,7 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                  elif 'thumb' in nm: found_config, finger_prefix = sensor_configs['thumb'], 'thumb'
                  
                  if found_config:
+                     print(f"[DEBUG_MJCF]   -> Config FOUND for {finger_prefix}")
                      for suffix, pos in found_config:
                          # Use body_name prefix to avoid collision if multiple hands/fingers exist
                          # e.g. "Right_Index_Tip_sensor_0_1"
