@@ -1158,8 +1158,8 @@ if HAS_MATPLOTLIB and args.mode == 'forward':
             model.actuator_gainprm[self.target_actuator_id, 0] = kp
             model.actuator_biasprm[self.target_actuator_id, 1] = -kv
             
-            self.box_kp.set_val(f"{kp:.1f}")
-            self.box_kv.set_val(f"{kv:.1f}")
+            self.box_kp.set_val(f"{{kp:.1f}}")
+            self.box_kv.set_val(f"{{kv:.1f}}")
             self.is_updating = False
 
     # Create 4 Slots
