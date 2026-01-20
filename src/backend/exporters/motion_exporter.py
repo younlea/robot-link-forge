@@ -990,32 +990,59 @@ else:
     joint_grid_map = detect_finger_joints(model)
     log_file_name = "torque_log.csv"
     data_source_names = sorted(joint_ids.keys())
-    z_lim = (-5, 5)
+    data_source_names = sorted(joint_ids.keys())
+    z_lim = (-20, 20)
 
 print(f"Logging to: {{log_file_name}}")
 csv_file = open(log_file_name, 'w', newline='')
 writer = csv.writer(csv_file)
 writer.writerow(['Time'] + data_source_names)
 
-def get_frame(time_s):
-    t_ms = time_s * 1000.0
-    kfs = rec['keyframes']
-    if not kfs: return {{}}
-    if t_ms >= kfs[-1]['timestamp']: return kfs[-1]['joints']
-    if t_ms <= kfs[0]['timestamp']: return kfs[0]['joints']
-    for i in range(len(kfs)-1):
-        if kfs[i]['timestamp'] <= t_ms < kfs[i+1]['timestamp']:
-            t1 = kfs[i]['timestamp']
-            t2 = kfs[i+1]['timestamp']
-            ratio = (t_ms - t1)/(t2-t1) if (t2-t1)>0 else 0
-            j_t = {{}}
-            for k, v in kfs[i]['joints'].items():
-                v2 = kfs[i+1]['joints'].get(k, v)
-                j_t[k] = v + (v2 - v) * ratio
-            return j_t
-    return kfs[0]['joints']
-
 print("Starting Replay...")
+
+# --- Pre-calculate Trajectory (Interpolation) ---
+print("Pre-calculating trajectory for Inverse Dynamics...")
+
+# Prepare time array for simulation steps
+duration = rec['duration'] / 1000.0 # seconds
+if duration <= 0: duration = 1.0
+dt = model.opt.timestep
+trajectory_times = np.arange(0, duration, dt)
+n_steps = len(trajectory_times)
+
+# Target arrays (Steps x Dims)
+qpos_traj = np.zeros((n_steps, model.nq))
+qvel_traj = np.zeros((n_steps, model.nv))
+qacc_traj = np.zeros((n_steps, model.nv))
+
+# Flatten keyframes to arrays for interpolation
+kf_times = [k['timestamp']/1000.0 for k in rec['keyframes']]
+kf_joints = rec['keyframes']
+
+# For each joint, interpolate
+for jname in joint_ids.keys():
+    jid = joint_ids[jname]
+    qadr = model.jnt_qposadr[jid]
+    dof_adr = model.jnt_dofadr[jid] # For velocity/acc mapping (assumes simple 1-1 for now)
+    
+    # Extract raw points
+    y_points = []
+    first_val = kf_joints[0]['joints'].get(jname, 0.0)
+    for kf in kf_joints:
+        y_points.append(kf['joints'].get(jname, first_val))
+    
+    # Linear Interpolation
+    q_interp = np.interp(trajectory_times, kf_times, y_points)
+    qpos_traj[:, qadr] = q_interp
+    
+    # Calculate Velocity (Finite Difference)
+    # v[i] = (q[i+1] - q[i]) / dt
+    qvel_traj[:, dof_adr] = np.gradient(q_interp, dt)
+    
+    # Calculate Acceleration
+    qacc_traj[:, dof_adr] = np.gradient(qvel_traj[:, dof_adr], dt)
+
+print("Trajectory calculation complete.")
 
 if HAS_MATPLOTLIB:
     plt.ion()
@@ -1087,6 +1114,7 @@ if HAS_MATPLOTLIB:
     ax.set_zlim(*z_lim)
 
 with mujoco.viewer.launch_passive(model, data) as viewer:
+    print("Starting simulation loop...")
     start_time = time.time()
     last_print = 0
     
@@ -1097,82 +1125,131 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             start_time = now
             elapsed = 0
             
-        targets = get_frame(elapsed)
-        for jname, target_pos in targets.items():
-            if jname in actuator_ids:
-                data.ctrl[actuator_ids[jname]] = target_pos
-                
-        mujoco.mj_step(model, data)
+        # --- INVERSE DYNAMICS MODE ---
+        # 1. Look up pre-calculated state
+        # elapsed is in seconds
+        idx = int(elapsed / dt)
+        if idx >= len(trajectory_times):
+            idx = len(trajectory_times) - 1
+        
+        # Set state (qpos, qvel, qacc)
+        data.qpos[:model.nq] = qpos_traj[idx]
+        data.qvel[:model.nv] = qvel_traj[idx]
+        data.qacc[:model.nv] = qacc_traj[idx]
+        
+        # Inverse Dynamics: Compute forces required to produce qacc given qpos, qvel
+        mujoco.mj_inverse(model, data)
+        
         viewer.sync()
         
-        if now - last_print > 0.1:
-            # 1. Collect Snapshot
-            snapshot = {{}}
-            row = [elapsed]
+        # 2. Capture Torque (qfrc_inverse)
+        # Note: qfrc_inverse includes gravity, coriolis, and contact forces needed.
+        # We want to show the Actuator forces required. 
+        # data.qfrc_inverse is the generalized force. 
+        # For actuated joints, this is the torque the motor must produce.
+        
+        torques = []
+        if args.mode == 'joints':
+            for r in range(3):
+                row_vals = []
+                for c in range(5): # 5 fingers
+                    jname = joint_grid_map[r][c]
+                    val = 0.0
+                    if jname and jname in joint_ids:
+                        jid = joint_ids[jname]
+                        dof_adr = model.jnt_dofadr[jid]
+                        # Use qfrc_inverse
+                        val = data.qfrc_inverse[dof_adr]
+                    row_vals.append(val)
+                torques.append(row_vals)
             
-            if args.mode == "sensors":
-                for sname in data_source_names:
-                    sid = sensor_ids[sname]
-                    adr = model.sensor_adr[sid]
-                    val = data.sensordata[adr]
-                    snapshot[sname] = val
-                    row.append(val)
-            else:
-                 for jname in data_source_names:
-                     jid = joint_ids[jname]
-                     val = data.qfrc_actuator[model.jnt_qposadr[jid]]
-                     snapshot[jname] = val
-                     row.append(val)
+            # Update Plot
+            dz_list = []
+            c_list = []
+            
+            for c in range(5):
+                for r in range(3):
+                    t = torques[r][c]
+                    # Color mapping
+                    # Limit +/- 20
+                    norm_t = max(-20, min(20, t))
+                    color_val = (norm_t + 20) / 40.0 # 0..1
+                    
+                    dz_list.append(t)
+                    c_list.append(plt.cm.coolwarm(color_val))
 
-            writer.writerow(row)
+        elif args.mode == 'sensors':
+            # Sensors logic remains similar, but using mj_inverse might affect contact dynamics?
+            mujoco.mj_sensor(model, data)
             
-            # 2. Update Plot
-            if HAS_MATPLOTLIB:
-                dz_list = []
-                c_list = []
-                
-                if args.mode == 'sensors':
-                    # Use map_linear_to_grid
-                    for (f, r, c) in map_linear_to_grid:
-                        sname = sensor_grid_map[f][r][c]
-                        val = 0.0
-                        if sname and sname in snapshot:
-                            val = snapshot[sname]
-                        dz_list.append(abs(val))
-                        
-                        # Heatmap simple
-                        if abs(val) > 2.0: c_list.append('r')
-                        elif abs(val) > 0.5: c_list.append('y')
-                        else: c_list.append('g')
-                else:
-                    # Joints (iterate y then x per meshgrid flatten)
-                    # Flatten order x=[01234,01234], y=[00000,11111] -> r=0,c=0..4 then r=1..
-                    for r in range(3):
-                        for c in range(5):
-                            name = joint_grid_map[r][c]
+            current_vals = data.sensordata
+            
+            dz_list = []
+            c_list = []
+            
+            if sensor_grid_map:
+                # 3x7 Grid
+                for f in range(5):
+                    for r in range(7):
+                        for c in range(3):
+                            sname = sensor_grid_map[f][r][c]
                             val = 0.0
-                            if name and name in snapshot: val = snapshot[name]
-                            dz_list.append(abs(val))
-                            thresh1, thresh2 = 0.5, 2.0
-                            if abs(val) > thresh2: c_list.append('r')
-                            elif abs(val) > thresh1: c_list.append('y')
-                            else: c_list.append('g')
-                        
-                dz = np.array(dz_list)
-                for coll in ax.collections: coll.remove()
-                ax.bar3d(x_flat, y_flat, z_base, dx, dy, dz, color=c_list, shade=True)
-                ax.set_zlim(*z_lim)
-                try:
-                    fig.canvas.draw_idle()
-                    fig.canvas.flush_events()
-                except:
-                    pass
-                plt.pause(0.001)
+                            if sname and sname in sensor_ids:
+                                s_idx = sensor_ids[sname]
+                                val = current_vals[s_idx]
+                            
+                            dz_list.append(val)
+                            c_list.append(plt.cm.viridis(val / 5.0)) # 0..5N range
+            else:
+                # Linear fallback
+                for i in range(min(len(data_source_names), 10)):
+                    sname = data_source_names[i]
+                    s_idx = sensor_ids[sname]
+                    val = current_vals[s_idx]
+                    dz_list.append(val)
+                    c_list.append(plt.cm.viridis(val / 5.0))
 
-            last_print = now
+
+        # Update Bar Plot (Common)
+        if HAS_MATPLOTLIB and 'dz_list' in locals() and dz_list:
+            try:
+                for coll in ax.collections: coll.remove()
+            except:
+                pass
             
-        time.sleep(model.opt.timestep)
+            # RE-DRAW STRATEGY
+            ax.clear()
+            ax.set_zlim(*z_lim)
+            if args.mode == 'joints':
+                ax.set_title(f"Joint Torques (Nm) - T={{elapsed:.2f}}s")
+                ax.set_xlabel("Fingers")
+                ax.set_ylabel("Joints")
+                ax.set_xticks(np.arange(5) + 0.25, FINGER_NAMES)
+                ax.set_yticks(np.arange(3) + 0.25, ["J1", "J2", "J3"])
+                ax.bar3d(x_flat, y_flat, z_base, dx, dy, dz_list, color=c_list, shade=True)
+            else: # Sensors mode
+                ax.set_title(f"Touch Force (N) - T={{elapsed:.2f}}s")
+                ax.set_xlabel("Fingers (Sub-cols)")
+                ax.set_ylabel("Sensor Rows (0=Tip, 6=Base)")
+                ax.set_xticks(finger_centers, FINGER_NAMES)
+                ax.set_yticks(range(7))
+                ax.bar3d(x_flat, y_flat, z_base, dx, dy, dz_list, color=c_list, shade=True)
+            
+            try:
+                fig.canvas.draw_idle()
+                fig.canvas.flush_events()
+            except:
+                pass
+            plt.pause(0.001)
+
+        # Logging
+        if args.mode == 'sensors':
+            row = [elapsed] + [data.sensordata[sensor_ids[n]] for n in data_source_names]
+            writer.writerow(row)
+        else:
+            # Log Torques
+            row = [elapsed] + [data.qfrc_inverse[model.jnt_dofadr[joint_ids[n]]] for n in data_source_names]
+            writer.writerow(row)
 
 csv_file.close()
 """
-
