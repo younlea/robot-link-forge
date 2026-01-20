@@ -421,6 +421,21 @@ try:
 except (ImportError, AttributeError):
     pass
 
+# HACK: Shim for 'matplotlib.tri.triangulation' missing in recent matplotlib (3.7+)
+try:
+    import matplotlib.tri
+    if not hasattr(matplotlib.tri, 'triangulation'):
+        # Create a dummy module alias
+        # Older mplot3d expects 'matplotlib.tri.triangulation'
+        # Modern matplotlib puts 'Triangulation' directly in 'matplotlib.tri'
+        import types
+        tri_mod = types.ModuleType('matplotlib.tri.triangulation')
+        if hasattr(matplotlib.tri, 'Triangulation'):
+            tri_mod.Triangulation = matplotlib.tri.Triangulation
+        sys.modules['matplotlib.tri.triangulation'] = tri_mod
+except (ImportError, AttributeError):
+    pass
+
 import mpl_toolkits.mplot3d # Required for projection='3d'
 
 # --- Configuration ---
