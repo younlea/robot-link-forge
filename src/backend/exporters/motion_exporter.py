@@ -408,14 +408,18 @@ except ImportError:
     # Inject dummy docstring module
     dummy_docstring = types.ModuleType('matplotlib.docstring')
     class MockDocString:
-        def copy(self, *args, **kwargs):
-            return lambda x: x
         def __call__(self, *args, **kwargs):
+            # Usage: @interpd (args[0] is func/class) -> return it
+            # Usage: @interpd(...) (args are params) -> return decorator
+            if args and (callable(args[0]) or isinstance(args[0], type)):
+                return args[0]
             return lambda x: x
-    
-    mock_func = lambda *args, **kwargs: lambda x: x
-    dummy_docstring.copy = mock_func
-    dummy_docstring.interpd = MockDocString() # interpd was often used as a class or object with methods
+        def __getattr__(self, key):
+            # Support .update() or other methods returning a callable/decorator
+            return lambda *args, **kwargs: (lambda x: x if not args or not callable(args[0]) else args[0])
+
+    dummy_docstring.copy = lambda *args, **kwargs: lambda x: x
+    dummy_docstring.interpd = MockDocString()
     dummy_docstring.dedent = lambda x: x
     sys.modules['matplotlib.docstring'] = dummy_docstring
 
