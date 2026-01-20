@@ -1215,7 +1215,8 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
     last_print = 0
     
     # Set initial physics params
-    update_sliders(0)
+    # Set initial physics params
+    # update_sliders(0) # Removed in favor of scoped UI
     
     while viewer.is_running():
         now = time.time()
@@ -1317,10 +1318,30 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             dz_list = []
             
             if args.mode == 'sensors':
-                 # ... existing sensor logic ...
-                 # (Not modifying sensor grid logic in this request, assuming it's stable)
-                 pass
-            
+                ax.set_title(f"Sensor Forces (N) T={{elapsed:.2f}}s")
+                # 3x7 Logic
+                for f in range(5):
+                    for r in range(7):
+                        for c in range(3):
+                            sname = sensor_grid_map[f][r][c]
+                            val = 0.0
+                            if sname and sname in sensor_ids:
+                                idx_map = data_source_names.index(sname)
+                                val = vals_to_plot[idx_map]
+                            dz_list.append(val)
+                            c_list.append(plt.cm.viridis(val / 5.0))
+                
+                # Finger tick logic
+                x_flat_arr = []
+                y_flat_arr = []
+                for f in range(5):
+                    for r in range(7):
+                        for c in range(3):
+                            x_flat_arr.append(f*4 + c)
+                            y_flat_arr.append(r)
+                            
+                ax.bar3d(x_flat_arr, y_flat_arr, np.zeros_like(x_flat_arr), 0.8, 0.8, dz_list, color=c_list, shade=True)
+
             elif args.mode in ['inverse', 'forward']:
                 # Bar Plot for Torques
                 ax.set_title(f"Joint Torques (Nm) T={{elapsed:.2f}}s")
@@ -1347,31 +1368,6 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                 # Set X ticks
                 ax.set_xticks(x + 0.25)
                 ax.set_xticklabels(pretty_labels, rotation=45, fontsize=8)
-
-                ax.set_title(f"Sensor Forces (N) T={{elapsed:.2f}}s")
-                # 3x7 Logic
-                for f in range(5):
-                    for r in range(7):
-                        for c in range(3):
-                            sname = sensor_grid_map[f][r][c]
-                            val = 0.0
-                            if sname and sname in sensor_ids:
-                                idx_map = data_source_names.index(sname)
-                                val = vals_to_plot[idx_map]
-                            dz_list.append(val)
-                            c_list.append(plt.cm.viridis(val / 5.0))
-                
-                # Finger tick logic (same as before)
-                # ...
-                x_flat_arr = []
-                y_flat_arr = []
-                for f in range(5):
-                    for r in range(7):
-                        for c in range(3):
-                            x_flat_arr.append(f*4 + c)
-                            y_flat_arr.append(r)
-                
-                ax.bar3d(x_flat_arr, y_flat_arr, np.zeros_like(x_flat_arr), 0.8, 0.8, dz_list, color=c_list, shade=True)
                 
             else:
                 ax.set_title(f"Torques (Nm) T={{elapsed:.2f}}s Modes: Inverse/Forward")
