@@ -1012,14 +1012,14 @@ current_kv = 10.0   # Moderate damping
 
 # Global Scope for Sliders
 scope_selection = 'All' # Default
-scope_map = {
+scope_map = {{
     'All': [],
     'Thumb': ['thumb'],
     'Index': ['index'],
     'Middle': ['middle'],
     'Ring': ['ring'],
     'Little': ['little', 'pinky']
-}
+}}
 
 def update_actuator_gains(kp, kv):
     # Determine target actuators based on scope
