@@ -1078,7 +1078,7 @@ if HAS_MATPLOTLIB:
     def update_scope(label):
         global scope_selection
         scope_selection = label
-        print(f"Scope set to: {scope_selection}. Adjust sliders to apply to this group.")
+        print(f"Scope set to: {{scope_selection}}. Adjust sliders to apply to this group.")
         # Optional: Reset sliders to current average of group? 
         # For simplicity, we just keep current slider pos and apply it on next change OR apply now?
         # User might want to just switch scope then move slider.
