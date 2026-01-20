@@ -392,10 +392,12 @@ import numpy as np
 import os
 import csv
 import collections
+import re
 
 # Try to import matplotlib for sensor graphing
 import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons, Button
+from mpl_toolkits.mplot3d import Axes3D
 
 # --- Configuration ---
 MODEL_XML = "{model_filename}"
@@ -410,8 +412,8 @@ data = mujoco.MjData(model)
 
 print("\\n=== Interactive Mode ===")
 print("Use the MuJoCo viewer controls to move joints.")
-print("Right window: Real-time sensor graph system.")
-print("Select a FINGER category to see its sensors.")
+print("Right window: Real-time 3D Sensor Visualizer.")
+print("Select FINGERS to view their sensor grids.")
 print("Press 'C' in view to see collision geoms.")
 
 start_time = time.time()
@@ -425,6 +427,20 @@ timestamps = []
 sensor_indices_by_finger = collections.defaultdict(list)
 # Ensure order: Thumb, Index, Middle, Ring, Little, Other
 finger_categories = ['Thumb', 'Index', 'Middle', 'Ring', 'Little', 'Other']
+active_fingers = {{'Thumb': False, 'Index': True, 'Middle': False, 'Ring': False, 'Little': False, 'Other': False}}
+
+# Helper to parse grid position from name (e.g., _sensor_3_2 -> row 3, col 2)
+def parse_grid_pos(name):
+    # Pattern: ..._sensor_ROW_COL or similar
+    # Our exporter produces: {body}_sensor_{row}_{col}
+    # e.g. "index_finger-3rd-end_sensor_0_1"
+    match = re.search(r'_sensor_(\\d+)_(\\d+)', name)
+    if match:
+        return int(match.group(1)), int(match.group(2))
+    return -1, -1
+
+# Map sensor index to (finger, row, col)
+sensor_map = {{}}
 
 if model.nsensor > 0:
     for i in range(model.nsensor):
@@ -433,121 +449,149 @@ if model.nsensor > 0:
         sensor_names.append(name)
         
         low = name.lower()
-        if 'thumb' in low: sensor_indices_by_finger['Thumb'].append(i)
-        elif 'index' in low: sensor_indices_by_finger['Index'].append(i)
-        elif 'middle' in low: sensor_indices_by_finger['Middle'].append(i)
-        elif 'ring' in low: sensor_indices_by_finger['Ring'].append(i)
-        elif 'little' in low or 'pinky' in low: sensor_indices_by_finger['Little'].append(i)
-        else: sensor_indices_by_finger['Other'].append(i)
+        cat = 'Other'
+        if 'thumb' in low: cat = 'Thumb'
+        elif 'index' in low: cat = 'Index'
+        elif 'middle' in low: cat = 'Middle'
+        elif 'ring' in low: cat = 'Ring'
+        elif 'little' in low or 'pinky' in low: cat = 'Little'
+        
+        sensor_indices_by_finger[cat].append(i)
+        
+        # Parse grid
+        r, c = parse_grid_pos(name)
+        if r != -1:
+            # Shift column to 0-indexed if it is 1-3
+            # Exporter uses 1,2,3. Let's map to 0,1,2
+            if c > 0: c -= 1
+            sensor_map[i] = (cat, r, c)
+        else:
+            # Linear fallback
+            sensor_map[i] = (cat, i, 0) # Just stack them if no grid found
+
 else:
     print("No sensors found in model.")
 
-# --- UI State ---
-current_view = "HOME" # HOME or DETAIL
-current_finger = None
-
-# --- Setup Real-time Plot ---
+# --- Setup Real-time Plot (3D) ---
 plt.ion()
-fig, ax = plt.subplots(figsize=(14, 7))
-plt.subplots_adjust(left=0.3) # Make lots of room for UI
+fig = plt.figure(figsize=(16, 8))
+plt.subplots_adjust(left=0.2, right=0.95, bottom=0.1, top=0.95, wspace=0.3, hspace=0.3)
 
-# Initially create ALL lines but hide them
-lines = []
-for i, name in enumerate(sensor_names):
-    ln, = ax.plot([], [], label=name, visible=False) # Start hidden
-    lines.append(ln)
+# UI Area (Left side)
+ax_ui_check = plt.axes([0.02, 0.6, 0.15, 0.3]) # Checkboxes
+ax_ui_save = plt.axes([0.02, 0.5, 0.15, 0.05])  # Save button
+ax_ui_clear = plt.axes([0.02, 0.43, 0.15, 0.05]) # Clear button
 
-ax.set_title("Real-time Sensor Data")
-ax.set_xlabel("Time (s)")
-ax.set_ylabel("Force")
-ax.set_ylim(-0.1, 5.0) # Approx range, will autoscale
+# Dynamic Subplots Store
+subplots = {{}} # cat -> ax
+bars = {{}} # cat -> bar_collection (or list of bars)
 
-# --- UI Elements ---
-# We will dynamically clear/rebuild the widgets axes
+# --- UI Callbacks ---
+def update_layout(val=None):
+    # Clear all existing subplots
+    for cat, ax in subplots.items():
+        fig.delaxes(ax)
+    subplots.clear()
+    bars.clear()
+    
+    # Identify active categories
+    visible_cats = [cat for cat in finger_categories if active_fingers[cat] and sensor_indices_by_finger[cat]]
+    n = len(visible_cats)
+    if n == 0:
+        plt.draw()
+        return
 
-ui_axes = [] # Track axes to clear them
+    # Create subplots (1 row, N cols)
+    for i, cat in enumerate(visible_cats):
+        ax = fig.add_subplot(1, n, i+1, projection='3d')
+        ax.set_title(f"{{cat}} Sensors")
+        ax.set_zlabel("Force (N)")
+        ax.set_ylim(0, 4) # approx 3 cols 
+        ax.set_xlim(0, 8) # approx 7 rows
+        ax.set_zlim(0, 5) # Max force expected
+        
+        # Setup grid mesh for this finger
+        # We need to map sensor INDICES to x,y positions
+        # x = row, y = col
+        
+        _indices = sensor_indices_by_finger[cat]
+        _x, _y, _z_bottom = [], [], []
+        _dx, _dy = [], []
+        
+        # Initialize bar positions
+        for idx in _indices:
+            _, r, c = sensor_map.get(idx, (cat, 0, 0))
+            # Orient: Row along X, Col along Y?
+            # 3 cols (width), 7 rows (length along finger)
+            _x.append(r) 
+            _y.append(c) 
+            _z_bottom.append(0)
+            _dx.append(0.8) # Width of bar
+            _dy.append(0.8)
+        
+        _z_height = np.zeros(len(_indices)) # Initial height 0
+        
+        # Create initial bars
+        # Note: bar3d returns a Poly3DCollection
+        # modifying it efficiently is tricky in older matplotlib, but we will try standard approach.
+        # Actually, for animation, remove and redraw is often necessary or setting properties.
+        # But let's verify if we can just update.
+        
+        # Store metadata needed to redraw/update
+        bars[cat] = {{
+            'ax': ax,
+            'indices': _indices,
+            'x': np.array(_x),
+            'y': np.array(_y),
+            'dx': np.array(_dx),
+            'dy': np.array(_dy)
+        }}
+        
+        subplots[cat] = ax
 
-def clear_ui():
-    global ui_axes, buttons, checkbuttons
-    for a in ui_axes:
-        a.remove()
-    ui_axes = []
-    buttons = {{}} # Keep references
-    checkbuttons = None
     plt.draw()
 
-buttons = {{}}
-checkbuttons = None
+def toggle_finger(label):
+    active_fingers[label] = not active_fingers[label]
+    update_layout()
 
-def show_home_menu(event=None):
-    global current_view
-    current_view = "HOME"
-    clear_ui()
-    ax.set_title("Select a Finger Group")
-    
-    # Create Buttons for each non-empty category
-    y_pos = 0.8
-    for cat in finger_categories:
-        if not sensor_indices_by_finger[cat]: continue
-        
-        # Axis for button
-        b_ax = plt.axes([0.05, y_pos, 0.2, 0.08]) # Left panel
-        btn = Button(b_ax, f"{{cat}} ({{len(sensor_indices_by_finger[cat])}})")
-        # Closure to capture category
-        def make_callback(c):
-            return lambda event: show_detail_menu(c)
-        btn.on_clicked(make_callback(cat))
-        
-        buttons[cat] = btn # Store ref
-        ui_axes.append(b_ax)
-        y_pos -= 0.1
+# Checkbuttons
+labels = [cat for cat in finger_categories if sensor_indices_by_finger[cat]]
+actives = [active_fingers[cat] for cat in labels]
+check = CheckButtons(ax_ui_check, labels, actives)
+check.on_clicked(toggle_finger)
 
-def show_detail_menu(finger):
-    global current_view, current_finger, checkbuttons
-    current_view = "DETAIL"
-    current_finger = finger
-    clear_ui()
-    ax.set_title(f"Sensors for {{finger}}")
-    
-    # Back Button
-    b_ax = plt.axes([0.05, 0.85, 0.2, 0.08])
-    btn = Button(b_ax, "< BACK")
-    btn.on_clicked(show_home_menu)
-    buttons['back'] = btn
-    ui_axes.append(b_ax)
-    
-    # Checkboxes for sensors in this group
-    indices = sensor_indices_by_finger[finger]
-    labels = [sensor_names[i] for i in indices]
-    # Check visibility state
-    actives = [lines[i].get_visible() for i in indices]
-    
-    # Scrollable? No, just squeeze them in for now. 18 sensors is a lot for 80% height.
-    # We might need small font.
-    c_ax = plt.axes([0.05, 0.1, 0.2, 0.7]) # large vertical area
-    checkbuttons = CheckButtons(c_ax, labels, actives)
-    
-    def on_check(label):
-        # Find index 
-        # CAUTION: label is non-unique if we removed prefix? No, names are unique.
-        idx = -1
-        for i in indices:
-            if sensor_names[i] == label:
-                idx = i
-                break
-        if idx != -1:
-            lines[idx].set_visible(not lines[idx].get_visible())
-            plt.draw()
-            
-    checkbuttons.on_clicked(on_check)
-    ui_axes.append(c_ax)
-    
-    # Force initial visibility update (if needed)
-    plt.draw()
+# Save Button
+def save_data(event):
+    if not sensor_names or not sensor_history:
+        print("No data to save.")
+        return
+    filename = f"sensor_log_{{int(time.time())}}.csv"
+    print(f"Saving data to {{filename}}...")
+    with open(filename, 'w', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Time'] + sensor_names)
+        for t, row in zip(timestamps, sensor_history):
+            writer.writerow([t] + list(row))
+    print("Save complete.")
 
-# Start at Home
-show_home_menu()
+btn_save = Button(ax_ui_save, 'Save to CSV')
+btn_save.on_clicked(save_data)
 
+# Clear Data Button
+def clear_data(event):
+    global sensor_history, timestamps
+    sensor_history = []
+    timestamps = []
+    start_time = time.time() # Reset time relative
+    print("Data history cleared.")
+
+btn_clear = Button(ax_ui_clear, 'Clear Data')
+btn_clear.on_clicked(clear_data)
+
+
+# Initial layout
+update_layout()
 plt.show(block=False)
 
 # --- Launch Viewer ---
@@ -570,79 +614,64 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             sensor_history.append(current_vals)
             timestamps.append(t_now)
             
-            # Update Plot at 10Hz
+            # Update Plot at 10Hz to save FPS
             if time.time() - last_plot_time > 0.1:
-                # DEBUG: Verify sensor data is non-zero
+                
+                # Check for zero data warning
                 if current_vals.max() == 0 and current_vals.min() == 0:
                      if not hasattr(viewer, 'has_warned_zero'):
-                         print("[DEBUG] Warning: All sensor values are 0.0. Check collision contacts!")
+                         # print("[DEBUG] All sensors 0.0") 
                          viewer.has_warned_zero = True
-                else:
-                     if hasattr(viewer, 'has_warned_zero'):
-                         print(f"[DEBUG] Sensor data detected! Max: {{current_vals.max():.4f}}")
-                         del viewer.has_warned_zero # Reset warning
-
-                limit = 500
-                x_data = timestamps[-limit:]
-                # But we also need to update data for lines that might become visible? 
-                # Yes, update data for all, but drawing only happens for visible.
                 
-                # Check for autoscale
-                max_val = 0
-                has_visible = False
+                # Update 3D Plots
+                # Matplotlib 3D animation is slow if fully redrawn.
+                # However, set_3d_properties isn't always sufficient for bar3d.
+                # The 'fast' way for bar3d is unfortunately clearing and re-adding or specific collection hacks.
+                # We will try clearing the collections only.
                 
-                raw_history = np.array(sensor_history[-limit:])
-                
-                for i, ln in enumerate(lines):
-                    # Always set data so it's ready when checked
-                    y_data = raw_history[:, i]
-                    ln.set_data(x_data, y_data)
+                for cat, meta in bars.items():
+                    ax = meta['ax']
+                    indices = meta['indices']
                     
-                    if ln.get_visible():
-                        has_visible = True
-                        m = np.max(y_data) if len(y_data) > 0 else 0
-                        if m > max_val: max_val = m
+                    # Extract heights for this finger's sensors
+                    # current_vals is full array.
+                    z_heights = current_vals[indices]
+                    
+                    # Clear previous bars
+                    # ax.collections.clear() # This clears too much? check
+                    # Better: remove specific collection if we stored it?
+                    # Let's just create new ones and clear ax? No, axes props lost.
+                    
+                    # Remove old collections
+                    for c in ax.collections:
+                        c.remove()
+                    
+                    # Re-plot
+                    # Use color map based on intensity
+                    # Normalize simple 0-5
+                    colors = plt.cm.jet(z_heights / 5.0)
+                    
+                    ax.bar3d(meta['x'], meta['y'], np.zeros_like(z_heights), 
+                             meta['dx'], meta['dy'], z_heights, 
+                             color=colors, shade=True)
+                    
+                    # Re-set limits because cla/collections clear might shift auto-scale
+                    # (bar3d usually respects limits if set, but removing collections is safe)
+                    # Force limits again just in case
+                    ax.set_zlim(0, 5) 
 
-                ax.relim()
-                ax.autoscale_view(True,True,True)
-                
-                # Do NOT use plt.pause() as it steals focus.
-                # Use canvas.draw_idle() and flush_events().
+                # Handle GUI events
                 fig.canvas.draw_idle()
                 try:
                     fig.canvas.flush_events()
                 except NotImplementedError:
-                    plt.pause(0.001) # Fallback if backend doesn't support flush_events
-                
-                ax.set_xlim(x_data[0], x_data[-1] + 1)
-                
-                # Dynamic Y-scale if visible
-                if has_visible:
-                    # Smoothing scale
-                    cur_ylim = ax.get_ylim()[1]
-                    target_ylim = max(0.5, max_val * 1.2)
-                    # Simple interpolation or set
-                    ax.set_ylim(-0.1, target_ylim)
-                
-                # fig.canvas.draw() # Expensive
-                # fig.canvas.flush_events()
-                # Use blit if possible, but flush_events is safer for UI
-                # plt.pause(0.001) # REMOVED: This steals focus. We already flushed events above. 
+                    plt.pause(0.001)
                 
                 last_plot_time = time.time()
 
         time_until_next_step = model.opt.timestep - (time.time() - step_start)
         if time_until_next_step > 0:
             time.sleep(time_until_next_step)
-
-print("Saving data to sensor_log.csv...")
-if sensor_names and sensor_history:
-    with open('sensor_log.csv', 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(['Time'] + sensor_names)
-        for t, row in zip(timestamps, sensor_history):
-            writer.writerow([t] + list(row))
-    print("Saved.")
 
 plt.ioff()
 plt.show() 
