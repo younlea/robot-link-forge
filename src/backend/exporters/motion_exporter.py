@@ -856,7 +856,7 @@ import csv
 try:
     import matplotlib.pyplot as plt
     from mpl_toolkits.mplot3d import Axes3D
-    from matplotlib.widgets import Slider, RadioButtons, CheckButtons
+    from matplotlib.widgets import Slider, RadioButtons, CheckButtons, TextBox
     HAS_MATPLOTLIB = True
 except ImportError:
     print("Warning: matplotlib not found. Visualization will be disabled.")
@@ -977,6 +977,10 @@ writer.writerow(['Time'] + data_source_names)
 # --- Pre-calculate Trajectory (Interpolation) ---
 duration = rec['duration'] / 1000.0 # seconds
 if duration <= 0: duration = 1.0
+# Pre-compute Grids
+joint_grid_map = detect_finger_joints(model)
+sensor_grid_map = detect_finger_sensors(model)
+
 dt = model.opt.timestep
 trajectory_times = np.arange(0, duration, dt)
 n_steps = len(trajectory_times)
@@ -1343,31 +1347,46 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                 ax.bar3d(x_flat_arr, y_flat_arr, np.zeros_like(x_flat_arr), 0.8, 0.8, dz_list, color=c_list, shade=True)
 
             elif args.mode in ['inverse', 'forward']:
-                # Bar Plot for Torques
+                # Bar Plot for Torques (2D Grid: Finger vs Joint Rank)
                 ax.set_title(f"Joint Torques (Nm) T={{elapsed:.2f}}s")
                 
-                # Make labels readable
-                pretty_labels = [get_pretty_label(n) for n in data_source_names]
+                # Setup Grid
+                # X: Fingers (0..4) 'Thumb', 'Index' ...
+                # Y: Joints (0..2) '1st', '2nd', '3rd'
                 
-                x = np.arange(len(vals_to_plot))
-                y = np.zeros_like(x)
-                z = np.zeros_like(x)
-                dx = np.ones_like(x) * 0.5
-                dy = np.ones_like(x) * 0.5
-                dz = vals_to_plot
+                x_bar = []
+                y_bar = []
+                dz_bar = []
+                c_bar = []
                 
-                # Colors
-                colors = []
-                for v in dz:
-                    if abs(v) > 10.0: colors.append('red') # Warning
-                    elif abs(v) > 5.0: colors.append('orange')
-                    else: colors.append('green')
-                    
-                ax.bar3d(x, y, z, dx, dy, dz, color=colors)
+                for c in range(5):
+                    for r in range(3):
+                        jname = joint_grid_map[r][c]
+                        val = 0.0
+                        if jname and jname in joint_ids:
+                             # Find value
+                             if jname in data_source_names:
+                                 idx_map = data_source_names.index(jname)
+                                 val = vals_to_plot[idx_map]
+                        
+                        x_bar.append(c)
+                        y_bar.append(r)
+                        dz_bar.append(val)
+                        
+                        # Color Logic
+                        if abs(val) > 10.0: c_bar.append('red')
+                        elif abs(val) > 5.0: c_bar.append('orange')
+                        else: c_bar.append('green')
+
+                # Plot
+                # Use narrow bars
+                ax.bar3d(x_bar, y_bar, np.zeros_like(x_bar), 0.5, 0.5, dz_bar, color=c_bar, shade=True)
                 
-                # Set X ticks
-                ax.set_xticks(x + 0.25)
-                ax.set_xticklabels(pretty_labels, rotation=45, fontsize=8)
+                # Labels
+                ax.set_xticks(np.arange(5) + 0.25)
+                ax.set_xticklabels(FINGER_NAMES, rotation=0, fontsize=9)
+                ax.set_yticks(np.arange(3) + 0.25)
+                ax.set_yticklabels(['1st', '2nd', '3rd'], rotation=0, fontsize=9)
                 
             else:
                 ax.set_title(f"Torques (Nm) T={{elapsed:.2f}}s Modes: Inverse/Forward")
