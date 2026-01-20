@@ -1844,17 +1844,6 @@ python3 replay_mujoco.py {i}
                          f.write(sh_content)
                      os.chmod(sh_path, 0o755)
 
-                 # Generate Torque Replay Script (New Feature)
-                 torque_py = generate_mujoco_torque_replay_script(mjcf_filename)
-                 with open(os.path.join(package_dir, "replay_with_torque.py"), "w") as f:
-                     f.write(torque_py)
-                 
-                 # Generate Bash Script for Torque Replay (Generic)
-                 torque_sh = generate_torque_launch_script("replay_with_torque.py", 0)
-                 with open(os.path.join(package_dir, "run_torque_replay.sh"), "w") as f:
-                     f.write(torque_sh)
-                 os.chmod(os.path.join(package_dir, "run_torque_replay.sh"), 0o755)
-
                  # Generate Individual Scripts
                  for i, rec in enumerate(processed_recs):
                      rec_name_clean = to_snake_case(rec.get('name', f'rec_{i}'))
@@ -1873,6 +1862,17 @@ python3 replay_mujoco.py {i}
                  import traceback
                  with open("DEBUG_REC_TRACE.txt", "w") as f:
                      f.write(traceback.format_exc())
+
+        # Generate Torque Replay Script (ALWAYS, for convenience)
+        torque_py = generate_mujoco_torque_replay_script(mjcf_filename)
+        with open(os.path.join(package_dir, "replay_with_torque.py"), "w") as f:
+            f.write(torque_py)
+        
+        # Generate Bash Script for Torque Replay (Generic)
+        torque_sh = generate_torque_launch_script("replay_with_torque.py", 0)
+        with open(os.path.join(package_dir, "run_torque_replay.sh"), "w") as f:
+            f.write(torque_sh)
+        os.chmod(os.path.join(package_dir, "run_torque_replay.sh"), 0o755)
 
 
         launch_bat = f"""@echo off
