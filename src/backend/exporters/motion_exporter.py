@@ -1104,8 +1104,8 @@ if HAS_MATPLOTLIB and args.mode == 'forward':
 
         def set_visible(self, vis):
             self.ax_lbl.set_visible(vis)
-            self.ax_kp_box.ax.set_visible(vis)
-            self.ax_kv_box.ax.set_visible(vis)
+            self.ax_kp_box.set_visible(vis) # Fixed: TextBox axis doesn't have .ax
+            self.ax_kv_box.set_visible(vis)
             self.ax_kp_slide.ax.set_visible(vis)
             self.ax_kv_slide.ax.set_visible(vis)
             if not vis:
@@ -1323,7 +1323,11 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             
             if args.mode == 'sensors':
                 ax.set_title(f"Sensor Forces (N) T={{elapsed:.2f}}s")
+                ax.set_zlim(0, 5) # Sensors are positive
                 # 3x7 Logic
+                # Initialize c_list
+                c_list = []
+                
                 for f in range(5):
                     for r in range(7):
                         for c in range(3):
@@ -1349,6 +1353,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             elif args.mode in ['inverse', 'forward']:
                 # Bar Plot for Torques (2D Grid: Finger vs Joint Rank)
                 ax.set_title(f"Joint Torques (Nm) T={{elapsed:.2f}}s")
+                ax.set_zlim(-50, 50) # Z-Axis increased to 50
                 
                 # Setup Grid
                 # X: Fingers (0..4) 'Thumb', 'Index' ...
@@ -1373,10 +1378,11 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                         y_bar.append(r)
                         dz_bar.append(val)
                         
-                        # Color Logic
-                        if abs(val) > 10.0: c_bar.append('red')
-                        elif abs(val) > 5.0: c_bar.append('orange')
-                        else: c_bar.append('green')
+                        # Color Logic (Coolwarm)
+                        # Map -50..50 to 0..1
+                        norm_val = np.clip(val, -50, 50)
+                        # Shift to 0..1: (val + 50) / 100
+                        c_bar.append(plt.cm.coolwarm((norm_val + 50) / 100.0))
 
                 # Plot
                 # Use narrow bars
