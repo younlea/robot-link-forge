@@ -1,4 +1,5 @@
 
+import re
 import json
 import math
 from typing import List, Dict, Any
@@ -684,6 +685,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
 
 plt.ioff()
 plt.show() 
+"""
 
 
 def generate_replay_script(recording_id: str, recording_name: str) -> str:
