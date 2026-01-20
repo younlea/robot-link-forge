@@ -1007,8 +1007,8 @@ for jname, jid in joint_ids.items():
     qacc_traj[:, dof_adr] = np.gradient(qvel_traj[:, dof_adr], dt)
 
 # Tunable Parameters (Forward Mode)
-current_kp = 500.0
-current_kv = 30.0
+current_kp = 1500.0 # High stiffness for accurate tracking
+current_kv = 50.0   # Moderate damping
 
 def update_actuator_gains(kp, kv):
     # Assumes position actuators with [kp, kv, scale] or [kp, damping, ...]

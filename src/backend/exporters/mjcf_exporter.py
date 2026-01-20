@@ -217,17 +217,12 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                  asset_name = get_mesh_asset_name(link_id, mesh_files_map[link_id], v.meshScale)
                  
                  # NO scale attribute here
-                 # Determine collision properties based on body name (Selective Collision)
-                 # Logic from mjcf_sample.xml: Tips (-end) get collision, others do not.
-                 is_collidable = False
-                 nm_low = body_name.lower()
-                 # Expanded keyword list for tips
-                 if body_name.endswith('-end'):
-                     is_collidable = True
-                 elif any(k in nm_low for k in ["tip", "distal", "end", "3rd"]):
-                      is_collidable = True
-                 
-                 c_val = "1" if is_collidable else "0"
+                 # Determine collision properties
+                 # PREVIOUSLY: Restricted to tips only.
+                 # FIX: Enable collision for ALL meshes to prevent self-penetration (fingertips passing through palm/each other).
+                 # We rely on MuJoCo's internal collision filtering or user mesh quality.
+                 is_collidable = True
+                 c_val = "1"
 
                  # Create Single Mesh Geom (Visual + Collision)
                  # group="1" is standard for visual. In MJCF sample, group="1" is also used for collision mesh.
