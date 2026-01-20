@@ -413,6 +413,14 @@ except ImportError:
     dummy_docstring.copy = lambda *args, **kwargs: lambda x: x
     sys.modules['matplotlib.docstring'] = dummy_docstring
 
+# HACK: Shim for 'rcParams' missing in matplotlib.axes (3.9+)
+try:
+    import matplotlib.axes
+    from matplotlib import rcParams
+    matplotlib.axes.rcParams = rcParams
+except (ImportError, AttributeError):
+    pass
+
 import mpl_toolkits.mplot3d # Required for projection='3d'
 
 # --- Configuration ---
