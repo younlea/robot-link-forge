@@ -1892,6 +1892,13 @@ python3 replay_with_torque.py {i} --mode $MODE
 
             except Exception as e:
                  print(f"Error processing MuJoCo recordings: {e}")
+                 with open("DEBUG_REC_ERROR.txt", "w") as f:
+                     f.write(str(e))
+                 # traceback
+                 import traceback
+                 with open("DEBUG_REC_TRACE.txt", "w") as f:
+                     f.write(traceback.format_exc())
+
 
         launch_bat = f"""@echo off
 python visualize_mjcf.py %*

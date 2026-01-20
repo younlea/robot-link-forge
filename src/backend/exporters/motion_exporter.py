@@ -934,7 +934,7 @@ if args.mode == "sensors":
         print("[DEBUG] Falling back to linear list (1xN) if any sensors exist.")
         # If the user expected a 3x7 grid but got none, this explains the "1x5" perception if they see something else or nothing.
     else:
-        print(f"[DEBUG] Mapped {found_sensors_count} sensors to 3x7 grid.")
+        print(f"[DEBUG] Mapped {{found_sensors_count}} sensors to 3x7 grid.")
     log_file_name = "sensor_log.csv"
     data_source_names = sorted(sensor_ids.keys())
     z_lim = (0, 5) 
