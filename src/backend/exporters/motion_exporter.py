@@ -1307,7 +1307,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             elif "tip" in name: idx_str = "Tip"
             
             if finger == "Unknown": return name
-            return f"{{finger}}\n{{idx_str}}"
+            return f"{{finger}}\\n{{idx_str}}"
 
         # Draw Plot (Throttle)
         if HAS_MATPLOTLIB and (now - last_print > 0.1):
