@@ -783,6 +783,54 @@ echo "Running interactive viewer..."
 python3 {python_script_name} "$@"
 """
 
+def generate_torque_launch_script(python_script_name: str, default_rec_idx: int = 0) -> str:
+    """
+    Generates a bash script that sets up the environment and runs the torque replay.
+    Includes interactive mode selection.
+    """
+    return f"""#!/bin/bash
+set -e
+
+# Define venv directory
+VENV_DIR="venv"
+
+# 1. Create venv if it doesn't exist
+if [ ! -d "$VENV_DIR" ]; then
+    echo "Creating virtual environment..."
+    python3 -m venv "$VENV_DIR"
+fi
+
+# 2. Activate venv
+source "$VENV_DIR/bin/activate"
+
+# 3. Install dependencies
+# Upgrade pip to avoid warnings
+pip install --upgrade pip > /dev/null 2>&1
+
+# Install required packages
+# Pin matplotlib to <=3.7.3 to avoid issues with removed APIs
+# Pin numpy < 2 to avoid breaking changes
+echo "Installing dependencies (mujoco, matplotlib, numpy)..."
+pip install mujoco "matplotlib<=3.7.3" "numpy<2" > /dev/null 2>&1
+
+# 4. Interactive Mode Selection
+echo "----------------------------------------"
+echo "Select Visualization Mode:"
+echo "1. Joint Torques (3x5 Grid) [Default]"
+echo "2. Fingertip Sensors (3x7 Grid)"
+echo "----------------------------------------"
+read -p "Enter choice [1]: " choice
+
+MODE="joints"
+if [ "$choice" = "2" ]; then
+    MODE="sensors"
+fi
+
+# 5. Run the script
+echo "Starting Torque Replay in mode: $MODE..."
+python3 {python_script_name} {default_rec_idx} --mode $MODE
+"""
+
 def generate_mujoco_torque_replay_script(model_filename: str) -> str:
     """Generates MuJoCo python script for Replay with Real-time Torque Visualization (3x5 Grid)."""
     return f"""
