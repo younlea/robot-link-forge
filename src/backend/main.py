@@ -1124,6 +1124,12 @@ python3 replay_recording.py {i}
                         f.write(sh_content)
                     os.chmod(sh_path, 0o755)
 
+                # DEBUG TRACE
+                with open(os.path.join(package_dir, "DEBUG_TRACE.txt"), "w") as f:
+                    f.write("Reached Torque Generation Block.\n")
+                    f.write(f"URDF Filename: {urdf_filename}\n")
+                    f.write(f"Num Recordings: {len(processed_recs)}\n")
+
                 # Generate Torque Replay Script (New Feature)
                 torque_py = generate_mujoco_torque_replay_script(urdf_filename)
                 with open(os.path.join(package_dir, "replay_with_torque.py"), "w") as f:
