@@ -432,7 +432,7 @@ active_fingers = {{'Thumb': False, 'Index': True, 'Middle': False, 'Ring': False
 # Helper to parse grid position from name (e.g., _sensor_3_2 -> row 3, col 2)
 def parse_grid_pos(name):
     # Pattern: ..._sensor_ROW_COL or similar
-    # Our exporter produces: {body}_sensor_{row}_{col}
+    # Our exporter produces: {{body}}_sensor_{{row}}_{{col}}
     # e.g. "index_finger-3rd-end_sensor_0_1"
     match = re.search(r'_sensor_(\\d+)_(\\d+)', name)
     if match:
