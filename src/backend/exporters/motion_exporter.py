@@ -397,6 +397,22 @@ import re
 # Try to import matplotlib for sensor graphing
 import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons, Button
+
+# HACK: Shim for broken/mixed matplotlib environments (3.9+ vs older mpl_toolkits)
+# 'docstring' was removed in 3.9, but older mplot3d installations might still try to import it.
+import sys
+import types
+try:
+    from matplotlib import docstring
+except ImportError:
+    # Inject dummy docstring module
+    dummy_docstring = types.ModuleType('matplotlib.docstring')
+    class MockDocString:
+        def copy(self, *args, **kwargs):
+            return lambda x: x
+    dummy_docstring.copy = lambda *args, **kwargs: lambda x: x
+    sys.modules['matplotlib.docstring'] = dummy_docstring
+
 import mpl_toolkits.mplot3d # Required for projection='3d'
 
 # --- Configuration ---
