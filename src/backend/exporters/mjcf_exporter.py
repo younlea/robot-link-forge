@@ -218,11 +218,21 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                  
                  # NO scale attribute here
                  # Determine collision properties
-                 # PREVIOUSLY: Restricted to tips only.
-                 # FIX: Enable collision for ALL meshes to prevent self-penetration (fingertips passing through palm/each other).
-                 # We rely on MuJoCo's internal collision filtering or user mesh quality.
-                 is_collidable = True
-                 c_val = "1"
+                 # REVERTED: Restricted to tips only to prevent self-locking.
+                 # "Use STL Mesh" means we use the visual mesh for collision geom, but only for tips.
+                 is_collidable = False
+                 nm_low = body_name.lower()
+                 if body_name.endswith('-end'):
+                     is_collidable = True
+                 elif any(k in nm_low for k in ["tip", "distal", "end", "3rd"]):
+                      is_collidable = True
+                 elif direct_hand and (is_leaf or "index" in nm_low or "middle" in nm_low or "ring" in nm_low or "little" in nm_low or "thumb" in nm_low):
+                      # Heuristic: If direct_hand mode, maybe we want more finger segments to collide?
+                      # User said "finger ends". Let's stick to the stricter tip heuristic first or leaves.
+                      pass
+                      if is_leaf: is_collidable = True
+
+                 c_val = "1" if is_collidable else "0"
 
                  # Create Single Mesh Geom (Visual + Collision)
                  # group="1" is standard for visual. In MJCF sample, group="1" is also used for collision mesh.
