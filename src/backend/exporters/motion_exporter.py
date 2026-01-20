@@ -435,6 +435,7 @@ try:
         # Older mplot3d expects 'matplotlib.tri.triangulation'
         # Modern matplotlib puts 'Triangulation' directly in 'matplotlib.tri'
         import types
+        tri_mod = types.ModuleType('matplotlib.tri.triangulation')
         if hasattr(matplotlib.tri, 'Triangulation'):
             tri_mod.Triangulation = matplotlib.tri.Triangulation
         sys.modules['matplotlib.tri.triangulation'] = tri_mod
