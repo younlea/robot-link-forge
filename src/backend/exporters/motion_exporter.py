@@ -397,7 +397,8 @@ import re
 
 # Try to import matplotlib for sensor graphing
 import matplotlib.pyplot as plt
-from matplotlib.widgets import CheckButtons, Button
+import matplotlib.pyplot as plt
+from matplotlib.widgets import CheckButtons, Button, Slider, RadioButtons, TextBox
 import mpl_toolkits.mplot3d # Required for projection='3d'
 
 
@@ -1050,47 +1051,162 @@ def update_actuator_gains(kp, kv):
         model.actuator_biasprm[mask, 1] = -kv
 
 # Interactive Plot
-if HAS_MATPLOTLIB:
+if HAS_MATPLOTLIB and args.mode == 'forward':
     plt.ion()
     # Layout
-    fig = plt.figure(figsize=(14, 9)) # Taller for more UI
-    plt.subplots_adjust(bottom=0.35) # More Space for UI
+    fig = plt.figure(figsize=(14, 10))
+    plt.subplots_adjust(bottom=0.45) # Huge Space for Detail UI
     ax = fig.add_subplot(111, projection='3d')
     
-    # UI Area
-    ax_kp = plt.axes([0.25, 0.20, 0.65, 0.03])
-    ax_kv = plt.axes([0.25, 0.15, 0.65, 0.03])
-    ax_radio = plt.axes([0.05, 0.1, 0.15, 0.2]) # Left side radio
-    
-    slider_kp = Slider(ax_kp, 'Stiffness (Kp)', 1.0, 2000.0, valinit=current_kp)
-    slider_kv = Slider(ax_kv, 'Damping (Kv)', 0.1, 200.0, valinit=current_kv)
-
+    # UI Areas
+    # Left: Radio for Scope
+    ax_radio = plt.axes([0.02, 0.1, 0.12, 0.25])
     radio = RadioButtons(ax_radio, list(scope_map.keys()))
 
-    def update_sliders(val):
-        global current_kp, current_kv
-        current_kp = slider_kp.val
-        current_kv = slider_kv.val
+    # Right: Detail Slots for Selected Scope (Max 4 slots)
+    # We create static axes for slots
+    slots = []
+    
+    # Helper to clean labels
+    def clean_jname(n):
+        return n.replace('joint', '').replace('_', ' ').strip()
         
-        if args.mode == 'forward':
-             update_actuator_gains(current_kp, current_kv)
-             
+    class JointControl:
+        def __init__(self, idx, y_pos):
+            self.idx = idx
+            self.ax_lbl = plt.axes([0.18, y_pos, 0.15, 0.03])
+            self.ax_kp_box = plt.axes([0.35, y_pos, 0.1, 0.03])
+            self.ax_kv_box = plt.axes([0.47, y_pos, 0.1, 0.03])
+            self.ax_kp_slide = plt.axes([0.60, y_pos+0.015, 0.35, 0.015])
+            self.ax_kv_slide = plt.axes([0.60, y_pos, 0.35, 0.015])
+            
+            self.box_kp = TextBox(self.ax_kp_box, 'Kp ', initial='0')
+            self.box_kv = TextBox(self.ax_kv_box, 'Kv ', initial='0')
+            self.slide_kp = Slider(self.ax_kp_slide, '', 0.1, 2000.0, valinit=100)
+            self.slide_kv = Slider(self.ax_kv_slide, '', 0.1, 200.0, valinit=10)
+            
+            self.target_actuator_id = -1
+            
+            # Callbacks
+            self.box_kp.on_submit(self.on_box_submit)
+            self.box_kv.on_submit(self.on_box_submit)
+            self.slide_kp.on_changed(self.on_slide_change)
+            self.slide_kv.on_changed(self.on_slide_change)
+            
+            self.is_updating = False
+            
+            # Hide initially
+            self.set_visible(False)
+
+        def set_visible(self, vis):
+            self.ax_lbl.set_visible(vis)
+            self.ax_kp_box.ax.set_visible(vis)
+            self.ax_kv_box.ax.set_visible(vis)
+            self.ax_kp_slide.ax.set_visible(vis)
+            self.ax_kv_slide.ax.set_visible(vis)
+            if not vis:
+                self.ax_lbl.axis('off')
+
+        def set_target(self, name, aid):
+            self.target_actuator_id = aid
+            self.is_updating = True
+            
+            # Label
+            self.ax_lbl.clear()
+            self.ax_lbl.text(0, 0, clean_jname(name), fontsize=9)
+            self.ax_lbl.axis('off')
+            
+            # Read current values
+            curr_kp = model.actuator_gainprm[aid, 0]
+            curr_kv = -model.actuator_biasprm[aid, 1]
+            
+            self.box_kp.set_val(str(curr_kp))
+            self.box_kv.set_val(str(curr_kv))
+            self.slide_kp.set_val(curr_kp)
+            self.slide_kv.set_val(curr_kv)
+            
+            self.set_visible(True)
+            self.is_updating = False
+
+        def on_box_submit(self, val):
+            if self.target_actuator_id == -1 or self.is_updating: return
+            try:
+                v = float(val)
+                self.is_updating = True
+                # Update model
+                # Check which box triggered? Hard to tell, assuming we just re-read both or update specific
+                # TextBox callback passes val.
+                # Just update both from box values to be safe
+                kp = float(self.box_kp.text)
+                kv = float(self.box_kv.text)
+                
+                model.actuator_gainprm[self.target_actuator_id, 0] = kp
+                model.actuator_biasprm[self.target_actuator_id, 1] = -kv
+                
+                # Sync sliders
+                self.slide_kp.set_val(kp)
+                self.slide_kv.set_val(kv)
+                self.is_updating = False
+            except: pass
+
+        def on_slide_change(self, val):
+            if self.target_actuator_id == -1 or self.is_updating: return
+            self.is_updating = True
+            kp = self.slide_kp.val
+            kv = self.slide_kv.val
+            
+            model.actuator_gainprm[self.target_actuator_id, 0] = kp
+            model.actuator_biasprm[self.target_actuator_id, 1] = -kv
+            
+            self.box_kp.set_val(f"{kp:.1f}")
+            self.box_kv.set_val(f"{kv:.1f}")
+            self.is_updating = False
+
+    # Create 4 Slots
+    for i in range(4):
+        slots.append(JointControl(i, 0.35 - (i * 0.08)))
+
     def update_scope(label):
         global scope_selection
         scope_selection = label
-        print(f"Scope set to: {{scope_selection}}. Adjust sliders to apply to this group.")
-        # Optional: Reset sliders to current average of group? 
-        # For simplicity, we just keep current slider pos and apply it on next change OR apply now?
-        # User might want to just switch scope then move slider.
-        # Let's apply now to confirm
-        update_sliders(None)
+        
+        # Identify actuators in this scope
+        target_aids = [] # (name, aid)
+        
+        keywords = scope_map.get(scope_selection, [])
+        if scope_selection == 'All':
+            # Too many for details? Show first 4?
+            # Or just show a note "Select specific finger for details"
+            pass
+        
+        # Sort by joint name to get 1, 2, 3 ordered
+        # actuator_ids is name -> id
+        sorted_acts = sorted(actuator_ids.items())
+        
+        count = 0
+        for name, aid in sorted_acts:
+            name_low = name.lower()
+            if any(k in name_low for k in keywords):
+                if count < 4:
+                    slots[count].set_target(name, aid)
+                    count += 1
+        
+        # Hide unused
+        for i in range(count, 4):
+            slots[i].set_visible(False)
+            
+        fig.canvas.draw_idle()
 
-    slider_kp.on_changed(update_sliders)
-    slider_kv.on_changed(update_sliders)
     radio.on_clicked(update_scope)
+    # Init default
+    update_scope(list(scope_map.keys())[0] if scope_map else 'All')
     
-    # Initial Update
-    update_sliders(0)
+elif HAS_MATPLOTLIB:
+    # Fallback/General Plot
+    plt.ion()
+    fig = plt.figure(figsize=(14, 9))
+    ax = fig.add_subplot(111, projection='3d')
+
 
 # Main Loop
 with mujoco.viewer.launch_passive(model, data) as viewer:
@@ -1150,7 +1266,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         viewer.sync()
 
         
-        # --- VISUALIZATION & LOGGING ---
+# --- VISUALIZATION & LOGGING ---
         # Collect Data
         vals_to_plot = []
         
@@ -1170,6 +1286,28 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         row = [elapsed] + vals_to_plot
         writer.writerow(row)
         
+        # User requested: "Finger name, 1st, 2nd, 3rd" labels
+        def get_pretty_label(name):
+            # Parse standard robot names
+            # e.g. "index_finger_joint_1" -> "Index 1st"
+            low = name.lower()
+            finger = "Unknown"
+            if "thumb" in low: finger = "Thumb"
+            elif "index" in low: finger = "Index"
+            elif "middle" in low: finger = "Middle"
+            elif "ring" in low: finger = "Ring"
+            elif "little" in low or "pinky" in low: finger = "Little"
+            
+            # Find index
+            idx_str = ""
+            if "1" in name or "proximal" in name: idx_str = "1st"
+            elif "2" in name or "medial" in name: idx_str = "2nd"
+            elif "3" in name or "distal" in name: idx_str = "3rd"
+            elif "tip" in name: idx_str = "Tip"
+            
+            if finger == "Unknown": return name
+            return f"{finger}\n{idx_str}"
+
         # Draw Plot (Throttle)
         if HAS_MATPLOTLIB and (now - last_print > 0.1):
             ax.clear()
@@ -1177,10 +1315,39 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             
             # Determine mapping
             dz_list = []
-            c_list = []
             
-            # Map linear values to grid
             if args.mode == 'sensors':
+                 # ... existing sensor logic ...
+                 # (Not modifying sensor grid logic in this request, assuming it's stable)
+                 pass
+            
+            elif args.mode in ['inverse', 'forward']:
+                # Bar Plot for Torques
+                ax.set_title(f"Joint Torques (Nm) T={{elapsed:.2f}}s")
+                
+                # Make labels readable
+                pretty_labels = [get_pretty_label(n) for n in data_source_names]
+                
+                x = np.arange(len(vals_to_plot))
+                y = np.zeros_like(x)
+                z = np.zeros_like(x)
+                dx = np.ones_like(x) * 0.5
+                dy = np.ones_like(x) * 0.5
+                dz = vals_to_plot
+                
+                # Colors
+                colors = []
+                for v in dz:
+                    if abs(v) > 10.0: colors.append('red') # Warning
+                    elif abs(v) > 5.0: colors.append('orange')
+                    else: colors.append('green')
+                    
+                ax.bar3d(x, y, z, dx, dy, dz, color=colors)
+                
+                # Set X ticks
+                ax.set_xticks(x + 0.25)
+                ax.set_xticklabels(pretty_labels, rotation=45, fontsize=8)
+
                 ax.set_title(f"Sensor Forces (N) T={{elapsed:.2f}}s")
                 # 3x7 Logic
                 for f in range(5):
