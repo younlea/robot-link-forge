@@ -132,7 +132,7 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                          xml.append(f'{indent}  <joint name="{joint_xml_name}" type="hinge" axis="{axis_str}" {range_str} />')
                          
                          ctrl_range = range_str.replace("range=", "ctrlrange=") if range_str else 'ctrlrange="-3.14 3.14"'
-                         actuators.append(f'{indent}    <position name="{joint_xml_name}_act" joint="{joint_xml_name}" kp="200" kv="20" {ctrl_range}/>')
+                         actuators.append(f'{indent}    <position name="{joint_xml_name}_act" joint="{joint_xml_name}" kp="1000" kv="50" {ctrl_range}/>')
 
                      # Capture Info for Replay Mapping
                          # Note: for rotational joints we used 'active_axes' logic.
@@ -154,7 +154,7 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                     xml.append(f'{indent}  <joint name="{joint.name}" type="slide" axis="{axis_str}" {range_str} />')
                     
                     ctrl_range = range_str.replace("range=", "ctrlrange=") if range_str else 'ctrlrange="-1 1"'
-                    actuators.append(f'{indent}    <position name="{joint.name}_act" joint="{joint.name}" kp="300" kv="20" {ctrl_range}/>')
+                    actuators.append(f'{indent}    <position name="{joint.name}_act" joint="{joint.name}" kp="1000" kv="50" {ctrl_range}/>')
 
                     # Capture Info for Replay Mapping
                     generated_joints_info.append({

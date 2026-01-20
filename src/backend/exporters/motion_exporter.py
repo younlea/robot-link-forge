@@ -922,6 +922,19 @@ print(f"Loaded recording [#{{rec_idx}}]: {{rec['name']}} (Mode: {{args.mode}})")
 # Setup Mode
 if args.mode == "sensors":
     sensor_grid_map = detect_finger_sensors(model)
+    # DEBUG: Check if sensors were detected for 3x7 grid
+    found_sensors_count = 0
+    for f in range(5):
+        for r in range(7):
+            for c in range(3):
+                if sensor_grid_map[f][r][c]: found_sensors_count += 1
+    
+    if found_sensors_count == 0:
+        print("[DEBUG] No sensors matched the 3x7 grid pattern (_R_C suffix).")
+        print("[DEBUG] Falling back to linear list (1xN) if any sensors exist.")
+        # If the user expected a 3x7 grid but got none, this explains the "1x5" perception if they see something else or nothing.
+    else:
+        print(f"[DEBUG] Mapped {found_sensors_count} sensors to 3x7 grid.")
     log_file_name = "sensor_log.csv"
     data_source_names = sorted(sensor_ids.keys())
     z_lim = (0, 5) 
@@ -958,6 +971,12 @@ print("Starting Replay...")
 
 if HAS_MATPLOTLIB:
     plt.ion()
+    # Add blocking show check or just force figure creation
+    # Some backends need this.
+    try:
+        plt.show(block=False)
+    except: 
+        pass
     fig = plt.figure(figsize=(12, 8))
     ax = fig.add_subplot(111, projection='3d')
     mode_title = "Joint Torques (Nm)" if args.mode == 'joints' else "Touch Force (N)"
@@ -1095,7 +1114,11 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                 for coll in ax.collections: coll.remove()
                 ax.bar3d(x_flat, y_flat, z_base, dx, dy, dz, color=c_list, shade=True)
                 ax.set_zlim(*z_lim)
-                fig.canvas.draw_idle()
+                try:
+                    fig.canvas.draw_idle()
+                    fig.canvas.flush_events()
+                except:
+                    pass
                 plt.pause(0.001)
 
             last_print = now
