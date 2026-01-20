@@ -600,64 +600,7 @@ btn_clear.on_clicked(clear_data)
 update_layout()
 
 
-def generate_replay_script(recording_id: str, recording_name: str) -> str:
-    """Generates a python script to replay a specific recording in MuJoCo."""
-    sanitized_name = re.sub(r'[^a-zA-Z0-9_]', '_', recording_name)
-    return f"""
-import mujoco
-import mujoco.viewer
-import time
-import json
-import os
-import math
 
-# Load model
-model = mujoco.MjModel.from_xml_path("robot.xml")
-data = mujoco.MjData(model)
-
-# Load recordings
-with open("recordings.json", "r") as f:
-    recordings = json.load(f)
-
-# Find target recording
-target_id = "{recording_id}"
-recording = next((r for r in recordings if r['id'] == target_id), None)
-
-if not recording:
-    print(f"Recording {{target_id}} not found.")
-    exit(1)
-
-print(f"Replaying: {{recording['name']}} (Duration: {{recording['duration']}}s)")
-
-# Lookup joints
-joint_names = [model.joint(i).name for i in range(model.njnt)]
-joint_ids = {{name: model.joint(name).id for name in joint_names}}
-
-with mujoco.viewer.launch_passive(model, data) as viewer:
-    start_time = time.time()
-    while viewer.is_running():
-        elapsed = time.time() - start_time
-        
-        # Simple playback loop (looping)
-        t_in_rec = elapsed % recording['duration']
-        
-        # Find keyframe (simple Step interpolation for now, or Linear)
-        # Assuming sorted keyframes
-        current_kf = recording['keyframes'][0]
-        for kf in recording['keyframes']:
-            if kf['timestamp'] > t_in_rec:
-                break
-            current_kf = kf
-            
-        # Apply joint values
-        for j_name, j_val in current_kf['joints'].items():
-            if j_name in joint_ids:
-                data.qpos[joint_ids[j_name]] = j_val
-                
-        mujoco.mj_step(model, data)
-        viewer.sync()
-        time.sleep(model.opt.timestep)
-"""
 plt.show(block=False)
 
 # --- Launch Viewer ---
@@ -742,3 +685,62 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
 plt.ioff()
 plt.show() 
 """
+
+def generate_replay_script(recording_id: str, recording_name: str) -> str:
+    \"\"\"Generates a python script to replay a specific recording in MuJoCo.\"\"\"
+    sanitized_name = re.sub(r'[^a-zA-Z0-9_]', '_', recording_name)
+    return f\"\"\"
+import mujoco
+import mujoco.viewer
+import time
+import json
+import os
+import math
+
+# Load model
+model = mujoco.MjModel.from_xml_path("robot.xml")
+data = mujoco.MjData(model)
+
+# Load recordings
+with open("recordings.json", "r") as f:
+    recordings = json.load(f)
+
+# Find target recording
+target_id = "{recording_id}"
+recording = next((r for r in recordings if r['id'] == target_id), None)
+
+if not recording:
+    print(f"Recording {{target_id}} not found.")
+    exit(1)
+
+print(f"Replaying: {{recording['name']}} (Duration: {{recording['duration']}}s)")
+
+# Lookup joints
+joint_names = [model.joint(i).name for i in range(model.njnt)]
+joint_ids = {{name: model.joint(name).id for name in joint_names}}
+
+with mujoco.viewer.launch_passive(model, data) as viewer:
+    start_time = time.time()
+    while viewer.is_running():
+        elapsed = time.time() - start_time
+        
+        # Simple playback loop (looping)
+        t_in_rec = elapsed % recording['duration']
+        
+        # Find keyframe (simple Step interpolation for now, or Linear)
+        # Assuming sorted keyframes
+        current_kf = recording['keyframes'][0]
+        for kf in recording['keyframes']:
+            if kf['timestamp'] > t_in_rec:
+                break
+            current_kf = kf
+            
+        # Apply joint values
+        for j_name, j_val in current_kf['joints'].items():
+            if j_name in joint_ids:
+                data.qpos[joint_ids[j_name]] = j_val
+                
+        mujoco.mj_step(model, data)
+        viewer.sync()
+        time.sleep(model.opt.timestep)
+\"\"\"
