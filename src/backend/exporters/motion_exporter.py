@@ -745,3 +745,40 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         mujoco.mj_step(model, data)
         viewer.sync()
 """
+
+def generate_demo_script(python_script_name: str) -> str:
+    """
+    Generates a bash script that:
+    1. Creates a venv if missing.
+    2. Installs dependencies in the venv.
+    3. Runs the target python script within the venv.
+    """
+    return f"""#!/bin/bash
+set -e
+
+# Define venv directory
+VENV_DIR="venv"
+
+# 1. Create venv if it doesn't exist
+if [ ! -d "$VENV_DIR" ]; then
+    echo "Creating virtual environment..."
+    python3 -m venv "$VENV_DIR"
+fi
+
+# 2. Activate venv
+source "$VENV_DIR/bin/activate"
+
+# 3. Install dependencies
+# Upgrade pip to avoid warnings
+pip install --upgrade pip > /dev/null 2>&1
+
+# Install required packages
+# Pin matplotlib to <=3.7.3 to avoid issues with removed APIs (e.g. initializers)
+# Pin numpy < 2 to avoid breaking changes
+echo "Installing dependencies..."
+pip install mujoco "matplotlib<=3.7.3" "numpy<2" > /dev/null 2>&1
+
+# 4. Run the interactive script
+echo "Running interactive viewer..."
+python3 {python_script_name} "$@"
+"""
