@@ -90,6 +90,15 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
         if link_id not in unique_link_names:
              body_name = to_snake_case(body_name)
         
+        # Determine if it is a leaf (Pre-calculation for Collision & Sensors)
+        is_leaf = True
+        if link.childJoints:
+            for child_joint_id in link.childJoints:
+                cj = robot.joints.get(child_joint_id)
+                if cj and cj.childLinkId:
+                    is_leaf = False
+                    break
+
         pos_str = "0 0 0"
         euler_str = "0 0 0"
 
@@ -277,15 +286,7 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                      xml.append(f'{indent}  <geom {geom_str} pos="{v_pos}" euler="{v_euler}" rgba="{rgb_str}" />')
 
         # Determine if we should add a sensor
-        # It is a leaf if it has no child joints, OR if its child joints don't lead to valid bodies
-        is_leaf = True
-        if link.childJoints:
-            for child_joint_id in link.childJoints:
-                cj = robot.joints.get(child_joint_id)
-                if cj and cj.childLinkId:
-                    # Found a valid child link, so this is NOT a leaf
-                    is_leaf = False
-                    break
+        # is_leaf is already calculated at the top
         
         # Heuristic: User might name things "finger_tip" etc.
         name_lower = body_name.lower()
