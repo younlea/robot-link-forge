@@ -450,6 +450,14 @@ try:
 except (ImportError, AttributeError):
     pass
 
+# HACK: Shim for '_set_ticklabels' missing in matplotlib.axis.Axis (3.9+)
+try:
+    import matplotlib.axis
+    if not hasattr(matplotlib.axis.Axis, '_set_ticklabels'):
+        matplotlib.axis.Axis._set_ticklabels = matplotlib.axis.Axis.set_ticklabels
+except (ImportError, AttributeError):
+    pass
+
 import mpl_toolkits.mplot3d # Required for projection='3d'
 
 # --- Configuration ---
