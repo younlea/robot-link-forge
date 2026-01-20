@@ -1106,8 +1106,8 @@ if HAS_MATPLOTLIB and args.mode == 'forward':
             self.ax_lbl.set_visible(vis)
             self.ax_kp_box.set_visible(vis) # Fixed: TextBox axis doesn't have .ax
             self.ax_kv_box.set_visible(vis)
-            self.ax_kp_slide.ax.set_visible(vis)
-            self.ax_kv_slide.ax.set_visible(vis)
+            self.ax_kp_slide.set_visible(vis) # Fixed: Slider axis doesn't have .ax
+            self.ax_kv_slide.set_visible(vis)
             if not vis:
                 self.ax_lbl.axis('off')
 
@@ -1349,6 +1349,14 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                             y_flat_arr.append(r)
                             
                 ax.bar3d(x_flat_arr, y_flat_arr, np.zeros_like(x_flat_arr), 0.8, 0.8, dz_list, color=c_list, shade=True)
+                
+                # Sensor Graph Labels
+                tick_locs = []
+                for i in range(5):
+                    tick_locs.append(i*4 + 1)
+                ax.set_xticks(tick_locs)
+                ax.set_xticklabels(FINGER_NAMES, fontsize=9)
+
 
             elif args.mode in ['inverse', 'forward']:
                 # Bar Plot for Torques (2D Grid: Finger vs Joint Rank)
