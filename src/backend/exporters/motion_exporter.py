@@ -407,20 +407,28 @@ try:
 except ImportError:
     # Inject dummy docstring module
     dummy_docstring = types.ModuleType('matplotlib.docstring')
-    class MockDocString:
+    # Inject dummy docstring module
+    dummy_docstring = types.ModuleType('matplotlib.docstring')
+    
+    class UniversalShim:
         def __call__(self, *args, **kwargs):
-            # Usage: @interpd (args[0] is func/class) -> return it
-            # Usage: @interpd(...) (args are params) -> return decorator
-            if args and (callable(args[0]) or isinstance(args[0], type)):
+            # Case 1: Called as bare decorator on a class/func -> Return the class/func
+            if args and len(args) == 1 and (callable(args[0]) or isinstance(args[0], type)):
                 return args[0]
-            return lambda x: x
+            # Case 2: Called with params (factory) or .method(...) -> Return SELF (to be used as decorator or method)
+            # This allows @shim(), @shim().update(), etc.
+            return self
+        
         def __getattr__(self, key):
-            # Support .update() or other methods returning a callable/decorator
-            return lambda *args, **kwargs: (lambda x: x if not args or not callable(args[0]) else args[0])
+            # Allow method chaining (.update(), .copy(), .dedent())
+            return self
 
-    dummy_docstring.copy = lambda *args, **kwargs: lambda x: x
-    dummy_docstring.interpd = MockDocString()
-    dummy_docstring.dedent = lambda x: x
+    # Apply shim to everything
+    shim_instance = UniversalShim()
+    dummy_docstring.copy = shim_instance
+    dummy_docstring.interpd = shim_instance
+    dummy_docstring.dedent = shim_instance
+    sys.modules['matplotlib.docstring'] = dummy_docstring
     sys.modules['matplotlib.docstring'] = dummy_docstring
 
 # HACK: Shim for 'rcParams' missing in matplotlib.axes (3.9+)
