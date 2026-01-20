@@ -685,6 +685,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
 plt.ioff()
 plt.show() 
 
+
 def generate_replay_script(recording_id: str, recording_name: str) -> str:
     """Generates a python script to replay a specific recording in MuJoCo."""
     sanitized_name = re.sub(r'[^a-zA-Z0-9_]', '_', recording_name)
