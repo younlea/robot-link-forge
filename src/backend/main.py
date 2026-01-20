@@ -24,7 +24,8 @@ from exporters.motion_exporter import (
     generate_mujoco_playback_script,
     generate_mujoco_interactive_script,
     generate_replay_script,
-    generate_demo_script
+    generate_demo_script,
+    generate_mujoco_torque_replay_script
 )
 from exporters.stl_utils import ensure_binary_stl
 
@@ -1118,6 +1119,54 @@ mujoco.viewer.launch(model, data)
 # Replay recording #{i}: {rec.get('name')}
 python3 replay_recording.py {i}
 """
+
+                    with open(sh_path, "w") as f:
+                        f.write(sh_content)
+                    os.chmod(sh_path, 0o755)
+
+                # Generate Torque Replay Script (New Feature)
+                torque_py = generate_mujoco_torque_replay_script(urdf_filename)
+                with open(os.path.join(package_dir, "replay_with_torque.py"), "w") as f:
+                    f.write(torque_py)
+                
+                # Generate Bash Script for Torque Replay (Generic)
+                torque_sh = f"""#!/bin/bash
+# Replay with Real-time Torque Visualization (Default #0)
+echo "Select Visualization Mode:"
+echo "1. Joint Torques (3x5 Grid)"
+echo "2. Fingertip Sensors (1x5 Grid)"
+read -p "Enter choice [1]: " choice
+
+MODE="joints"
+if [ "$choice" = "2" ]; then
+    MODE="sensors"
+fi
+
+python3 replay_with_torque.py 0 --mode $MODE
+"""
+                with open(os.path.join(package_dir, "run_torque_replay.sh"), "w") as f:
+                    f.write(torque_sh)
+                os.chmod(os.path.join(package_dir, "run_torque_replay.sh"), 0o755)
+
+                # Generate Individual Scripts
+                for i, rec in enumerate(processed_recs):
+                    rec_name_clean = to_snake_case(rec.get('name', f'rec_{i}'))
+                    sh_filename = f"run_torque_replay_{i}_{rec_name_clean}.sh"
+                    sh_path = os.path.join(package_dir, sh_filename)
+                    sh_content = f"""#!/bin/bash
+# Replay recording #{i} with Torque Viz
+echo "Select Visualization Mode:"
+echo "1. Joint Torques (3x5 Grid)"
+echo "2. Fingertip Sensors (1x5 Grid)"
+read -p "Enter choice [1]: " choice
+
+MODE="joints"
+if [ "$choice" = "2" ]; then
+    MODE="sensors"
+fi
+
+python3 replay_with_torque.py {i} --mode $MODE
+"""
                     with open(sh_path, "w") as f:
                         f.write(sh_content)
                     os.chmod(sh_path, 0o755)
@@ -1211,7 +1260,19 @@ Alternatively, you can run the python script directly:
 ```bash
 python3 replay_recording.py [index]
 ```
+```
 (Where [index] is 0, 1, 2...)
+
+### Torque Visualization
+To replay with real-time finger torque visualization (3x5 grid) and logging:
+```bash
+./run_torque_replay.sh
+```
+This will:
+1. Replay the motion using closed-loop control.
+2. Display a real-time dashboard of joint torques for fingers.
+3. Save all torque data to `torque_log.csv`.
+
 """
 
         with open(os.path.join(package_dir, "README.md"), "w") as f:

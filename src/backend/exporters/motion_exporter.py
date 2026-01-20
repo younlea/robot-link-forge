@@ -782,3 +782,326 @@ pip install mujoco "matplotlib<=3.7.3" "numpy<2" > /dev/null 2>&1
 echo "Running interactive viewer..."
 python3 {python_script_name} "$@"
 """
+
+def generate_mujoco_torque_replay_script(model_filename: str) -> str:
+    """Generates MuJoCo python script for Replay with Real-time Torque Visualization (3x5 Grid)."""
+    return f"""
+import time
+import json
+import mujoco
+import mujoco.viewer
+import numpy as np
+import os
+import argparse
+import sys
+import csv
+
+# Try importing matplotlib
+try:
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    HAS_MATPLOTLIB = True
+except ImportError:
+    print("Warning: matplotlib not found. Visualization will be disabled.")
+    HAS_MATPLOTLIB = False
+
+# --- Configuration ---
+MODEL_XML = "{model_filename}"
+RECORDINGS_JSON = "recordings.json"
+
+# --- 3x5 Finger Grid Config ---
+FINGER_KEYS = ['thumb', 'index', 'middle', 'ring', 'little']
+FINGER_NAMES = ['Thumb', 'Index', 'Middle', 'Ring', 'Little']
+GRID_ROWS_JOINTS = 3 # Joints per finger
+GRID_ROWS_SENSORS = 1 # Sensors per finger (typically 1 tip)
+
+def detect_finger_joints(model):
+    all_joints = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, i) for i in range(model.njnt)]
+    buckets = {{key: [] for key in FINGER_KEYS}}
+    
+    for jname in all_joints:
+        if not jname: continue
+        low = jname.lower()
+        for key in FINGER_KEYS:
+            if key == 'little' and ('little' in low or 'pinky' in low):
+                buckets[key].append(jname)
+                break
+            elif key in low:
+                buckets[key].append(jname)
+                break
+    
+    grid_map = [[None for _ in range(5)] for _ in range(3)]
+    for c, key in enumerate(FINGER_KEYS):
+        joints = sorted(buckets[key])
+        for r in range(min(3, len(joints))):
+             grid_map[r][c] = joints[r]
+    return grid_map
+
+
+def detect_finger_sensors(model):
+    # Returns 5x21 flattened map (approx) or structured dict
+    # We want to find sensors with suffixes _R_C where R=0..6, C=1..3
+    nsens = model.nsensor
+    all_sensors = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SENSOR, i) for i in range(nsens)]
+    
+    # Structure: [finger_idx][row][col] -> sensor_name
+    # 5 fingers, 7 rows, 3 cols
+    grid_map = [[[None for _ in range(3)] for _ in range(7)] for _ in range(5)]
+    
+    for sname in all_sensors:
+        if not sname: continue
+        low = sname.lower()
+        
+        # Identify Finger
+        f_idx = -1
+        for i, key in enumerate(FINGER_KEYS):
+            if key == 'little' and ('little' in low or 'pinky' in low): f_idx = i; break
+            elif key in low: f_idx = i; break
+        
+        if f_idx == -1: continue
+        
+        # Identify Grid Position (Suffix _R_C)
+        # We look for pattern "_(\d)_(\d)$" or similar.
+        # The sensor names are like "..._sensor_0_1"
+        try:
+            parts = sname.split('_')
+            # Look for last two digits
+            # e.g. ["...", "sensor", "0", "1"]
+            if len(parts) >= 2 and parts[-1].isdigit() and parts[-2].isdigit():
+                r = int(parts[-2])
+                c = int(parts[-1])
+                # c is 1-based in config (1,2,3), we want 0-based
+                c_idx = c - 1
+                if 0 <= r < 7 and 0 <= c_idx < 3:
+                     grid_map[f_idx][r][c_idx] = sname
+        except:
+            pass
+            
+    return grid_map
+
+# --- Main Logic ---
+
+if not os.path.exists(MODEL_XML):
+    print(f"Error: Model file {{MODEL_XML}} not found.")
+    exit(1)
+
+print(f"Loading model: {{MODEL_XML}}")
+model = mujoco.MjModel.from_xml_path(MODEL_XML)
+data = mujoco.MjData(model)
+
+# Maps
+joint_ids = {{mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, i): i for i in range(model.njnt)}}
+sensor_ids = {{mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_SENSOR, i): i for i in range(model.nsensor)}}
+actuator_ids = {{}}
+for i in range(model.nu):
+    name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
+    if name and name.endswith("_act"):
+        jname = name[:-4]
+        actuator_ids[jname] = i
+
+if not os.path.exists(RECORDINGS_JSON):
+    print("recordings.json not found.")
+    exit(1)
+    
+with open(RECORDINGS_JSON, "r") as f:
+    recs = json.load(f)
+
+# Parse Arguments
+parser = argparse.ArgumentParser()
+parser.add_argument("index", nargs="?", type=int, default=0, help="Index of recording")
+parser.add_argument("--mode", choices=["joints", "sensors"], default="joints", help="Visualization mode")
+args = parser.parse_args()
+
+rec_idx = args.index
+if rec_idx < 0 or rec_idx >= len(recs):
+    print(f"Index {{rec_idx}} out of range. Defaulting to 0.")
+    rec_idx = 0
+rec = recs[rec_idx]
+print(f"Loaded recording [#{{rec_idx}}]: {{rec['name']}} (Mode: {{args.mode}})")
+
+# Setup Mode
+if args.mode == "sensors":
+    sensor_grid_map = detect_finger_sensors(model)
+    log_file_name = "sensor_log.csv"
+    data_source_names = sorted(sensor_ids.keys())
+    z_lim = (0, 5) 
+else:
+    joint_grid_map = detect_finger_joints(model)
+    log_file_name = "torque_log.csv"
+    data_source_names = sorted(joint_ids.keys())
+    z_lim = (-5, 5)
+
+print(f"Logging to: {{log_file_name}}")
+csv_file = open(log_file_name, 'w', newline='')
+writer = csv.writer(csv_file)
+writer.writerow(['Time'] + data_source_names)
+
+def get_frame(time_s):
+    t_ms = time_s * 1000.0
+    kfs = rec['keyframes']
+    if not kfs: return {{}}
+    if t_ms >= kfs[-1]['timestamp']: return kfs[-1]['joints']
+    if t_ms <= kfs[0]['timestamp']: return kfs[0]['joints']
+    for i in range(len(kfs)-1):
+        if kfs[i]['timestamp'] <= t_ms < kfs[i+1]['timestamp']:
+            t1 = kfs[i]['timestamp']
+            t2 = kfs[i+1]['timestamp']
+            ratio = (t_ms - t1)/(t2-t1) if (t2-t1)>0 else 0
+            j_t = {{}}
+            for k, v in kfs[i]['joints'].items():
+                v2 = kfs[i+1]['joints'].get(k, v)
+                j_t[k] = v + (v2 - v) * ratio
+            return j_t
+    return kfs[0]['joints']
+
+print("Starting Replay...")
+
+if HAS_MATPLOTLIB:
+    plt.ion()
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    mode_title = "Joint Torques (Nm)" if args.mode == 'joints' else "Touch Force (N)"
+    ax.set_title(f"{{mode_title}}: {{rec['name']}}")
+    ax.set_zlabel('Value')
+    
+    if args.mode == 'sensors':
+        # 3x7 Grid Visualization
+        ax.set_xlabel('Fingers (Sub-cols)')
+        ax.set_ylabel('Sensor Rows (0=Tip, 6=Base)')
+        
+        # Prepare Coords
+        # 5 Fingers * 3 Cols = 15 columns total (+ spacing)
+        # Let's say spacing is 1 unit. Finger width is 3 units.
+        # Finger 0: x=0,1,2
+        # Finger 1: x=4,5,6
+        # ...
+        
+        x_vals = []
+        y_vals = []
+        map_linear_to_grid = [] # Stores (f, r, c) for each bar
+        
+        for f in range(5):
+            x_offset = f * 4
+            for r in range(7):
+                for c in range(3):
+                    x_vals.append(x_offset + c)
+                    y_vals.append(r)
+                    map_linear_to_grid.append((f, r, c))
+                    
+        x_flat = np.array(x_vals)
+        y_flat = np.array(y_vals)
+        z_base = np.zeros_like(x_flat)
+        dx = 0.8 * np.ones_like(z_base)
+        dy = 0.8 * np.ones_like(z_base)
+        
+        # Ticks
+        finger_centers = [f * 4 + 1 for f in range(5)]
+        ax.set_xticks(finger_centers)
+        ax.set_xticklabels(FINGER_NAMES)
+        ax.set_yticks(range(7))
+        
+    else:
+        # Joints Config
+        ax.set_xlabel('Fingers')
+        ax.set_ylabel('Position')
+        _x = np.arange(5)
+        _y = np.arange(3)
+        _xx, _yy = np.meshgrid(_x, _y)
+        x_flat = _xx.flatten()
+        y_flat = _yy.flatten()
+        z_base = np.zeros_like(x_flat)
+        dx = 0.5 * np.ones_like(z_base)
+        dy = 0.5 * np.ones_like(z_base)
+        ax.set_xticks(_x + 0.25)
+        ax.set_xticklabels(FINGER_NAMES)
+        ax.set_yticks(_y + 0.25)
+        ax.set_yticklabels(['J1', 'J2', 'J3'])
+        
+    ax.set_zlim(*z_lim)
+
+with mujoco.viewer.launch_passive(model, data) as viewer:
+    start_time = time.time()
+    last_print = 0
+    
+    while viewer.is_running():
+        now = time.time()
+        elapsed = now - start_time
+        if elapsed > rec['duration']/1000.0:
+            start_time = now
+            elapsed = 0
+            
+        targets = get_frame(elapsed)
+        for jname, target_pos in targets.items():
+            if jname in actuator_ids:
+                data.ctrl[actuator_ids[jname]] = target_pos
+                
+        mujoco.mj_step(model, data)
+        viewer.sync()
+        
+        if now - last_print > 0.1:
+            # 1. Collect Snapshot
+            snapshot = {{}}
+            row = [elapsed]
+            
+            if args.mode == "sensors":
+                for sname in data_source_names:
+                    sid = sensor_ids[sname]
+                    adr = model.sensor_adr[sid]
+                    val = data.sensordata[adr]
+                    snapshot[sname] = val
+                    row.append(val)
+            else:
+                 for jname in data_source_names:
+                     jid = joint_ids[jname]
+                     val = data.qfrc_actuator[model.jnt_qposadr[jid]]
+                     snapshot[jname] = val
+                     row.append(val)
+
+            writer.writerow(row)
+            
+            # 2. Update Plot
+            if HAS_MATPLOTLIB:
+                dz_list = []
+                c_list = []
+                
+                if args.mode == 'sensors':
+                    # Use map_linear_to_grid
+                    for (f, r, c) in map_linear_to_grid:
+                        sname = sensor_grid_map[f][r][c]
+                        val = 0.0
+                        if sname and sname in snapshot:
+                            val = snapshot[sname]
+                        dz_list.append(abs(val))
+                        
+                        # Heatmap simple
+                        if abs(val) > 2.0: c_list.append('r')
+                        elif abs(val) > 0.5: c_list.append('y')
+                        else: c_list.append('g')
+                else:
+                    # Joints (iterate y then x per meshgrid flatten)
+                    # Flatten order x=[01234,01234], y=[00000,11111] -> r=0,c=0..4 then r=1..
+                    for r in range(3):
+                        for c in range(5):
+                            name = joint_grid_map[r][c]
+                            val = 0.0
+                            if name and name in snapshot: val = snapshot[name]
+                            dz_list.append(abs(val))
+                            thresh1, thresh2 = 0.5, 2.0
+                            if abs(val) > thresh2: c_list.append('r')
+                            elif abs(val) > thresh1: c_list.append('y')
+                            else: c_list.append('g')
+                        
+                dz = np.array(dz_list)
+                for coll in ax.collections: coll.remove()
+                ax.bar3d(x_flat, y_flat, z_base, dx, dy, dz, color=c_list, shade=True)
+                ax.set_zlim(*z_lim)
+                fig.canvas.draw_idle()
+                plt.pause(0.001)
+
+            last_print = now
+            
+        time.sleep(model.opt.timestep)
+
+csv_file.close()
+"""
+
