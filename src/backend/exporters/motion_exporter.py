@@ -397,58 +397,7 @@ import re
 # Try to import matplotlib for sensor graphing
 import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons, Button
-
-# HACK: Shim for broken/mixed matplotlib environments (3.9+ vs older mpl_toolkits)
-import sys
-import types
-try:
-    # Try to import existing module
-    import matplotlib.docstring
-except ImportError:
-    # Create valid module if missing
-    fake_mod = types.ModuleType('matplotlib.docstring')
-    sys.modules['matplotlib.docstring'] = fake_mod
-    # Also inject into matplotlib package if possible
-    try:
-        import matplotlib
-        matplotlib.docstring = fake_mod
-    except ImportError:
-        pass
-
-# Ensure 'matplotlib.docstring' is available
-if 'matplotlib.docstring' not in sys.modules:
-     sys.modules['matplotlib.docstring'] = types.ModuleType('matplotlib.docstring')
-
-import matplotlib.docstring as docstring_mod
-
-# Define robust Identity Shim
-class RobustIdentity:
-    def __init__(self, *args, **kwargs):
-        pass
-    def __call__(self, *args, **kwargs):
-        # If used as decorator @shim class Foo: -> args[0] is class
-        if args and (callable(args[0]) or isinstance(args[0], type)):
-            return args[0]
-        # If used as factory @shim() -> return self (which behaves as decorator)
-        return self
-    def __getattr__(self, key):
-        return self
-
-# Inject missing attributes
-if not hasattr(docstring_mod, 'interpd'):
-    docstring_mod.interpd = RobustIdentity()
-if not hasattr(docstring_mod, 'dedent'):
-    docstring_mod.dedent = RobustIdentity()
-if not hasattr(docstring_mod, 'copy'):
-    docstring_mod.copy = lambda *args, **kwargs: RobustIdentity()
-
-# HACK: Shim for 'rcParams' missing in matplotlib.axes (3.9+)
-try:
-    import matplotlib.axes
-    from matplotlib import rcParams
-    matplotlib.axes.rcParams = rcParams
-except (ImportError, AttributeError):
-    pass
+import mpl_toolkits.mplot3d # Required for projection='3d'
 
 # HACK: Shim for 'matplotlib.tri.triangulation' missing in recent matplotlib (3.7+)
 try:
