@@ -1007,52 +1007,87 @@ for jname, jid in joint_ids.items():
     qacc_traj[:, dof_adr] = np.gradient(qvel_traj[:, dof_adr], dt)
 
 # Tunable Parameters (Forward Mode)
-current_kp = 1500.0 # High stiffness for accurate tracking
-current_kv = 50.0   # Moderate damping
+current_kp = 100.0 # Low initial stiffness to prevent start-up shock
+current_kv = 10.0   # Moderate damping
+
+# Global Scope for Sliders
+scope_selection = 'All' # Default
+scope_map = {
+    'All': [],
+    'Thumb': ['thumb'],
+    'Index': ['index'],
+    'Middle': ['middle'],
+    'Ring': ['ring'],
+    'Little': ['little', 'pinky']
+}
 
 def update_actuator_gains(kp, kv):
-    # Assumes position actuators with [kp, kv, scale] or [kp, damping, ...]
-    # Standard general actuator or position actuator:
-    # gainprm[0] usually Kp.
-    # biasprm[1] usually -Kv (damping).
-    # This varies by definition, but for 'position' type in MJCF:
-    # default is gainprm=[kp, 0, 0], biasprm=[0, -kv, 0] (approx).
-    # Let's try setting strictly if they are position actuators.
-    pass
-    # Implementation dependent on MJCF type. 
-    # For now, we update 'model.actuator_gainprm' column 0 and 'model.actuator_biasprm' column 1
-    # assuming simple position control model.
-    model.actuator_gainprm[:, 0] = kp
-    model.actuator_biasprm[:, 1] = -kv # Damping is usually negative feedback
+    # Determine target actuators based on scope
+    # Iterating over actuator_ids (name -> id)
+    # We want to match names that contain the scope keywords
+    
+    target_indices = []
+    
+    if scope_selection == 'All':
+        target_indices = range(model.nu)
+    else:
+        # Filter
+        keywords = scope_map.get(scope_selection, [])
+        for name, aid in actuator_ids.items():
+            name_low = name.lower()
+            if any(k in name_low for k in keywords):
+                target_indices.append(aid)
+    
+    # Apply
+    # Note: target_indices is a list of INTs
+    if target_indices:
+        # We need to set them individually or via mask?
+        # Creating a mask is safer for numpy indexing
+        mask = np.zeros(model.nu, dtype=bool)
+        for i in target_indices: mask[i] = True
+        
+        model.actuator_gainprm[mask, 0] = kp
+        model.actuator_biasprm[mask, 1] = -kv
 
 # Interactive Plot
 if HAS_MATPLOTLIB:
     plt.ion()
     # Layout
-    fig = plt.figure(figsize=(14, 8))
-    plt.subplots_adjust(bottom=0.25) # Space for sliders
+    fig = plt.figure(figsize=(14, 9)) # Taller for more UI
+    plt.subplots_adjust(bottom=0.35) # More Space for UI
     ax = fig.add_subplot(111, projection='3d')
     
-    # Sliders
-    ax_kp = plt.axes([0.25, 0.1, 0.65, 0.03])
-    ax_kv = plt.axes([0.25, 0.05, 0.65, 0.03])
+    # UI Area
+    ax_kp = plt.axes([0.25, 0.20, 0.65, 0.03])
+    ax_kv = plt.axes([0.25, 0.15, 0.65, 0.03])
+    ax_radio = plt.axes([0.05, 0.1, 0.15, 0.2]) # Left side radio
     
-    slider_kp = Slider(ax_kp, 'Stiffness (Kp)', 0.1, 2000.0, valinit=current_kp)
+    slider_kp = Slider(ax_kp, 'Stiffness (Kp)', 1.0, 2000.0, valinit=current_kp)
     slider_kv = Slider(ax_kv, 'Damping (Kv)', 0.1, 200.0, valinit=current_kv)
+
+    radio = RadioButtons(ax_radio, list(scope_map.keys()))
 
     def update_sliders(val):
         global current_kp, current_kv
         current_kp = slider_kp.val
         current_kv = slider_kv.val
-        # Update model immediately
-        # NOTE: This only affects Forward Dynamics!
+        
         if args.mode == 'forward':
-            # For all Actuators
-             model.actuator_gainprm[:, 0] = current_kp
-             model.actuator_biasprm[:, 1] = -current_kv
+             update_actuator_gains(current_kp, current_kv)
              
+    def update_scope(label):
+        global scope_selection
+        scope_selection = label
+        print(f"Scope set to: {scope_selection}. Adjust sliders to apply to this group.")
+        # Optional: Reset sliders to current average of group? 
+        # For simplicity, we just keep current slider pos and apply it on next change OR apply now?
+        # User might want to just switch scope then move slider.
+        # Let's apply now to confirm
+        update_sliders(None)
+
     slider_kp.on_changed(update_sliders)
     slider_kv.on_changed(update_sliders)
+    radio.on_clicked(update_scope)
     
     # Initial Update
     update_sliders(0)
@@ -1077,17 +1112,33 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         if step_idx >= n_steps: step_idx = n_steps - 1
             
         # --- PHYSICS STEP ---
-        if args.mode == 'inverse':
-            # 1. INVERSE DYNAMICS (Theoretical)
+        if args.mode == 'inverse' or args.mode == 'sensors':
+            # 1. INVERSE DYNAMICS / KINEMATIC Mode
+            # "Mode 1" Logic: Forced State
+            # This ensures EXACT trajectory following for Sensors Mode too.
             data.qpos[:model.nq] = qpos_traj[step_idx]
             data.qvel[:model.nv] = qvel_traj[step_idx]
             data.qacc[:model.nv] = qacc_traj[step_idx]
             mujoco.mj_inverse(model, data)
             
-        else: # 'forward' or 'sensors'
+            # Note: For sensors to work in Inverse Mode, relying on overlap?
+            # mj_inverse -> mj_collision -> mj_sensor?
+            # Actually mj_inverse calculates forces. Sensors usually depend on FWD pipeline (mj_step).
+            # If we just force qpos, we can call mj_fwdPosition -> mj_sensor?
+            # But mj_inverse does checks.
+            # To get valid sensor data (Contacts), we might need `mj_forward` AFTER setting qpos?
+            # No, `mj_inverse` is full inverse.
+            # Let's try `mujoco.mj_step` but OVERRIDING position?
+            # No, that's unstable.
+            # Best for Sensors is often: `data.qpos = target; mujoco.mj_forward(model, data)`
+            # This ignores inertia but computes static forces/contacts at that pose.
+            if args.mode == 'sensors':
+                # Force kinematic state, then compute sensors/contacts statically
+                mujoco.mj_forward(model, data)
+            
+        else: # 'forward'
             # 2. FORWARD DYNAMICS (Validation)
             # Set Target for Actuators (Position Control)
-            # Corresponds to interpolation at this time
             for jname, jid in joint_ids.items():
                  target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
                  if jname in actuator_ids:
@@ -1097,6 +1148,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             mujoco.mj_step(model, data)
 
         viewer.sync()
+
         
         # --- VISUALIZATION & LOGGING ---
         # Collect Data
