@@ -399,37 +399,48 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons, Button
 
 # HACK: Shim for broken/mixed matplotlib environments (3.9+ vs older mpl_toolkits)
-# 'docstring' was removed in 3.9, but older mplot3d installations might still try to import it.
 import sys
 import types
 try:
-    from matplotlib import docstring
+    # Try to import existing module
+    import matplotlib.docstring
 except ImportError:
-    # Inject dummy docstring module
-    dummy_docstring = types.ModuleType('matplotlib.docstring')
-    # Inject dummy docstring module
-    dummy_docstring = types.ModuleType('matplotlib.docstring')
-    
-    class UniversalShim:
-        def __call__(self, *args, **kwargs):
-            # Case 1: Called as bare decorator on a class/func -> Return the class/func
-            if args and len(args) == 1 and (callable(args[0]) or isinstance(args[0], type)):
-                return args[0]
-            # Case 2: Called with params (factory) or .method(...) -> Return SELF (to be used as decorator or method)
-            # This allows @shim(), @shim().update(), etc.
-            return self
-        
-        def __getattr__(self, key):
-            # Allow method chaining (.update(), .copy(), .dedent())
-            return self
+    # Create valid module if missing
+    fake_mod = types.ModuleType('matplotlib.docstring')
+    sys.modules['matplotlib.docstring'] = fake_mod
+    # Also inject into matplotlib package if possible
+    try:
+        import matplotlib
+        matplotlib.docstring = fake_mod
+    except ImportError:
+        pass
 
-    # Apply shim to everything
-    shim_instance = UniversalShim()
-    dummy_docstring.copy = shim_instance
-    dummy_docstring.interpd = shim_instance
-    dummy_docstring.dedent = shim_instance
-    sys.modules['matplotlib.docstring'] = dummy_docstring
-    sys.modules['matplotlib.docstring'] = dummy_docstring
+# Ensure 'matplotlib.docstring' is available
+if 'matplotlib.docstring' not in sys.modules:
+     sys.modules['matplotlib.docstring'] = types.ModuleType('matplotlib.docstring')
+
+import matplotlib.docstring as docstring_mod
+
+# Define robust Identity Shim
+class RobustIdentity:
+    def __init__(self, *args, **kwargs):
+        pass
+    def __call__(self, *args, **kwargs):
+        # If used as decorator @shim class Foo: -> args[0] is class
+        if args and (callable(args[0]) or isinstance(args[0], type)):
+            return args[0]
+        # If used as factory @shim() -> return self (which behaves as decorator)
+        return self
+    def __getattr__(self, key):
+        return self
+
+# Inject missing attributes
+if not hasattr(docstring_mod, 'interpd'):
+    docstring_mod.interpd = RobustIdentity()
+if not hasattr(docstring_mod, 'dedent'):
+    docstring_mod.dedent = RobustIdentity()
+if not hasattr(docstring_mod, 'copy'):
+    docstring_mod.copy = lambda *args, **kwargs: RobustIdentity()
 
 # HACK: Shim for 'rcParams' missing in matplotlib.axes (3.9+)
 try:
