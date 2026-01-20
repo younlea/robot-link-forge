@@ -399,36 +399,9 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons, Button
 import mpl_toolkits.mplot3d # Required for projection='3d'
 
-# HACK: Shim for 'matplotlib.tri.triangulation' missing in recent matplotlib (3.7+)
-try:
-    import matplotlib.tri
-    if not hasattr(matplotlib.tri, 'triangulation'):
-        # Create a dummy module alias
-        # Older mplot3d expects 'matplotlib.tri.triangulation'
-        # Modern matplotlib puts 'Triangulation' directly in 'matplotlib.tri'
-        import types
-        tri_mod = types.ModuleType('matplotlib.tri.triangulation')
-        if hasattr(matplotlib.tri, 'Triangulation'):
-            tri_mod.Triangulation = matplotlib.tri.Triangulation
-        sys.modules['matplotlib.tri.triangulation'] = tri_mod
-except (ImportError, AttributeError):
-    pass
 
-# HACK: Shim for 'matplotlib.cbook._define_aliases' missing in recent matplotlib (3.9+)
-try:
-    import matplotlib.cbook
-    if not hasattr(matplotlib.cbook, '_define_aliases'):
-        matplotlib.cbook._define_aliases = lambda *args, **kwargs: None
-except (ImportError, AttributeError):
-    pass
 
-# HACK: Shim for '_set_ticklabels' missing in matplotlib.axis.Axis (3.9+)
-try:
-    import matplotlib.axis
-    if not hasattr(matplotlib.axis.Axis, '_set_ticklabels'):
-        matplotlib.axis.Axis._set_ticklabels = matplotlib.axis.Axis.set_ticklabels
-except (ImportError, AttributeError):
-    pass
+
 
 import mpl_toolkits.mplot3d # Required for projection='3d'
 
