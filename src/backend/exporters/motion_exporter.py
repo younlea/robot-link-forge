@@ -410,7 +410,13 @@ except ImportError:
     class MockDocString:
         def copy(self, *args, **kwargs):
             return lambda x: x
-    dummy_docstring.copy = lambda *args, **kwargs: lambda x: x
+        def __call__(self, *args, **kwargs):
+            return lambda x: x
+    
+    mock_func = lambda *args, **kwargs: lambda x: x
+    dummy_docstring.copy = mock_func
+    dummy_docstring.interpd = MockDocString() # interpd was often used as a class or object with methods
+    dummy_docstring.dedent = lambda x: x
     sys.modules['matplotlib.docstring'] = dummy_docstring
 
 # HACK: Shim for 'rcParams' missing in matplotlib.axes (3.9+)
