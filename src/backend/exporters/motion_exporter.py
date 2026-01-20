@@ -397,7 +397,7 @@ import re
 # Try to import matplotlib for sensor graphing
 import matplotlib.pyplot as plt
 from matplotlib.widgets import CheckButtons, Button
-from mpl_toolkits.mplot3d import Axes3D
+import mpl_toolkits.mplot3d # Required for projection='3d'
 
 # --- Configuration ---
 MODEL_XML = "{model_filename}"
