@@ -993,29 +993,22 @@ async def export_mujoco_urdf(
                     with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
                          shutil.copyfileobj(file.file, tmp_upload)
                          tmp_upload_path = tmp_upload.name
-                    
                     try:
                         ensure_binary_stl(tmp_upload_path, dest_path)
                     finally:
-                         if os.path.exists(tmp_upload_path):
-                             os.remove(tmp_upload_path)
-
+                        if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
                     mesh_files_map[link_id] = safe_filename
                 elif link_id in robot.joints:
                      joint_name = to_snake_case(robot.joints[link_id].name)
                      safe_filename = f"{joint_name}_{link_id[:4]}.stl"
                      dest_path = os.path.join(mesh_dir, safe_filename)
-                     
                      with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
                          shutil.copyfileobj(file.file, tmp_upload)
                          tmp_upload_path = tmp_upload.name
-
                      try:
                         ensure_binary_stl(tmp_upload_path, dest_path)
                      finally:
-                         if os.path.exists(tmp_upload_path):
-                             os.remove(tmp_upload_path)
-
+                        if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
                      mesh_files_map[link_id] = safe_filename
 
         # Generate URDF

@@ -39,4 +39,13 @@ def api_joints():
     return jsonify(load_json(JOINTS_PATH))
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Torque Replay Script")
+    parser.add_argument("--flask", action="store_true", help="Start Flask server")
+    args = parser.parse_args()
+
+    if args.flask:
+        app.run(host='0.0.0.0', port=5000)
+    else:
+        print("Flask server not started. Running in non-server mode.")
