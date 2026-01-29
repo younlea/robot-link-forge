@@ -342,12 +342,8 @@ async def export_urdf_package_ros2(
         except Exception as e:
             raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
 
-        sanitized_robot_name = to_snake_case(robot_name)
-        if not sanitized_robot_name:
-            sanitized_robot_name = "my_robot"
-        
+        sanitized_robot_name = to_snake_case(robot_name) or "my_robot"
         tmpdir = tempfile.mkdtemp()
-        
         package_dir = os.path.join(tmpdir, sanitized_robot_name)
         urdf_dir = os.path.join(package_dir, "urdf")
         mesh_dir = os.path.join(package_dir, "meshes")
@@ -831,21 +827,10 @@ To play back the recorded motions:
         with open(os.path.join(package_dir, "README.md"), "w") as f:
             f.write(readme_content)
 
-        # Create the zip archive
-        archive_path = shutil.make_archive(
-            base_name=os.path.join(tmpdir, sanitized_robot_name),
-            format='zip',
-            root_dir=tmpdir,
-            base_dir=sanitized_robot_name
-        )
-        
-        background_tasks.add_task(shutil.rmtree, tmpdir)
-        
-        return FileResponse(
-            path=archive_path, 
-            media_type='application/zip', 
-            filename=f"{sanitized_robot_name}_ros2_package.zip"
-        )
+        # Zip it
+        shutil.make_archive(package_dir, 'zip', root_dir=tmpdir, base_dir=sanitized_robot_name)
+        return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_ros2_package.zip")
+
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -995,7 +980,7 @@ async def export_mujoco_urdf(
                          tmp_upload_path = tmp_upload.name
                     try:
                         ensure_binary_stl(tmp_upload_path, dest_path)
-                    finally:
+                    finally: 
                         if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
                     mesh_files_map[link_id] = safe_filename
                 elif link_id in robot.joints:
@@ -1012,6 +997,8 @@ async def export_mujoco_urdf(
                      mesh_files_map[link_id] = safe_filename
 
         # Generate URDF
+        # Note: Gazebo works best with standard URDF, collisions enabled.
+        # We reuse the standard export and then inject tags.
         urdf_content, _, joint_infos = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names, for_mujoco=True)
 
         # Generate Actuators XML
@@ -1761,7 +1748,7 @@ async def export_mujoco_mjcf(
                          tmp_upload_path = tmp_upload.name
                     try:
                         ensure_binary_stl(tmp_upload_path, dest_path)
-                    finally:
+                    finally: 
                         if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
                     mesh_files_map[link_id] = safe_filename
                 elif link_id in robot.joints:
@@ -2372,3 +2359,7 @@ This will:
     except Exception as e:
         print(f"Export Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+        shutil.copy(
+            os.path.join(os.getcwd(), "motor_parameter_adjustment.py"),
+            os.path.join(package_dir, "motor_parameter_adjustment.py")
+        )
