@@ -7,15 +7,20 @@ echo "3. Fingertip Sensors (Motion with Sensor Values)"
 echo "4. Exit"
 read -p "Enter choice [1]: " choice
 
+# Define script paths
+PYTHON_SCRIPT_DIR="$(dirname "$0")"
+TORQUE_SCRIPT="$PYTHON_SCRIPT_DIR/replay_with_torque.py"
+MOTOR_PARAM_SCRIPT="$PYTHON_SCRIPT_DIR/motor_parameter_adjustment.py"
+
 if [ "$choice" = "1" ]; then
     # Joint Torques Visualization
-    python3 replay_with_torque.py 0 --mode joints
+    python3 "$TORQUE_SCRIPT" 0 --mode joints
 elif [ "$choice" = "2" ]; then
     # Motion with Motor Parameter Adjustment
-    python3 motor_parameter_adjustment.py
+    python3 "$MOTOR_PARAM_SCRIPT"
 elif [ "$choice" = "3" ]; then
     # Fingertip Sensors Visualization
-    python3 replay_with_torque.py 0 --mode sensors
+    python3 "$TORQUE_SCRIPT" 0 --mode sensors
 elif [ "$choice" = "4" ]; then
     echo "Exiting..."
     exit 0
