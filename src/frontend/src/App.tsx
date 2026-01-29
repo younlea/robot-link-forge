@@ -6,7 +6,6 @@ import Sidebar from './components/Sidebar';
 import { useRobotStore } from './store';
 import { CameraManager } from './components/CameraManager';
 import { CameraUI } from './components/CameraUI';
-import MotorParameterTuner from './components/MotorParameterTuner';
 
 function App() {
   const { selectItem } = useRobotStore();
@@ -41,9 +40,6 @@ function App() {
       </Canvas>
       <CameraUI />
       <Sidebar />
-      <div className="absolute bottom-4 right-4">
-        <MotorParameterTuner />
-      </div>
     </div>
   );
 }

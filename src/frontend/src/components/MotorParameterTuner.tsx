@@ -1,6 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Line } from 'react-chartjs-2';
+import { Chart, CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend } from 'chart.js';
+
+// Register required Chart.js components
+Chart.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
 
 interface MotorParameterTunerProps {
   onParametersUpdated?: (kp: number, kv: number) => void;
@@ -17,6 +21,15 @@ const MotorParameterTuner: React.FC<MotorParameterTunerProps> = ({ onParametersU
     tracking_error: 0,
     rms_torque: 0,
   });
+
+  useEffect(() => {
+    // Cleanup function to destroy charts if necessary
+    return () => {
+      Object.values(Chart.instances).forEach((chart) => {
+        if (chart) chart.destroy();
+      });
+    };
+  }, []);
 
   const handleUpdate = async () => {
     try {
