@@ -37,6 +37,19 @@ class RobotJoint(BaseModel):
     dof: JointDOF
     axis: Optional[List[float]] = None
     limits: Dict[str, JointLimit]
+    # Optional physical/joint parameters useful for MuJoCo motor sizing
+    armature: Optional[float] = None
+    frictionloss: Optional[float] = None
+    # Optional motor specification: gear, forcelim, velocity, kp, kv, ctrllimited
+    class MotorSpec(BaseModel):
+        gear: Optional[float] = None
+        forcelim: Optional[float] = None
+        velocity: Optional[float] = None
+        kp: Optional[float] = None
+        kv: Optional[float] = None
+        ctrllimited: Optional[bool] = None
+
+    motor: Optional[MotorSpec] = None
     origin: JointOrigin
     visual: Optional[Visual] = None
 

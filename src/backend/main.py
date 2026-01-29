@@ -11,6 +11,7 @@ import tempfile
 import re
 import math
 from datetime import datetime
+from pydantic import BaseModel
 
 # --- Refactored Modules ---
 from robot_models import RobotData, RobotLink, RobotJoint, Visual
@@ -400,7 +401,7 @@ async def export_urdf_package_ros2(
             f.write(urdf_content)
 
         # Create ROS2 specific files
-        package_xml = f"""<?xml version="1.0"?>\n<package format=\"3\">\n  <name>{sanitized_robot_name}</name>\n  <version>0.1.0</version>\n  <description>A description of {sanitized_robot_name}</description>\n  <maintainer email=\"user@example.com\">Your Name</maintainer>\n  <license>MIT</license>\n\n  <buildtool_depend>ament_cmake</buildtool_depend>\n\n  <exec_depend>joint_state_publisher</exec_depend>\n  <exec_depend>joint_state_publisher_gui</exec_depend>\n  <exec_depend>robot_state_publisher</exec_depend>\n  <exec_depend>rviz2</exec_depend>\n  <exec_depend>xacro</exec_depend>\n\n  <test_depend>ament_lint_auto</test_depend>\n  <test_depend>ament_lint_common</test_depend>\n\n  <export>\n    <build_type>ament_cmake</build_type>\n  </export>\n</package>\n"""
+        package_xml = f"""<?xml version="1.0"?>\n<package format="3">\n  <name>{sanitized_robot_name}</name>\n  <version>0.1.0</version>\n  <description>A description of {sanitized_robot_name}</description>\n  <maintainer email="user@example.com">Your Name</maintainer>\n  <license>MIT</license>\n\n  <buildtool_depend>ament_cmake</buildtool_depend>\n\n  <exec_depend>joint_state_publisher</exec_depend>\n  <exec_depend>joint_state_publisher_gui</exec_depend>\n  <exec_depend>robot_state_publisher</exec_depend>\n  <exec_depend>rviz2</exec_depend>\n  <exec_depend>xacro</exec_depend>\n\n  <test_depend>ament_lint_auto</test_depend>\n  <test_depend>ament_lint_common</test_depend>\n\n  <export>\n    <build_type>ament_cmake</build_type>\n  </export>\n</package>\n"""
         with open(os.path.join(package_dir, "package.xml"), "w") as f:
             f.write(package_xml)
 
@@ -418,6 +419,13 @@ async def export_urdf_package_ros2(
                 os.makedirs(config_dir, exist_ok=True)
                 with open(os.path.join(config_dir, "recordings.json"), "w") as f:
                     json.dump(processed_recs, f, indent=2)
+                # Save generated_joints_info so the replay UI can prefill motor parameters
+                try:
+                    with open(os.path.join(config_dir, "generated_joints_info.json"), "w") as f:
+                        json.dump(generated_joints_info, f, indent=2)
+                except Exception:
+                    # non-fatal: continue even if we cannot write this
+                    pass
                 extra_install_dirs += " config"
                 
                 # 2. Generate Replay Node in scripts/
@@ -982,7 +990,6 @@ async def export_mujoco_urdf(
                     clean_name = unique_link_names[link_id]
                     safe_filename = f"{clean_name}.stl"
                     dest_path = os.path.join(mesh_dir, safe_filename)
-                    # Save upload to temp file first to process it
                     with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
                          shutil.copyfileobj(file.file, tmp_upload)
                          tmp_upload_path = tmp_upload.name
@@ -1019,9 +1026,16 @@ async def export_mujoco_urdf(
         for j_info in joint_infos:
             j_name = j_info['name']
             j_type = j_info['type']
-            # Add position actuator for moving joints
-            # Default kp=50 is decent for simple models.
-            # ctrlrange limits the slider.
+            # Use motor spec when provided
+            motor = j_info.get('motor') or {}
+            kp_val = motor.get('kp') if motor.get('kp') is not None else 50
+            kv_val = motor.get('kv') if motor.get('kv') is not None else 1
+            gear = motor.get('gear')
+            velocity = motor.get('velocity')
+            forcelim = motor.get('forcelim')
+            ctrllimited = motor.get('ctrllimited')
+
+            # ctrlrange from joint limit
             if j_info.get('limit'):
                 lower = j_info['limit'].lower
                 upper = j_info['limit'].upper
@@ -1029,7 +1043,17 @@ async def export_mujoco_urdf(
             else:
                 ctrl_range = "-3.14 3.14"
 
-            actuators_xml += f'    <position name="{j_name}_act" joint="{j_name}" kp="50" ctrlrange="{ctrl_range}" />\n'
+            attrs = f' kp="{kp_val}" kv="{kv_val}"'
+            if gear is not None:
+                attrs += f' gear="{gear}"'
+            if velocity is not None:
+                attrs += f' velocity="{velocity}"'
+            if forcelim is not None:
+                attrs += f' forcelim="{forcelim}"'
+            if ctrllimited is not None:
+                attrs += f' ctrllimited="{str(bool(ctrllimited)).lower()}"'
+
+            actuators_xml += f'    <position name="{j_name}_act" joint="{j_name}"{attrs} ctrlrange="{ctrl_range}" />\n'
         
         # FIX for MuJoCo: 
         # 1. Strip full package path to leave just filename: "package://robot/meshes/foo.stl" -> "foo.stl"
@@ -1276,8 +1300,7 @@ Simply run the script corresponding to the recording you want to play:
 
 Alternatively, you can run the python script directly:
 ```bash
-python3 replay_recording.py [index]
-```
+python3 replay_mujoco.py [index]
 ```
 (Where [index] is 0, 1, 2...)
 
@@ -1522,14 +1545,7 @@ async def export_gazebo_ros2(
             f.write(launch_content)
             
         # package.xml (ament_cmake)
-        package_xml = f"""<?xml version="1.0"?>
-<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
-<package format="3">
-  <name>{sanitized_robot_name}</name>
-  <version>0.0.0</version>
-  <description>Gazebo ROS 2 package for {sanitized_robot_name}</description>
-  <maintainer email="user@todo.todo">User</maintainer>
-  <license>TODO: License declaration</license>
+        package_xml = f"""<?xml version="1.0"?>\n<package format="3">\n  <name>{sanitized_robot_name}</name>\n  <version>0.0.0</version>\n  <description>Gazebo ROS 2 package for {sanitized_robot_name}</description>\n  <maintainer email="user@todo.todo">User</maintainer>\n  <license>TODO: License declaration</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
@@ -2340,12 +2356,22 @@ Alternatively, you can run the python script directly:
 python3 replay_mujoco.py [index]
 ```
 (Where [index] is 0, 1, 2...)
+
+### Torque Visualization
+To replay with real-time finger torque visualization (3x5 grid) and logging:
+```bash
+./run_torque_replay.sh
+```
+This will:
+1. Replay the motion using closed-loop control.
+2. Display a real-time dashboard of joint torques for fingers.
+3. Save all torque data to `torque_log.csv`.
+
 """
 
         with open(os.path.join(package_dir, "README_MUJOCO.md"), "w") as f:
             f.write(readme_content)
 
-        # Zip it
         # Zip it
         shutil.make_archive(package_dir, 'zip', root_dir=tmpdir, base_dir=sanitized_robot_name)
         return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_mujoco_mjcf.zip")

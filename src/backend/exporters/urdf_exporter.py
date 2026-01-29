@@ -272,19 +272,43 @@ def generate_urdf_xml(robot_data: RobotData, robot_name: str, mesh_files: Dict[s
                 
                 if sub['type'] != 'fixed':
                     joints_xml += f'    <axis xyz="{sub["axis"]}"/>\n'
+                    # Include motor and joint physical info for downstream exporters
+                    motor_info = None
+                    try:
+                        if getattr(joint, 'motor', None):
+                            m = joint.motor
+                            motor_info = {
+                                'gear': getattr(m, 'gear', None),
+                                'forcelim': getattr(m, 'forcelim', None),
+                                'velocity': getattr(m, 'velocity', None),
+                                'kp': getattr(m, 'kp', None),
+                                'kv': getattr(m, 'kv', None),
+                                'ctrllimited': getattr(m, 'ctrllimited', None)
+                            }
+                    except Exception:
+                        motor_info = None
+
                     generated_joints_info.append({
                         'name': final_joint_name,
                         'type': sub['type'],
                         'limit': sub['limit'],
                         'original_id': joint.id,
-                        'suffix': sub['suffix']
+                        'suffix': sub['suffix'],
+                        'motor': motor_info,
+                        'armature': getattr(joint, 'armature', None),
+                        'frictionloss': getattr(joint, 'frictionloss', None)
                     })
-                    
+
                     if sub['limit']:
                         joints_xml += f'    <limit lower="{sub["limit"].lower}" upper="{sub["limit"].upper}" effort="10" velocity="1.0"/>\n'
                     else:
                         joints_xml += f'    <limit lower="-3.14" upper="3.14" effort="10" velocity="1.0"/>\n'
-                    joints_xml += f'    <dynamics damping="5.0" friction="1.0" armature="0.1"/>\n'
+                    # Use provided armature/frictionloss if available for more realistic motor sizing
+                    arm = getattr(joint, 'armature', None)
+                    fric = getattr(joint, 'frictionloss', None)
+                    arm_str = f' armature="{arm}"' if arm is not None else ' armature="0.1"'
+                    fric_str = f' friction="{fric}"' if fric is not None else ' friction="1.0"'
+                    joints_xml += f'    <dynamics damping="5.0"{fric_str}{arm_str}/>\n'
                 else:
                     joints_xml += f'    <limit lower="-3.14" upper="3.14" effort="10" velocity="1.0"/>\n'
                 

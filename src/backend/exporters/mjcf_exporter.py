@@ -137,19 +137,63 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                          range_str = ""
                          if limit:
                              range_str = f'range="{limit.lower} {limit.upper}"'
-                         
-                         xml.append(f'{indent}  <joint name="{joint_xml_name}" type="hinge" axis="{axis_str}" {range_str} />')
-                         
+
+                         # Joint attributes: include armature/frictionloss if provided
+                         arm_attr = f' armature="{getattr(joint, "armature", None)}"' if getattr(joint, 'armature', None) is not None else ''
+                         fric_attr = f' frictionloss="{getattr(joint, "frictionloss", None)}"' if getattr(joint, 'frictionloss', None) is not None else ''
+
+                         xml.append(f'{indent}  <joint name="{joint_xml_name}" type="hinge" axis="{axis_str}" {range_str}{arm_attr}{fric_attr} />')
+
+                         # Actuator attributes: prefer joint.motor if present
+                         motor = getattr(joint, 'motor', None)
+                         kp = getattr(motor, 'kp', None) if motor else None
+                         kv = getattr(motor, 'kv', None) if motor else None
+                         gear = getattr(motor, 'gear', None) if motor else None
+                         velocity = getattr(motor, 'velocity', None) if motor else None
+                         forcelim = getattr(motor, 'forcelim', None) if motor else None
+                         ctrllimited = getattr(motor, 'ctrllimited', None) if motor else None
+
+                         kp_val = kp if kp is not None else 200
+                         kv_val = kv if kv is not None else 20
+                         attrs = f' kp="{kp_val}" kv="{kv_val}"'
+                         if gear is not None:
+                             attrs += f' gear="{gear}"'
+                         if velocity is not None:
+                             attrs += f' velocity="{velocity}"'
+                         if forcelim is not None:
+                             attrs += f' forcelim="{forcelim}"'
+                         if ctrllimited is not None:
+                             attrs += f' ctrllimited="{str(bool(ctrllimited)).lower()}"'
+
                          ctrl_range = range_str.replace("range=", "ctrlrange=") if range_str else 'ctrlrange="-3.14 3.14"'
-                         actuators.append(f'{indent}    <position name="{joint_xml_name}_act" joint="{joint_xml_name}" kp="500" kv="30" {ctrl_range}/>')
+                         actuators.append(f'{indent}    <position name="{joint_xml_name}_act" joint="{joint_xml_name}"{attrs} {ctrl_range} />')
 
                      # Capture Info for Replay Mapping
                          # Note: for rotational joints we used 'active_axes' logic.
                          # generated_joints_info needs {original_id, suffix, name}
+                         # Include mapping info for replay: include motor and joint physical attributes
+                         motor_info = None
+                         try:
+                             if getattr(joint, 'motor', None):
+                                 m = joint.motor
+                                 motor_info = {
+                                     'gear': getattr(m, 'gear', None),
+                                     'forcelim': getattr(m, 'forcelim', None),
+                                     'velocity': getattr(m, 'velocity', None),
+                                     'kp': getattr(m, 'kp', None),
+                                     'kv': getattr(m, 'kv', None),
+                                     'ctrllimited': getattr(m, 'ctrllimited', None)
+                                 }
+                         except Exception:
+                             motor_info = None
+
                          generated_joints_info.append({
-                             'original_id': parent_joint_id, 
-                             'suffix': dof_name, 
-                             'name': joint_xml_name
+                             'original_id': parent_joint_id,
+                             'suffix': dof_name,
+                             'name': joint_xml_name,
+                             'motor': motor_info,
+                             'armature': getattr(joint, 'armature', None),
+                             'frictionloss': getattr(joint, 'frictionloss', None)
                          })
 
                 elif joint.type == 'prismatic':
@@ -160,16 +204,54 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                     if curr_limit:
                         range_str = f'range="{curr_limit.lower} {curr_limit.upper}"'
                     
-                    xml.append(f'{indent}  <joint name="{joint.name}" type="slide" axis="{axis_str}" {range_str} />')
+                    xml.append(f'{indent}  <joint name="{joint.name}" type="slide" axis="{axis_str}" {range_str}'+ (f' armature="{getattr(joint, "armature", None)}"' if getattr(joint, 'armature', None) is not None else '') + (f' frictionloss="{getattr(joint, "frictionloss", None)}"' if getattr(joint, 'frictionloss', None) is not None else '') + ' />')
                     
+                    motor = getattr(joint, 'motor', None)
+                    kp = getattr(motor, 'kp', None) if motor else None
+                    kv = getattr(motor, 'kv', None) if motor else None
+                    gear = getattr(motor, 'gear', None) if motor else None
+                    velocity = getattr(motor, 'velocity', None) if motor else None
+                    forcelim = getattr(motor, 'forcelim', None) if motor else None
+                    ctrllimited = getattr(motor, 'ctrllimited', None) if motor else None
+
+                    kp_val = kp if kp is not None else 200
+                    kv_val = kv if kv is not None else 20
+                    attrs = f' kp="{kp_val}" kv="{kv_val}"'
+                    if gear is not None:
+                        attrs += f' gear="{gear}"'
+                    if velocity is not None:
+                        attrs += f' velocity="{velocity}"'
+                    if forcelim is not None:
+                        attrs += f' forcelim="{forcelim}"'
+                    if ctrllimited is not None:
+                        attrs += f' ctrllimited="{str(bool(ctrllimited)).lower()}"'
+
                     ctrl_range = range_str.replace("range=", "ctrlrange=") if range_str else 'ctrlrange="-1 1"'
-                    actuators.append(f'{indent}    <position name="{joint.name}_act" joint="{joint.name}" kp="500" kv="30" {ctrl_range}/>')
+                    actuators.append(f'{indent}    <position name="{joint.name}_act" joint="{joint.name}"{attrs} {ctrl_range}/>')
 
                     # Capture Info for Replay Mapping
+                    motor_info = None
+                    try:
+                        if getattr(joint, 'motor', None):
+                            m = joint.motor
+                            motor_info = {
+                                'gear': getattr(m, 'gear', None),
+                                'forcelim': getattr(m, 'forcelim', None),
+                                'velocity': getattr(m, 'velocity', None),
+                                'kp': getattr(m, 'kp', None),
+                                'kv': getattr(m, 'kv', None),
+                                'ctrllimited': getattr(m, 'ctrllimited', None)
+                            }
+                    except Exception:
+                        motor_info = None
+
                     generated_joints_info.append({
                         'original_id': parent_joint_id,
                         'suffix': 'prism',
-                        'name': joint.name
+                        'name': joint.name,
+                        'motor': motor_info,
+                        'armature': getattr(joint, 'armature', None),
+                        'frictionloss': getattr(joint, 'frictionloss', None)
                     })
 
         # --- Joint Visuals ---
