@@ -814,17 +814,31 @@ echo "Installing dependencies (mujoco, matplotlib, numpy)..."
 pip install mujoco "matplotlib<=3.7.3" "numpy<2" > /dev/null 2>&1
 
 # 4. Interactive Mode Selection
-echo "----------------------------------------"
+echo "========================================"
+echo "  MuJoCo Motion Analysis Tool"
+echo "========================================"
+echo ""
 echo "Select Analysis Mode:"
-echo "1. Inverse Dynamics (Theoretical Torque) [Default]"
-echo "   - Calculates exact torque needed to follow trajectory."
-echo "   - Ignores collisions (forced motion)."
-echo "2. Forward Dynamics (Validation & Tuning)"
-echo "   - Uses PID Control to track trajectory."
-echo "   - Respects collisions (stops on contact)."
-echo "   - Interactive Sliders to tune Kp/Kv."
-echo "3. Fingertip Sensors (3x7 Grid)"
-echo "----------------------------------------"
+echo ""
+echo "1. Joint Torque Visualization (Inverse Dynamics)"
+echo "   - Shows theoretical torque needed for recorded motion"
+echo "   - 3x5 grid for finger joints"
+echo "   - Ignores motor limitations (kinematic mode)"
+echo ""
+echo "2. Motor Sizing Validation (Forward Dynamics) ⭐ NEW"
+echo "   - Verify if selected motors can perform the motion"
+echo "   - Set motor parameters (torque, speed, inertia, etc.)"
+echo "   - Real-time validation with 4 graphs:"
+echo "     ① Torque Saturation Check"
+echo "     ② Position Tracking Error"
+echo "     ③ Speed-Torque Curve (T-N Curve)"
+echo "     ④ RMS Torque & Pass/Fail Judgment"
+echo ""
+echo "3. Fingertip Sensor Forces"
+echo "   - 3x7 grid for contact sensors"
+echo "   - Shows force magnitude at each sensor"
+echo ""
+echo "========================================"
 read -p "Enter choice [1]: " choice
 
 MODE="inverse"
@@ -835,7 +849,10 @@ elif [ "$choice" = "3" ]; then
 fi
 
 # 5. Run the script
+echo ""
 echo "Starting Analysis in mode: $MODE..."
+echo "Press Ctrl+C to exit."
+echo ""
 python3 {python_script_name} {default_rec_idx} --mode $MODE
 """
 
@@ -1026,6 +1043,85 @@ scope_map = {{
     'Little': ['little', 'pinky']
 }}
 
+# ===== MOTOR PARAMETER MANAGEMENT SYSTEM =====
+# Default motor parameters (conservative values)
+DEFAULT_MOTOR_PARAMS = {{
+    'forcelim': 10.0,      # Nm - max torque
+    'gear': 100.0,         # gear ratio
+    'velocity': 10.0,      # rad/s - max speed
+    'armature': 0.001,     # kg·m² - rotor inertia
+    'frictionloss': 0.1,   # Nm - friction
+    'kp': 50.0,            # position gain
+    'kv': 1.0              # velocity gain (damping)
+}}
+
+# Storage for per-joint motor parameters
+motor_params_storage = {{}}  # joint_name -> params dict
+motor_params_file = "motor_parameters.json"
+
+# Try to load existing parameters
+if os.path.exists(motor_params_file):
+    try:
+        with open(motor_params_file, 'r') as f:
+            motor_params_storage = json.load(f)
+        print(f"Loaded motor parameters from {{motor_params_file}}")
+    except:
+        print(f"Warning: Could not load {{motor_params_file}}, using defaults")
+
+# Initialize all joints with default or loaded parameters
+for jname in joint_ids.keys():
+    if jname not in motor_params_storage:
+        motor_params_storage[jname] = DEFAULT_MOTOR_PARAMS.copy()
+
+# Apply parameters to model
+def apply_motor_params_to_model(joint_name, params):
+    """Apply motor parameters to the MuJoCo model."""
+    if joint_name not in actuator_ids:
+        return
+    
+    aid = actuator_ids[joint_name]
+    jid = joint_ids[joint_name]
+    
+    # Actuator parameters
+    model.actuator_gainprm[aid, 0] = params['kp']
+    model.actuator_biasprm[aid, 1] = -params['kv']
+    model.actuator_gear[aid, 0] = params['gear']
+    model.actuator_forcerange[aid, :] = [-params['forcelim'], params['forcelim']]
+    
+    # Joint parameters
+    model.jnt_armature[jid] = params['armature']
+    model.dof_frictionloss[model.jnt_dofadr[jid]] = params['frictionloss']
+    
+    # Note: velocity limit in MuJoCo is tricky, typically set via actuator or joint damping
+
+def save_motor_params():
+    """Save motor parameters to JSON file."""
+    try:
+        with open(motor_params_file, 'w') as f:
+            json.dump(motor_params_storage, f, indent=2)
+        print(f"Saved motor parameters to {{motor_params_file}}")
+    except Exception as e:
+        print(f"Error saving motor parameters: {{e}}")
+
+# Apply all initial parameters
+for jname, params in motor_params_storage.items():
+    apply_motor_params_to_model(jname, params)
+
+# Validation data storage
+validation_data = {{
+    'time': [],
+    'torque_saturation': {{}},  # joint -> [values]
+    'tracking_error': {{}},     # joint -> [values]
+    'velocity': {{}},           # joint -> [values]
+    'torque': {{}}              # joint -> [values]
+}}
+
+for jname in joint_ids.keys():
+    validation_data['torque_saturation'][jname] = []
+    validation_data['tracking_error'][jname] = []
+    validation_data['velocity'][jname] = []
+    validation_data['torque'][jname] = []
+
 def update_actuator_gains(kp, kv):
     # Determine target actuators based on scope
     # Iterating over actuator_ids (name -> id)
@@ -1056,6 +1152,282 @@ def update_actuator_gains(kp, kv):
 
 # Interactive Plot
 if HAS_MATPLOTLIB and args.mode == 'forward':
+    plt.ion()
+    
+    # ===== NEW MOTOR VALIDATION UI =====
+    fig = plt.figure(figsize=(16, 10))
+    fig.canvas.manager.set_window_title('Motor Parameter Validation')
+    
+    # Layout: Left (Joint List + Params), Right (4 Validation Graphs)
+    gs = fig.add_gridspec(3, 3, left=0.05, right=0.95, top=0.95, bottom=0.05, 
+                          hspace=0.3, wspace=0.3, width_ratios=[1, 1.5, 1.5])
+    
+    # ===== LEFT PANEL: Joint Selection & Parameters =====
+    ax_joints = fig.add_subplot(gs[0:2, 0])
+    ax_joints.set_title("Joint List", fontsize=10, fontweight='bold')
+    ax_joints.axis('off')
+    
+    ax_params = fig.add_subplot(gs[2, 0])
+    ax_params.axis('off')
+    
+    # ===== RIGHT PANEL: 4 Validation Graphs =====
+    ax_torque_sat = fig.add_subplot(gs[0, 1])
+    ax_tracking = fig.add_subplot(gs[0, 2])
+    ax_tn_curve = fig.add_subplot(gs[1, 1])
+    ax_rms = fig.add_subplot(gs[1, 2])
+    
+    # Bottom: Status and Controls
+    ax_status = fig.add_subplot(gs[2, 1:])
+    ax_status.axis('off')
+    
+    # State
+    selected_joint = None
+    param_widgets = {{}}
+    validation_running = False
+    
+    # Joint selection with CheckButtons (to show modified status)
+    joint_list = sorted(joint_ids.keys())
+    joint_display = []
+    for jname in joint_list:
+        is_modified = motor_params_storage[jname] != DEFAULT_MOTOR_PARAMS
+        status = "✓" if is_modified else "○"
+        joint_display.append(f"{{status}} {{jname[:20]}}")  # Truncate long names
+    
+    # Radio buttons for joint selection
+    ax_radio_joints = plt.axes([0.02, 0.35, 0.18, 0.55])
+    from matplotlib.widgets import RadioButtons
+    radio_joints = RadioButtons(ax_radio_joints, joint_display[:min(20, len(joint_display))])  # Show first 20
+    
+    def on_joint_select(label):
+        global selected_joint
+        # Extract joint name from label
+        idx = joint_display.index(label)
+        selected_joint = joint_list[idx]
+        update_param_display()
+        fig.canvas.draw_idle()
+    
+    radio_joints.on_clicked(on_joint_select)
+    
+    # Initialize with first joint
+    if joint_list:
+        selected_joint = joint_list[0]
+    
+    # Parameter input fields (TextBox widgets)
+    def create_param_widgets():
+        y_start = 0.25
+        y_step = 0.035
+        param_names = ['forcelim', 'gear', 'velocity', 'armature', 'frictionloss', 'kp', 'kv']
+        param_labels = {{
+            'forcelim': 'Max Torque (Nm)',
+            'gear': 'Gear Ratio',
+            'velocity': 'Max Speed (rad/s)',
+            'armature': 'Inertia (kg·m²)',
+            'frictionloss': 'Friction (Nm)',
+            'kp': 'Position Gain',
+            'kv': 'Velocity Gain'
+        }}
+        
+        widgets = {{}}
+        for i, pname in enumerate(param_names):
+            y_pos = y_start - i * y_step
+            ax_box = plt.axes([0.22, y_pos, 0.15, 0.025])
+            
+            from matplotlib.widgets import TextBox
+            initial_val = str(DEFAULT_MOTOR_PARAMS[pname])
+            textbox = TextBox(ax_box, param_labels[pname] + ': ', initial=initial_val, 
+                            label_pad=0.01, textalignment='left')
+            textbox.label.set_fontsize(8)
+            widgets[pname] = textbox
+        
+        return widgets
+    
+    param_widgets = create_param_widgets()
+    
+    # Apply button
+    ax_apply_btn = plt.axes([0.22, 0.02, 0.07, 0.03])
+    ax_reset_btn = plt.axes([0.30, 0.02, 0.07, 0.03])
+    ax_save_btn = plt.axes([0.22, 0.06, 0.15, 0.03])
+    
+    from matplotlib.widgets import Button
+    btn_apply = Button(ax_apply_btn, 'Apply')
+    btn_reset = Button(ax_reset_btn, 'Reset')
+    btn_save = Button(ax_save_btn, 'Save All Params')
+    
+    def on_apply_click(event):
+        if not selected_joint:
+            return
+        
+        # Read values from widgets
+        try:
+            new_params = {{}}
+            for pname, widget in param_widgets.items():
+                new_params[pname] = float(widget.text)
+            
+            # Update storage
+            motor_params_storage[selected_joint] = new_params
+            
+            # Apply to model
+            apply_motor_params_to_model(selected_joint, new_params)
+            
+            # Update joint list display
+            update_joint_list_display()
+            
+            print(f"Applied parameters to {{selected_joint}}")
+            
+        except ValueError as e:
+            print(f"Error: Invalid parameter value - {{e}}")
+    
+    def on_reset_click(event):
+        if not selected_joint:
+            return
+        
+        motor_params_storage[selected_joint] = DEFAULT_MOTOR_PARAMS.copy()
+        apply_motor_params_to_model(selected_joint, DEFAULT_MOTOR_PARAMS)
+        update_param_display()
+        update_joint_list_display()
+        print(f"Reset {{selected_joint}} to default parameters")
+    
+    def on_save_click(event):
+        save_motor_params()
+    
+    btn_apply.on_clicked(on_apply_click)
+    btn_reset.on_clicked(on_reset_click)
+    btn_save.on_clicked(on_save_click)
+    
+    def update_param_display():
+        """Update parameter widgets with selected joint's values."""
+        if not selected_joint:
+            return
+        
+        params = motor_params_storage[selected_joint]
+        for pname, widget in param_widgets.items():
+            widget.set_val(str(params[pname]))
+    
+    def update_joint_list_display():
+        """Refresh joint list to show modified status."""
+        # This is complex to do dynamically with RadioButtons
+        # For now, just redraw status text
+        pass
+    
+    # Initialize display
+    update_param_display()
+    
+    # Validation graph initialization
+    torque_history = {{jname: [] for jname in joint_ids.keys()}}
+    error_history = {{jname: [] for jname in joint_ids.keys()}}
+    tn_points = {{jname: {{'vel': [], 'torque': []}} for jname in joint_ids.keys()}}
+    time_history = []
+    
+    def update_validation_graphs(elapsed_time):
+        """Update all 4 validation graphs."""
+        if not selected_joint or selected_joint not in joint_ids:
+            return
+        
+        jid = joint_ids[selected_joint]
+        aid = actuator_ids.get(selected_joint, -1)
+        
+        if aid == -1:
+            return
+        
+        params = motor_params_storage[selected_joint]
+        
+        # Get current data
+        current_torque = data.actuator_force[aid] if aid < len(data.actuator_force) else 0
+        target_pos = qpos_traj[min(int(elapsed_time / dt), n_steps-1), model.jnt_qposadr[jid]]
+        actual_pos = data.qpos[model.jnt_qposadr[jid]]
+        actual_vel = data.qvel[model.jnt_dofadr[jid]]
+        
+        # Calculate metrics
+        tracking_error = abs(target_pos - actual_pos)
+        torque_sat_ratio = abs(current_torque) / params['forcelim'] if params['forcelim'] > 0 else 0
+        
+        # Store data
+        torque_history[selected_joint].append(current_torque)
+        error_history[selected_joint].append(tracking_error)
+        tn_points[selected_joint]['vel'].append(abs(actual_vel))
+        tn_points[selected_joint]['torque'].append(abs(current_torque))
+        
+        # Keep only recent data (last 500 points)
+        max_history = 500
+        for hist in [torque_history[selected_joint], error_history[selected_joint]]:
+            if len(hist) > max_history:
+                hist.pop(0)
+        
+        # Update graphs every 10 frames
+        if len(time_history) % 10 == 0:
+            # Graph 1: Torque Saturation
+            ax_torque_sat.clear()
+            ax_torque_sat.set_title(f'① Torque Saturation - {{selected_joint[:15]}}', fontsize=9)
+            ax_torque_sat.set_xlabel('Time (s)', fontsize=8)
+            ax_torque_sat.set_ylabel('Torque (Nm)', fontsize=8)
+            if torque_history[selected_joint]:
+                t_plot = np.arange(len(torque_history[selected_joint])) * dt
+                ax_torque_sat.plot(t_plot, torque_history[selected_joint], 'b-', linewidth=1, label='Actual')
+                ax_torque_sat.axhline(params['forcelim'], color='r', linestyle='--', linewidth=1, label='Limit')
+                ax_torque_sat.axhline(-params['forcelim'], color='r', linestyle='--', linewidth=1)
+                ax_torque_sat.legend(fontsize=7)
+                ax_torque_sat.grid(True, alpha=0.3)
+            
+            # Graph 2: Tracking Error
+            ax_tracking.clear()
+            ax_tracking.set_title(f'② Tracking Error - {{selected_joint[:15]}}', fontsize=9)
+            ax_tracking.set_xlabel('Time (s)', fontsize=8)
+            ax_tracking.set_ylabel('Error (rad)', fontsize=8)
+            if error_history[selected_joint]:
+                t_plot = np.arange(len(error_history[selected_joint])) * dt
+                ax_tracking.plot(t_plot, error_history[selected_joint], 'g-', linewidth=1)
+                ax_tracking.axhline(0.1, color='orange', linestyle='--', linewidth=1, label='Warning (0.1 rad)')
+                ax_tracking.legend(fontsize=7)
+                ax_tracking.grid(True, alpha=0.3)
+            
+            # Graph 3: T-N Curve
+            ax_tn_curve.clear()
+            ax_tn_curve.set_title(f'③ Speed-Torque Curve - {{selected_joint[:15]}}', fontsize=9)
+            ax_tn_curve.set_xlabel('Velocity (rad/s)', fontsize=8)
+            ax_tn_curve.set_ylabel('Torque (Nm)', fontsize=8)
+            if tn_points[selected_joint]['vel']:
+                ax_tn_curve.scatter(tn_points[selected_joint]['vel'], 
+                                   tn_points[selected_joint]['torque'], 
+                                   c='blue', alpha=0.5, s=10)
+                # Draw motor limit box
+                ax_tn_curve.axhline(params['forcelim'], color='r', linestyle='--', linewidth=1)
+                ax_tn_curve.axvline(params['velocity'], color='r', linestyle='--', linewidth=1)
+                ax_tn_curve.grid(True, alpha=0.3)
+            
+            # Graph 4: RMS Torque & Pass/Fail
+            ax_rms.clear()
+            ax_rms.set_title('④ RMS Torque & Validation', fontsize=9)
+            ax_rms.axis('off')
+            
+            if torque_history[selected_joint]:
+                rms_torque = np.sqrt(np.mean(np.array(torque_history[selected_joint])**2))
+                max_torque = np.max(np.abs(torque_history[selected_joint]))
+                max_error = np.max(error_history[selected_joint]) if error_history[selected_joint] else 0
+                
+                # Pass/Fail criteria
+                torque_sat_pass = max_torque < params['forcelim'] * 0.95
+                tracking_pass = max_error < 0.1  # 0.1 rad threshold
+                rms_pass = rms_torque < params['forcelim'] * 0.7  # 70% of max for continuous
+                
+                status_text = f"""
+RMS Torque: {{rms_torque:.3f}} Nm
+Max Torque: {{max_torque:.3f}} / {{params['forcelim']:.3f}} Nm
+Max Error: {{max_error:.4f}} rad
+
+Results:
+① Torque Saturation: {{'✅ PASS' if torque_sat_pass else '❌ FAIL'}}
+② Tracking Error: {{'✅ PASS' if tracking_pass else '❌ FAIL'}}
+③ RMS (Thermal): {{'✅ PASS' if rms_pass else '⚠️ WARNING'}}
+
+Overall: {{'✅ MOTOR OK' if (torque_sat_pass and tracking_pass and rms_pass) else '❌ NEEDS STRONGER MOTOR'}}
+                """
+                ax_rms.text(0.1, 0.5, status_text, fontsize=8, verticalalignment='center',
+                           family='monospace')
+            
+            fig.canvas.draw_idle()
+    
+elif HAS_MATPLOTLIB and args.mode != 'sensors':
+    # OLD UI for backward compatibility (if needed)
     plt.ion()
     # Layout
     fig = plt.figure(figsize=(14, 10))
@@ -1258,7 +1630,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                 mujoco.mj_forward(model, data)
             
         else: # 'forward'
-            # 2. FORWARD DYNAMICS (Validation)
+            # 2. FORWARD DYNAMICS (Motor Validation Mode)
             # Set Target for Actuators (Position Control)
             for jname, jid in joint_ids.items():
                  target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
@@ -1267,6 +1639,15 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             
             # Run Physics
             mujoco.mj_step(model, data)
+            
+            # Update validation graphs
+            if HAS_MATPLOTLIB:
+                time_history.append(elapsed)
+                try:
+                    update_validation_graphs(elapsed)
+                except Exception as e:
+                    # Don't crash simulation if graph update fails
+                    pass
 
         viewer.sync()
 
@@ -1280,7 +1661,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             vals_to_plot = [data.qfrc_inverse[model.jnt_dofadr[joint_ids[n]]] for n in data_source_names]
             
         elif args.mode == 'forward':
-            # Plot Actuator Force (applied)
+            # Plot Actuator Force (applied) - for CSV logging
             vals_to_plot = [data.qfrc_actuator[model.jnt_dofadr[joint_ids[n]]] for n in data_source_names]
             
         elif args.mode == 'sensors':
