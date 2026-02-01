@@ -1046,7 +1046,7 @@ def apply_motor_params(jname, params):
     model.actuator_biasprm[aid, 1] = -params['kv']
     model.actuator_gear[aid, 0] = params['gear']
     model.actuator_forcerange[aid, :] = [-params['forcelim'], params['forcelim']]
-    model.jnt_armature[jid] = params['armature']
+    model.dof_armature[model.jnt_dofadr[jid]] = params['armature']
     model.dof_frictionloss[model.jnt_dofadr[jid]] = params['frictionloss']
 
 for jname, params in motor_params_storage.items():
