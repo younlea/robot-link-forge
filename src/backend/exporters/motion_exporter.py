@@ -833,15 +833,23 @@ echo "========================================"
 read -p "Enter choice [1]: " choice
 
 MODE="inverse"
-if [ "$choice" = "2" ]; then
-    MODE="forward"
-elif [ "$choice" = "3" ]; then
-    MODE="sensors"
-fi
+SCRIPT="replay_with_torque.py"
 
-# 5. Run the script
-echo "Starting Analysis in mode: $MODE..."
-python3 {python_script_name} {default_rec_idx} --mode $MODE
+if [ "$choice" = "2" ]; then
+    # Mode 2 uses separate script
+    SCRIPT="replay_motor_validation.py"
+    echo "Starting Motor Validation..."
+    python3 $SCRIPT {default_rec_idx}
+elif [ "$choice" = "3" ]; then
+    # Mode 3 uses original script with sensors mode
+    MODE="sensors"
+    echo "Starting Sensor Analysis in mode: $MODE..."
+    python3 $SCRIPT {default_rec_idx} --mode $MODE
+else
+    # Mode 1 (default) uses inverse dynamics
+    echo "Starting Analysis in mode: $MODE..."
+    python3 $SCRIPT {default_rec_idx} --mode $MODE
+fi
 """
 
 def generate_mujoco_torque_replay_script(model_filename: str) -> str:
@@ -953,7 +961,7 @@ with open(RECORDINGS_JSON, "r") as f:
 # Parse Arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("index", nargs="?", type=int, default=0, help="Index of recording")
-parser.add_argument("--mode", choices=["inverse", "forward", "sensors"], default="inverse", help="Analysis Mode")
+parser.add_argument("--mode", choices=["inverse", "sensors"], default="inverse", help="Analysis Mode")
 args = parser.parse_args()
 
 rec_idx = args.index
@@ -1016,234 +1024,9 @@ for jname, jid in joint_ids.items():
     qvel_traj[:, dof_adr] = np.gradient(q_interp, dt)
     qacc_traj[:, dof_adr] = np.gradient(qvel_traj[:, dof_adr], dt)
 
-# Tunable Parameters (Forward Mode)
-current_kp = 100.0
-current_kv = 10.0
-
-# Motor Parameter Management
-DEFAULT_MOTOR_PARAMS = {{
-    'forcelim': 10.0, 'gear': 100.0, 'velocity': 10.0,
-    'armature': 0.001, 'frictionloss': 0.1, 'kp': 50.0, 'kv': 1.0
-}}
-motor_params_storage = {{}}
-motor_params_file = "motor_parameters.json"
-
-if os.path.exists(motor_params_file):
-    try:
-        with open(motor_params_file, 'r') as f:
-            motor_params_storage = json.load(f)
-        print(f"Loaded motor parameters from {{motor_params_file}}")
-    except: pass
-
-for jname in joint_ids.keys():
-    if jname not in motor_params_storage:
-        motor_params_storage[jname] = DEFAULT_MOTOR_PARAMS.copy()
-
-def apply_motor_params(jname, params):
-    if jname not in actuator_ids: return
-    aid, jid = actuator_ids[jname], joint_ids[jname]
-    model.actuator_gainprm[aid, 0] = params['kp']
-    model.actuator_biasprm[aid, 1] = -params['kv']
-    model.actuator_gear[aid, 0] = params['gear']
-    model.actuator_forcerange[aid, :] = [-params['forcelim'], params['forcelim']]
-    model.dof_armature[model.jnt_dofadr[jid]] = params['armature']
-    model.dof_frictionloss[model.jnt_dofadr[jid]] = params['frictionloss']
-
-for jname, params in motor_params_storage.items():
-    apply_motor_params(jname, params)
-
-# Global Scope for Sliders
-scope_selection = 'All'
-scope_map = {{
-    'All': [],
-    'Thumb': ['thumb'],
-    'Index': ['index'],
-    'Middle': ['middle'],
-    'Ring': ['ring'],
-    'Little': ['little', 'pinky']
-}}
-
-def update_actuator_gains(kp, kv):
-    # Determine target actuators based on scope
-    # Iterating over actuator_ids (name -> id)
-    # We want to match names that contain the scope keywords
-    
-    target_indices = []
-    
-    if scope_selection == 'All':
-        target_indices = range(model.nu)
-    else:
-        # Filter
-        keywords = scope_map.get(scope_selection, [])
-        for name, aid in actuator_ids.items():
-            name_low = name.lower()
-            if any(k in name_low for k in keywords):
-                target_indices.append(aid)
-    
-    # Apply
-    # Note: target_indices is a list of INTs
-    if target_indices:
-        # We need to set them individually or via mask?
-        # Creating a mask is safer for numpy indexing
-        mask = np.zeros(model.nu, dtype=bool)
-        for i in target_indices: mask[i] = True
-        
-        model.actuator_gainprm[mask, 0] = kp
-        model.actuator_biasprm[mask, 1] = -kv
-
-# Interactive Plot
-if HAS_MATPLOTLIB and args.mode == 'forward':
-    plt.ion()
-    # Layout
-    fig = plt.figure(figsize=(14, 10))
-    plt.subplots_adjust(bottom=0.45) # Huge Space for Detail UI
-    ax = fig.add_subplot(111, projection='3d')
-    
-    # UI Areas
-    # Left: Radio for Scope
-    ax_radio = plt.axes([0.02, 0.1, 0.12, 0.25])
-    radio = RadioButtons(ax_radio, list(scope_map.keys()))
-
-    # Right: Detail Slots for Selected Scope (Max 4 slots)
-    # We create static axes for slots
-    slots = []
-    
-    # Helper to clean labels
-    def clean_jname(n):
-        return n.replace('joint', '').replace('_', ' ').strip()
-        
-    class JointControl:
-        def __init__(self, idx, y_pos):
-            self.idx = idx
-            self.ax_lbl = plt.axes([0.18, y_pos, 0.15, 0.03])
-            self.ax_kp_box = plt.axes([0.35, y_pos, 0.1, 0.03])
-            self.ax_kv_box = plt.axes([0.47, y_pos, 0.1, 0.03])
-            self.ax_kp_slide = plt.axes([0.60, y_pos+0.015, 0.35, 0.015])
-            self.ax_kv_slide = plt.axes([0.60, y_pos, 0.35, 0.015])
-            
-            self.box_kp = TextBox(self.ax_kp_box, 'Kp ', initial='0')
-            self.box_kv = TextBox(self.ax_kv_box, 'Kv ', initial='0')
-            self.slide_kp = Slider(self.ax_kp_slide, '', 0.1, 2000.0, valinit=100)
-            self.slide_kv = Slider(self.ax_kv_slide, '', 0.1, 200.0, valinit=10)
-            
-            self.target_actuator_id = -1
-            
-            # Callbacks
-            self.box_kp.on_submit(self.on_box_submit)
-            self.box_kv.on_submit(self.on_box_submit)
-            self.slide_kp.on_changed(self.on_slide_change)
-            self.slide_kv.on_changed(self.on_slide_change)
-            
-            self.is_updating = False
-            
-            # Hide initially
-            self.set_visible(False)
-
-        def set_visible(self, vis):
-            self.ax_lbl.set_visible(vis)
-            self.ax_kp_box.set_visible(vis) # Fixed: TextBox axis doesn't have .ax
-            self.ax_kv_box.set_visible(vis)
-            self.ax_kp_slide.set_visible(vis) # Fixed: Slider axis doesn't have .ax
-            self.ax_kv_slide.set_visible(vis)
-            if not vis:
-                self.ax_lbl.axis('off')
-
-        def set_target(self, name, aid):
-            self.target_actuator_id = aid
-            self.is_updating = True
-            
-            # Label
-            self.ax_lbl.clear()
-            self.ax_lbl.text(0, 0, clean_jname(name), fontsize=9)
-            self.ax_lbl.axis('off')
-            
-            # Read current values
-            curr_kp = model.actuator_gainprm[aid, 0]
-            curr_kv = -model.actuator_biasprm[aid, 1]
-            
-            self.box_kp.set_val(str(curr_kp))
-            self.box_kv.set_val(str(curr_kv))
-            self.slide_kp.set_val(curr_kp)
-            self.slide_kv.set_val(curr_kv)
-            
-            self.set_visible(True)
-            self.is_updating = False
-
-        def on_box_submit(self, val):
-            if self.target_actuator_id == -1 or self.is_updating: return
-            try:
-                v = float(val)
-                self.is_updating = True
-                # Update model
-                # Check which box triggered? Hard to tell, assuming we just re-read both or update specific
-                # TextBox callback passes val.
-                # Just update both from box values to be safe
-                kp = float(self.box_kp.text)
-                kv = float(self.box_kv.text)
-                
-                model.actuator_gainprm[self.target_actuator_id, 0] = kp
-                model.actuator_biasprm[self.target_actuator_id, 1] = -kv
-                
-                # Sync sliders
-                self.slide_kp.set_val(kp)
-                self.slide_kv.set_val(kv)
-                self.is_updating = False
-            except: pass
-
-        def on_slide_change(self, val):
-            if self.target_actuator_id == -1 or self.is_updating: return
-            self.is_updating = True
-            kp = self.slide_kp.val
-            kv = self.slide_kv.val
-            
-            model.actuator_gainprm[self.target_actuator_id, 0] = kp
-            model.actuator_biasprm[self.target_actuator_id, 1] = -kv
-            
-            self.box_kp.set_val(f"{{kp:.1f}}")
-            self.box_kv.set_val(f"{{kv:.1f}}")
-            self.is_updating = False
-
-    # Create 4 Slots
-    for i in range(4):
-        slots.append(JointControl(i, 0.35 - (i * 0.08)))
-
-    def update_scope(label):
-        global scope_selection
-        scope_selection = label
-        
-        # Identify actuators in this scope
-        target_aids = [] # (name, aid)
-        
-        keywords = scope_map.get(scope_selection, [])
-        if scope_selection == 'All':
-            # Too many for details? Show first 4?
-            # Or just show a note "Select specific finger for details"
-            pass
-        
-        # Sort by joint name to get 1, 2, 3 ordered
-        # actuator_ids is name -> id
-        sorted_acts = sorted(actuator_ids.items())
-        
-        count = 0
-        for name, aid in sorted_acts:
-            name_low = name.lower()
-            if any(k in name_low for k in keywords):
-                if count < 4:
-                    slots[count].set_target(name, aid)
-                    count += 1
-        
-        # Hide unused
-        for i in range(count, 4):
-            slots[i].set_visible(False)
-            
-        fig.canvas.draw_idle()
-
-    radio.on_clicked(update_scope)
-    # Init default
-    update_scope(list(scope_map.keys())[0] if scope_map else 'All')
-    
-elif HAS_MATPLOTLIB:
-    # Fallback/General Plot
+# Interactive Plot (Mode 1 and 3 only use simple visualization)
+# Interactive Plot (Mode 1 and 3 only use simple visualization)
+if HAS_MATPLOTLIB:
     plt.ion()
     fig = plt.figure(figsize=(14, 9))
     ax = fig.add_subplot(111, projection='3d')
@@ -1254,10 +1037,6 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
     print("Starting simulation loop...")
     start_time = time.time()
     last_print = 0
-    
-    # Set initial physics params
-    # Set initial physics params
-    # update_sliders(0) # Removed in favor of scoped UI
     
     while viewer.is_running():
         now = time.time()
@@ -1293,17 +1072,6 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             if args.mode == 'sensors':
                 # Force kinematic state, then compute sensors/contacts statically
                 mujoco.mj_forward(model, data)
-            
-        else: # 'forward'
-            # 2. FORWARD DYNAMICS (Validation)
-            # Set Target for Actuators (Position Control)
-            for jname, jid in joint_ids.items():
-                 target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
-                 if jname in actuator_ids:
-                     data.ctrl[actuator_ids[jname]] = target_q
-            
-            # Run Physics
-            mujoco.mj_step(model, data)
 
         viewer.sync()
 
@@ -1315,10 +1083,6 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         if args.mode == 'inverse':
             # Plot qfrc_inverse (Actuator Force required)
             vals_to_plot = [data.qfrc_inverse[model.jnt_dofadr[joint_ids[n]]] for n in data_source_names]
-            
-        elif args.mode == 'forward':
-            # Plot Actuator Force (applied)
-            vals_to_plot = [data.qfrc_actuator[model.jnt_dofadr[joint_ids[n]]] for n in data_source_names]
             
         elif args.mode == 'sensors':
             # Plot Sensor Data
@@ -1467,4 +1231,289 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             last_print = now
 
 csv_file.close()
+"""
+
+def generate_mujoco_motor_validation_script(model_filename: str) -> str:
+    """Generates Mode 2: Motor Sizing Validation Script (Separate from Mode 1 and 3)"""
+    return f"""
+import time
+import json
+import mujoco
+import mujoco.viewer
+import numpy as np
+import os
+import argparse
+import csv
+
+# Try importing matplotlib
+try:
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+    from matplotlib.widgets import Slider, RadioButtons, TextBox
+    HAS_MATPLOTLIB = True
+except ImportError:
+    print("Warning: matplotlib not found. Visualization will be disabled.")
+    HAS_MATPLOTLIB = False
+
+# --- Configuration ---
+MODEL_XML = "{model_filename}"
+RECORDINGS_JSON = "recordings.json"
+
+# --- Load Model ---
+if not os.path.exists(MODEL_XML):
+    print(f"Error: Model file {{MODEL_XML}} not found.")
+    exit(1)
+
+print(f"Loading model: {{MODEL_XML}}")
+model = mujoco.MjModel.from_xml_path(MODEL_XML)
+data = mujoco.MjData(model)
+
+# Maps
+joint_ids = {{mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, i): i for i in range(model.njnt)}}
+actuator_ids = {{}}
+for i in range(model.nu):
+    name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
+    if name and name.endswith("_act"):
+        jname = name[:-4]
+        actuator_ids[jname] = i
+
+# --- Load Recordings ---
+if not os.path.exists(RECORDINGS_JSON):
+    print("recordings.json not found.")
+    exit(1)
+    
+with open(RECORDINGS_JSON, "r") as f:
+    recs = json.load(f)
+
+# Parse Arguments
+parser = argparse.ArgumentParser()
+parser.add_argument("index", nargs="?", type=int, default=0, help="Index of recording")
+args = parser.parse_args()
+
+rec_idx = args.index
+if rec_idx < 0 or rec_idx >= len(recs):
+    rec_idx = 0
+rec = recs[rec_idx]
+
+print(f"Loaded {{rec['name']}}. Mode: Motor Validation")
+
+# --- Motor Parameter Management ---
+DEFAULT_MOTOR_PARAMS = {{
+    'forcelim': 10.0, 'gear': 100.0, 'velocity': 10.0,
+    'armature': 0.001, 'frictionloss': 0.1, 'kp': 50.0, 'kv': 1.0
+}}
+motor_params_storage = {{}}
+motor_params_file = "motor_parameters.json"
+
+if os.path.exists(motor_params_file):
+    try:
+        with open(motor_params_file, 'r') as f:
+            motor_params_storage = json.load(f)
+        print(f"Loaded motor parameters from {{motor_params_file}}")
+    except: pass
+
+for jname in joint_ids.keys():
+    if jname not in motor_params_storage:
+        motor_params_storage[jname] = DEFAULT_MOTOR_PARAMS.copy()
+
+def apply_motor_params(jname, params):
+    if jname not in actuator_ids: return
+    aid, jid = actuator_ids[jname], joint_ids[jname]
+    model.actuator_gainprm[aid, 0] = params['kp']
+    model.actuator_biasprm[aid, 1] = -params['kv']
+    model.actuator_gear[aid, 0] = params['gear']
+    model.actuator_forcerange[aid, :] = [-params['forcelim'], params['forcelim']]
+    model.dof_armature[model.jnt_dofadr[jid]] = params['armature']
+    model.dof_frictionloss[model.jnt_dofadr[jid]] = params['frictionloss']
+
+# Apply stored motor parameters
+for jname, params in motor_params_storage.items():
+    apply_motor_params(jname, params)
+
+# --- Pre-calculate Trajectory ---
+duration = rec['duration'] / 1000.0
+if duration <= 0: duration = 1.0
+
+dt = model.opt.timestep
+trajectory_times = np.arange(0, duration, dt)
+n_steps = len(trajectory_times)
+
+qpos_traj = np.zeros((n_steps, model.nq))
+qvel_traj = np.zeros((n_steps, model.nv))
+qacc_traj = np.zeros((n_steps, model.nv))
+
+kf_times = [k['timestamp']/1000.0 for k in rec['keyframes']]
+kf_joints = rec['keyframes']
+
+for jname, jid in joint_ids.items():
+    qadr = model.jnt_qposadr[jid]
+    dof_adr = model.jnt_dofadr[jid]
+    
+    y_points = []
+    first_val = kf_joints[0]['joints'].get(jname, 0.0)
+    prev_val = first_val
+    for kf in kf_joints:
+        val = kf['joints'].get(jname, prev_val)
+        y_points.append(val)
+        prev_val = val
+    
+    q_interp = np.interp(trajectory_times, kf_times, y_points)
+    qpos_traj[:, qadr] = q_interp
+    qvel_traj[:, dof_adr] = np.gradient(q_interp, dt)
+    qacc_traj[:, dof_adr] = np.gradient(qvel_traj[:, dof_adr], dt)
+
+# --- Interactive Motor Parameter UI ---
+if HAS_MATPLOTLIB:
+    plt.ion()
+    fig = plt.figure(figsize=(14, 10))
+    plt.subplots_adjust(bottom=0.45)
+    ax = fig.add_subplot(111, projection='3d')
+    
+    # Scope Selection
+    scope_map = {{
+        'All': [],
+        'Thumb': ['thumb'],
+        'Index': ['index'],
+        'Middle': ['middle'],
+        'Ring': ['ring'],
+        'Little': ['little', 'pinky']
+    }}
+    scope_selection = 'All'
+    
+    ax_radio = plt.axes([0.02, 0.1, 0.12, 0.25])
+    radio = RadioButtons(ax_radio, list(scope_map.keys()))
+    
+    # Motor Parameter Controls (simplified)
+    class JointControl:
+        def __init__(self, idx, y_pos):
+            self.idx = idx
+            self.jname = None
+            self.aid = None
+            
+            self.ax_lbl = plt.axes([0.18, y_pos, 0.15, 0.03])
+            self.ax_kp_box = plt.axes([0.35, y_pos, 0.1, 0.03])
+            self.ax_kv_box = plt.axes([0.47, y_pos, 0.1, 0.03])
+            
+            self.lbl = plt.Text(0.5, 0.5, "", transform=self.ax_lbl.transAxes, ha='center')
+            self.ax_lbl.add_artist(self.lbl)
+            self.ax_lbl.axis('off')
+            
+            self.kp_box = TextBox(self.ax_kp_box, "Kp:", initial="0")
+            self.kv_box = TextBox(self.ax_kv_box, "Kv:", initial="0")
+            
+            self.kp_box.on_submit(self.on_kp_change)
+            self.kv_box.on_submit(self.on_kv_change)
+            
+        def set_target(self, jname, aid):
+            self.jname = jname
+            self.aid = aid
+            self.lbl.set_text(jname)
+            
+            if jname in motor_params_storage:
+                params = motor_params_storage[jname]
+                self.kp_box.set_val(str(params['kp']))
+                self.kv_box.set_val(str(params['kv']))
+            
+            self.set_visible(True)
+            
+        def set_visible(self, vis):
+            self.ax_lbl.set_visible(vis)
+            self.ax_kp_box.set_visible(vis)
+            self.ax_kv_box.set_visible(vis)
+            
+        def on_kp_change(self, text):
+            if not self.jname: return
+            try:
+                kp = float(text)
+                motor_params_storage[self.jname]['kp'] = kp
+                apply_motor_params(self.jname, motor_params_storage[self.jname])
+                with open(motor_params_file, 'w') as f:
+                    json.dump(motor_params_storage, f, indent=2)
+            except: pass
+            
+        def on_kv_change(self, text):
+            if not self.jname: return
+            try:
+                kv = float(text)
+                motor_params_storage[self.jname]['kv'] = kv
+                apply_motor_params(self.jname, motor_params_storage[self.jname])
+                with open(motor_params_file, 'w') as f:
+                    json.dump(motor_params_storage, f, indent=2)
+            except: pass
+    
+    slots = []
+    for i in range(4):
+        slots.append(JointControl(i, 0.35 - (i * 0.08)))
+    
+    def update_scope(label):
+        global scope_selection
+        scope_selection = label
+        
+        target_aids = []
+        keywords = scope_map.get(scope_selection, [])
+        sorted_acts = sorted(actuator_ids.items())
+        
+        count = 0
+        for name, aid in sorted_acts:
+            name_low = name.lower()
+            if scope_selection == 'All' or any(k in name_low for k in keywords):
+                if count < 4:
+                    slots[count].set_target(name, aid)
+                    count += 1
+        
+        for i in range(count, 4):
+            slots[i].set_visible(False)
+            
+        fig.canvas.draw_idle()
+    
+    radio.on_clicked(update_scope)
+    update_scope(list(scope_map.keys())[0])
+
+# --- Main Simulation Loop ---
+log_file_name = "motor_validation_log.csv"
+csv_file = open(log_file_name, 'w', newline='')
+writer = csv.writer(csv_file)
+writer.writerow(['Time'] + list(joint_ids.keys()))
+
+with mujoco.viewer.launch_passive(model, data) as viewer:
+    print("Starting motor validation simulation...")
+    start_time = time.time()
+    last_print = 0
+    
+    while viewer.is_running():
+        now = time.time()
+        elapsed = now - start_time
+        if elapsed > duration:
+            start_time = now
+            elapsed = 0
+            
+        step_idx = int(elapsed / dt)
+        if step_idx >= n_steps: step_idx = n_steps - 1
+        
+        # Forward Dynamics with Motor Parameters
+        for jname, jid in joint_ids.items():
+            target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
+            if jname in actuator_ids:
+                data.ctrl[actuator_ids[jname]] = target_q
+        
+        mujoco.mj_step(model, data)
+        viewer.sync()
+        
+        # Logging
+        if now - last_print > 0.1:
+            joint_vals = [data.qpos[model.jnt_qposadr[jid]] for jid in joint_ids.values()]
+            writer.writerow([elapsed] + joint_vals)
+            
+            if HAS_MATPLOTLIB:
+                ax.clear()
+                ax.set_title(f"Motor Validation T={{elapsed:.2f}}s")
+                ax.set_zlim(-20, 20)
+                # Simple visualization placeholder
+                fig.canvas.draw_idle()
+                fig.canvas.flush_events()
+            
+            last_print = now
+
+csv_file.close()
+print(f"Motor validation complete. Log saved to {{log_file_name}}")
 """

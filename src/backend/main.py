@@ -26,6 +26,7 @@ from exporters.motion_exporter import (
     generate_replay_script,
     generate_demo_script,
     generate_mujoco_torque_replay_script,
+    generate_mujoco_motor_validation_script,
     generate_torque_launch_script
 )
 from exporters.stl_utils import ensure_binary_stl
@@ -69,7 +70,7 @@ async def save_recordings(request: Request):
     
     # Sanitize filename
     filename = re.sub(r'[^a-zA-Z0-9_\-\.]', '', filename)
-    if not filename.endswith(".json"):
+    if not filename.endswith(".json"):                  
         filename += ".json"
     
     filepath = os.path.join(RECORDINGS_DIR, filename)
@@ -1142,10 +1143,15 @@ python3 replay_recording.py {i}
                     f.write(f"URDF Filename: {urdf_filename}\n")
                     f.write(f"Num Recordings: {len(processed_recs)}\n")
 
-                # Generate Torque Replay Script (New Feature)
+                # Generate Torque Replay Script (Mode 1 and 3)
                 torque_py = generate_mujoco_torque_replay_script(urdf_filename)
                 with open(os.path.join(package_dir, "replay_with_torque.py"), "w") as f:
                     f.write(torque_py)
+                
+                # Generate Motor Validation Script (Mode 2)
+                motor_py = generate_mujoco_motor_validation_script(urdf_filename)
+                with open(os.path.join(package_dir, "replay_motor_validation.py"), "w") as f:
+                    f.write(motor_py)
                 
                 # Generate Bash Script for Torque Replay (Generic)
                 torque_sh = f"""#!/bin/bash
@@ -1863,10 +1869,14 @@ python3 replay_mujoco.py {i}
                  with open("DEBUG_REC_TRACE.txt", "w") as f:
                      f.write(traceback.format_exc())
 
-        # Generate Torque Replay Script (ALWAYS, for convenience)
+        # Generate Torque Replay Scripts (Mode 1, 2, 3)
         torque_py = generate_mujoco_torque_replay_script(mjcf_filename)
         with open(os.path.join(package_dir, "replay_with_torque.py"), "w") as f:
             f.write(torque_py)
+        
+        motor_py = generate_mujoco_motor_validation_script(mjcf_filename)
+        with open(os.path.join(package_dir, "replay_motor_validation.py"), "w") as f:
+            f.write(motor_py)
         
         # Generate Bash Script for Torque Replay (Generic)
         torque_sh = generate_torque_launch_script("replay_with_torque.py", 0)
