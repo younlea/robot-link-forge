@@ -814,17 +814,22 @@ echo "Installing dependencies (mujoco, matplotlib, numpy)..."
 pip install mujoco "matplotlib<=3.7.3" "numpy<2" > /dev/null 2>&1
 
 # 4. Interactive Mode Selection
-echo "----------------------------------------"
+echo "========================================"
+echo "  MuJoCo Motion Analysis Tool"
+echo "========================================"
+echo ""
 echo "Select Analysis Mode:"
-echo "1. Inverse Dynamics (Theoretical Torque) [Default]"
-echo "   - Calculates exact torque needed to follow trajectory."
-echo "   - Ignores collisions (forced motion)."
-echo "2. Forward Dynamics (Validation & Tuning)"
-echo "   - Uses PID Control to track trajectory."
-echo "   - Respects collisions (stops on contact)."
-echo "   - Interactive Sliders to tune Kp/Kv."
-echo "3. Fingertip Sensors (3x7 Grid)"
-echo "----------------------------------------"
+echo ""
+echo "1. Joint Torque Visualization"
+echo "   - Theoretical torque (inverse dynamics)"
+echo ""
+echo "2. Motor Sizing Validation"  
+echo "   - Set motor parameters and validate"
+echo ""
+echo "3. Fingertip Sensor Forces"
+echo "   - Contact force visualization"
+echo ""
+echo "========================================"
 read -p "Enter choice [1]: " choice
 
 MODE="inverse"
@@ -1012,11 +1017,43 @@ for jname, jid in joint_ids.items():
     qacc_traj[:, dof_adr] = np.gradient(qvel_traj[:, dof_adr], dt)
 
 # Tunable Parameters (Forward Mode)
-current_kp = 100.0 # Low initial stiffness to prevent start-up shock
-current_kv = 10.0   # Moderate damping
+current_kp = 100.0
+current_kv = 10.0
+
+# Motor Parameter Management
+DEFAULT_MOTOR_PARAMS = {{
+    'forcelim': 10.0, 'gear': 100.0, 'velocity': 10.0,
+    'armature': 0.001, 'frictionloss': 0.1, 'kp': 50.0, 'kv': 1.0
+}}
+motor_params_storage = {{}}
+motor_params_file = "motor_parameters.json"
+
+if os.path.exists(motor_params_file):
+    try:
+        with open(motor_params_file, 'r') as f:
+            motor_params_storage = json.load(f)
+        print(f"Loaded motor parameters from {{motor_params_file}}")
+    except: pass
+
+for jname in joint_ids.keys():
+    if jname not in motor_params_storage:
+        motor_params_storage[jname] = DEFAULT_MOTOR_PARAMS.copy()
+
+def apply_motor_params(jname, params):
+    if jname not in actuator_ids: return
+    aid, jid = actuator_ids[jname], joint_ids[jname]
+    model.actuator_gainprm[aid, 0] = params['kp']
+    model.actuator_biasprm[aid, 1] = -params['kv']
+    model.actuator_gear[aid, 0] = params['gear']
+    model.actuator_forcerange[aid, :] = [-params['forcelim'], params['forcelim']]
+    model.jnt_armature[jid] = params['armature']
+    model.dof_frictionloss[model.jnt_dofadr[jid]] = params['frictionloss']
+
+for jname, params in motor_params_storage.items():
+    apply_motor_params(jname, params)
 
 # Global Scope for Sliders
-scope_selection = 'All' # Default
+scope_selection = 'All'
 scope_map = {{
     'All': [],
     'Thumb': ['thumb'],

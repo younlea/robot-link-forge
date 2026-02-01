@@ -93,18 +93,32 @@ Runs the replay node to move the robot.
 *   Progress will be logged to the terminal: `Progress: 1.5s / 10.0s (15.0%)`.
 
 ### 4. Export & Replay (MuJoCo)
+
+MuJoCo export includes motor sizing validation tools for mechanical engineers.
+
 #### Setup
-1.  Extract the ZIP.
-2.  Install `mujoco` python package (`pip install mujoco`).
+1. Extract the ZIP file
+2. Run any shell script - virtual environment and dependencies are installed automatically
 
-#### Running
+#### Running Analysis
 ```bash
-# Visualize Model
-python3 visualize_urdf.py
+# Basic replay
+./replay_0_my_recording.sh
 
-# Replay Recording
-python3 replay_recording.py 0
+# Advanced analysis with visualization
+./run_torque_replay.sh
 ```
+
+**Analysis Modes:**
+- **Mode 1**: Joint Torque Visualization (inverse dynamics, 3x5 grid)
+- **Mode 2**: Motor Sizing Validation (set motor params, check performance)
+- **Mode 3**: Fingertip Sensor Forces (contact visualization, 3x7 grid)
+
+**Mode 2 Features:**
+- Set motor parameters per joint (forcelim, gear, velocity, armature, frictionloss)
+- Real-time validation: torque saturation, tracking error, T-N curve, RMS thermal load
+- Parameters saved to `motor_parameters.json` for reuse
+
 ---
 
 ## 🤝 Contributing
