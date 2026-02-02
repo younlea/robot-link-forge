@@ -857,13 +857,22 @@ def generate_mujoco_torque_replay_script(model_filename: str) -> str:
     return f"""
 import time
 import json
-import mujoco
-import mujoco.viewer
-import numpy as np
 import os
 import argparse
 import sys
 import csv
+
+# GLFW Error Fix: Set environment variables before importing MuJoCo
+os.environ['MUJOCO_GL'] = 'glfw'
+# Try to use a more compatible OpenGL version
+try:
+    import OpenGL
+    OpenGL.ERROR_CHECKING = False
+except: pass
+
+import mujoco
+import mujoco.viewer
+import numpy as np
 
 # Try importing matplotlib
 try:
@@ -1025,7 +1034,6 @@ for jname, jid in joint_ids.items():
     qacc_traj[:, dof_adr] = np.gradient(qvel_traj[:, dof_adr], dt)
 
 # Interactive Plot (Mode 1 and 3 only use simple visualization)
-# Interactive Plot (Mode 1 and 3 only use simple visualization)
 if HAS_MATPLOTLIB:
     plt.ion()
     fig = plt.figure(figsize=(14, 9))
@@ -1033,202 +1041,217 @@ if HAS_MATPLOTLIB:
 
 
 # Main Loop
-with mujoco.viewer.launch_passive(model, data) as viewer:
-    print("Starting simulation loop...")
-    start_time = time.time()
-    last_print = 0
-    
-    while viewer.is_running():
-        now = time.time()
-        elapsed = now - start_time
-        if elapsed > duration:
-            start_time = now
-            elapsed = 0
-            
-        step_idx = int(elapsed / dt)
-        if step_idx >= n_steps: step_idx = n_steps - 1
-            
-        # --- PHYSICS STEP ---
-        if args.mode == 'inverse' or args.mode == 'sensors':
-            # 1. INVERSE DYNAMICS / KINEMATIC Mode
-            # "Mode 1" Logic: Forced State
-            # This ensures EXACT trajectory following for Sensors Mode too.
-            data.qpos[:model.nq] = qpos_traj[step_idx]
-            data.qvel[:model.nv] = qvel_traj[step_idx]
-            data.qacc[:model.nv] = qacc_traj[step_idx]
-            mujoco.mj_inverse(model, data)
-            
-            # Note: For sensors to work in Inverse Mode, relying on overlap?
-            # mj_inverse -> mj_collision -> mj_sensor?
-            # Actually mj_inverse calculates forces. Sensors usually depend on FWD pipeline (mj_step).
-            # If we just force qpos, we can call mj_fwdPosition -> mj_sensor?
-            # But mj_inverse does checks.
-            # To get valid sensor data (Contacts), we might need `mj_forward` AFTER setting qpos?
-            # No, `mj_inverse` is full inverse.
-            # Let's try `mujoco.mj_step` but OVERRIDING position?
-            # No, that's unstable.
-            # Best for Sensors is often: `data.qpos = target; mujoco.mj_forward(model, data)`
-            # This ignores inertia but computes static forces/contacts at that pose.
-            if args.mode == 'sensors':
-                # Force kinematic state, then compute sensors/contacts statically
-                mujoco.mj_forward(model, data)
+try:
+    viewer = mujoco.viewer.launch_passive(model, data)
+except Exception as e:
+    print(f"Error creating viewer: {{e}}")
+    print("Trying alternative rendering method...")
+    try:
+        # Try with EGL backend as fallback
+        os.environ['MUJOCO_GL'] = 'egl'
+        viewer = mujoco.viewer.launch_passive(model, data)
+    except Exception as e2:
+        print(f"Alternative method also failed: {{e2}}")
+        print("Running in headless mode (no visualization)")
+        viewer = None
 
-        viewer.sync()
-
+if viewer:
+    with viewer:
+        print("Starting simulation loop...")
+        start_time = time.time()
+        last_print = 0
         
+        while viewer.is_running():
+            now = time.time()
+            elapsed = now - start_time
+            if elapsed > duration:
+                start_time = now
+                elapsed = 0
+                
+            step_idx = int(elapsed / dt)
+            if step_idx >= n_steps: step_idx = n_steps - 1
+                
+            # --- PHYSICS STEP ---
+            if args.mode == 'inverse' or args.mode == 'sensors':
+                # 1. INVERSE DYNAMICS / KINEMATIC Mode
+                # "Mode 1" Logic: Forced State
+                # This ensures EXACT trajectory following for Sensors Mode too.
+                data.qpos[:model.nq] = qpos_traj[step_idx]
+                data.qvel[:model.nv] = qvel_traj[step_idx]
+                data.qacc[:model.nv] = qacc_traj[step_idx]
+                mujoco.mj_inverse(model, data)
+                
+                # Note: For sensors to work in Inverse Mode, relying on overlap?
+                # mj_inverse -> mj_collision -> mj_sensor?
+                # Actually mj_inverse calculates forces. Sensors usually depend on FWD pipeline (mj_step).
+                # If we just force qpos, we can call mj_fwdPosition -> mj_sensor?
+                # But mj_inverse does checks.
+                # To get valid sensor data (Contacts), we might need `mj_forward` AFTER setting qpos?
+                # No, `mj_inverse` is full inverse.
+                # Let's try `mujoco.mj_step` but OVERRIDING position?
+                # No, that's unstable.
+                # Best for Sensors is often: `data.qpos = target; mujoco.mj_forward(model, data)`
+                # This ignores inertia but computes static forces/contacts at that pose.
+                if args.mode == 'sensors':
+                    # Force kinematic state, then compute sensors/contacts statically
+                    mujoco.mj_forward(model, data)
+
+            viewer.sync()
+
+            
 # --- VISUALIZATION & LOGGING ---
-        # Collect Data
-        vals_to_plot = []
-        
-        if args.mode == 'inverse':
-            # Plot qfrc_inverse (Actuator Force required)
-            vals_to_plot = [data.qfrc_inverse[model.jnt_dofadr[joint_ids[n]]] for n in data_source_names]
+            # Collect Data
+            vals_to_plot = []
             
-        elif args.mode == 'sensors':
-            # Plot Sensor Data
-            vals_to_plot = [data.sensordata[sensor_ids[n]] for n in data_source_names]
-
-        # Log
-        row = [elapsed] + vals_to_plot
-        writer.writerow(row)
-        
-        # User requested: "Finger name, 1st, 2nd, 3rd" labels
-        def get_pretty_label(name):
-            # Parse standard robot names
-            # e.g. "index_finger_joint_1" -> "Index 1st"
-            low = name.lower()
-            finger = "Unknown"
-            if "thumb" in low: finger = "Thumb"
-            elif "index" in low: finger = "Index"
-            elif "middle" in low: finger = "Middle"
-            elif "ring" in low: finger = "Ring"
-            elif "little" in low or "pinky" in low: finger = "Little"
-            
-            # Find index
-            idx_str = ""
-            if "1" in name or "proximal" in name: idx_str = "1st"
-            elif "2" in name or "medial" in name: idx_str = "2nd"
-            elif "3" in name or "distal" in name: idx_str = "3rd"
-            elif "tip" in name: idx_str = "Tip"
-            
-            if finger == "Unknown": return name
-            return f"{{finger}}\\n{{idx_str}}"
-
-        # Draw Plot (Throttle)
-        if HAS_MATPLOTLIB and (now - last_print > 0.1):
-            ax.clear()
-            ax.set_zlim(*z_lim_default)
-            
-            # Determine mapping
-            dz_list = []
-            
-            if args.mode == 'sensors':
-                ax.set_title(f"Sensor Forces (N) T={{elapsed:.2f}}s")
-                ax.set_zlim(0, 5) # Sensors are positive
-                # 3x7 Logic
-                # Initialize c_list
-                c_list = []
+            if args.mode == 'inverse':
+                # Plot qfrc_inverse (Actuator Force required)
+                vals_to_plot = [data.qfrc_inverse[model.jnt_dofadr[joint_ids[n]]] for n in data_source_names]
                 
-                for f in range(5):
-                    for r in range(7):
-                        for c in range(3):
-                            sname = sensor_grid_map[f][r][c]
+            elif args.mode == 'sensors':
+                # Plot Sensor Data
+                vals_to_plot = [data.sensordata[sensor_ids[n]] for n in data_source_names]
+
+            # Log
+            row = [elapsed] + vals_to_plot
+            writer.writerow(row)
+            
+            # User requested: "Finger name, 1st, 2nd, 3rd" labels
+            def get_pretty_label(name):
+                # Parse standard robot names
+                # e.g. "index_finger_joint_1" -> "Index 1st"
+                low = name.lower()
+                finger = "Unknown"
+                if "thumb" in low: finger = "Thumb"
+                elif "index" in low: finger = "Index"
+                elif "middle" in low: finger = "Middle"
+                elif "ring" in low: finger = "Ring"
+                elif "little" in low or "pinky" in low: finger = "Little"
+                
+                # Find index
+                idx_str = ""
+                if "1" in name or "proximal" in name: idx_str = "1st"
+                elif "2" in name or "medial" in name: idx_str = "2nd"
+                elif "3" in name or "distal" in name: idx_str = "3rd"
+                elif "tip" in name: idx_str = "Tip"
+                
+                if finger == "Unknown": return name
+                return f"{{finger}}\\n{{idx_str}}"
+
+            # Draw Plot (Throttle)
+            if HAS_MATPLOTLIB and (now - last_print > 0.1):
+                ax.clear()
+                ax.set_zlim(*z_lim_default)
+                
+                # Determine mapping
+                dz_list = []
+                
+                if args.mode == 'sensors':
+                    ax.set_title(f"Sensor Forces (N) T={{elapsed:.2f}}s")
+                    ax.set_zlim(0, 5) # Sensors are positive
+                    # 3x7 Logic
+                    # Initialize c_list
+                    c_list = []
+                    
+                    for f in range(5):
+                        for r in range(7):
+                            for c in range(3):
+                                sname = sensor_grid_map[f][r][c]
+                                val = 0.0
+                                if sname and sname in sensor_ids:
+                                    idx_map = data_source_names.index(sname)
+                                    val = vals_to_plot[idx_map]
+                                dz_list.append(val)
+                                c_list.append(plt.cm.viridis(val / 5.0))
+                    
+                    # Finger tick logic
+                    x_flat_arr = []
+                    y_flat_arr = []
+                    for f in range(5):
+                        for r in range(7):
+                            for c in range(3):
+                                x_flat_arr.append(f*4 + c)
+                                y_flat_arr.append(r)
+                                
+                    ax.bar3d(x_flat_arr, y_flat_arr, np.zeros_like(x_flat_arr), 0.8, 0.8, dz_list, color=c_list, shade=True)
+                    
+                    # Sensor Graph Labels
+                    tick_locs = []
+                    for i in range(5):
+                        tick_locs.append(i*4 + 1)
+                    ax.set_xticks(tick_locs)
+                    ax.set_xticklabels(FINGER_NAMES, fontsize=9)
+
+
+                elif args.mode in ['inverse', 'forward']:
+                    # Bar Plot for Torques (2D Grid: Finger vs Joint Rank)
+                    ax.set_title(f"Joint Torques (Nm) T={{elapsed:.2f}}s")
+                    ax.set_zlim(-50, 50) # Z-Axis increased to 50
+                    
+                    # Setup Grid
+                    # X: Fingers (0..4) 'Thumb', 'Index' ...
+                    # Y: Joints (0..2) '1st', '2nd', '3rd'
+                    
+                    x_bar = []
+                    y_bar = []
+                    dz_bar = []
+                    c_bar = []
+                    
+                    for c in range(5):
+                        for r in range(3):
+                            jname = joint_grid_map[r][c]
                             val = 0.0
-                            if sname and sname in sensor_ids:
-                                idx_map = data_source_names.index(sname)
-                                val = vals_to_plot[idx_map]
-                            dz_list.append(val)
-                            c_list.append(plt.cm.viridis(val / 5.0))
-                
-                # Finger tick logic
-                x_flat_arr = []
-                y_flat_arr = []
-                for f in range(5):
-                    for r in range(7):
-                        for c in range(3):
-                            x_flat_arr.append(f*4 + c)
-                            y_flat_arr.append(r)
+                            if jname and jname in joint_ids:
+                                 # Find value
+                                 if jname in data_source_names:
+                                     idx_map = data_source_names.index(jname)
+                                     val = vals_to_plot[idx_map]
                             
-                ax.bar3d(x_flat_arr, y_flat_arr, np.zeros_like(x_flat_arr), 0.8, 0.8, dz_list, color=c_list, shade=True)
-                
-                # Sensor Graph Labels
-                tick_locs = []
-                for i in range(5):
-                    tick_locs.append(i*4 + 1)
-                ax.set_xticks(tick_locs)
-                ax.set_xticklabels(FINGER_NAMES, fontsize=9)
+                            x_bar.append(c)
+                            y_bar.append(r)
+                            dz_bar.append(val)
+                            
+                            # Color Logic (Coolwarm)
+                            # Map -50..50 to 0..1
+                            norm_val = np.clip(val, -50, 50)
+                            # Shift to 0..1: (val + 50) / 100
+                            c_bar.append(plt.cm.coolwarm((norm_val + 50) / 100.0))
 
-
-            elif args.mode in ['inverse', 'forward']:
-                # Bar Plot for Torques (2D Grid: Finger vs Joint Rank)
-                ax.set_title(f"Joint Torques (Nm) T={{elapsed:.2f}}s")
-                ax.set_zlim(-50, 50) # Z-Axis increased to 50
-                
-                # Setup Grid
-                # X: Fingers (0..4) 'Thumb', 'Index' ...
-                # Y: Joints (0..2) '1st', '2nd', '3rd'
-                
-                x_bar = []
-                y_bar = []
-                dz_bar = []
-                c_bar = []
-                
-                for c in range(5):
-                    for r in range(3):
-                        jname = joint_grid_map[r][c]
-                        val = 0.0
-                        if jname and jname in joint_ids:
-                             # Find value
-                             if jname in data_source_names:
+                    # Plot
+                    # Use narrow bars
+                    ax.bar3d(x_bar, y_bar, np.zeros_like(x_bar), 0.5, 0.5, dz_bar, color=c_bar, shade=True)
+                    
+                    # Labels
+                    ax.set_xticks(np.arange(5) + 0.25)
+                    ax.set_xticklabels(FINGER_NAMES, rotation=0, fontsize=9)
+                    ax.set_yticks(np.arange(3) + 0.25)
+                    ax.set_yticklabels(['1st', '2nd', '3rd'], rotation=0, fontsize=9)
+                    
+                else:
+                    ax.set_title(f"Torques (Nm) T={{elapsed:.2f}}s Modes: Inverse/Forward")
+                    # 3x5 Logic
+                    for c in range(5):
+                        for r in range(3):
+                            jname = joint_grid_map[r][c]
+                            val = 0.0
+                            if jname and jname in joint_ids:
                                  idx_map = data_source_names.index(jname)
                                  val = vals_to_plot[idx_map]
-                        
-                        x_bar.append(c)
-                        y_bar.append(r)
-                        dz_bar.append(val)
-                        
-                        # Color Logic (Coolwarm)
-                        # Map -50..50 to 0..1
-                        norm_val = np.clip(val, -50, 50)
-                        # Shift to 0..1: (val + 50) / 100
-                        c_bar.append(plt.cm.coolwarm((norm_val + 50) / 100.0))
-
-                # Plot
-                # Use narrow bars
-                ax.bar3d(x_bar, y_bar, np.zeros_like(x_bar), 0.5, 0.5, dz_bar, color=c_bar, shade=True)
-                
-                # Labels
-                ax.set_xticks(np.arange(5) + 0.25)
-                ax.set_xticklabels(FINGER_NAMES, rotation=0, fontsize=9)
-                ax.set_yticks(np.arange(3) + 0.25)
-                ax.set_yticklabels(['1st', '2nd', '3rd'], rotation=0, fontsize=9)
-                
-            else:
-                ax.set_title(f"Torques (Nm) T={{elapsed:.2f}}s Modes: Inverse/Forward")
-                # 3x5 Logic
-                for c in range(5):
-                    for r in range(3):
-                        jname = joint_grid_map[r][c]
-                        val = 0.0
-                        if jname and jname in joint_ids:
-                             idx_map = data_source_names.index(jname)
-                             val = vals_to_plot[idx_map]
-                        dz_list.append(val)
-                        norm_val = np.clip(val, -20, 20)
-                        c_list.append(plt.cm.coolwarm((norm_val+20)/40.0))
-                
-                # Joints Mesh grid logic
-                _x = np.arange(5)
-                _y = np.arange(3)
-                _xx, _yy = np.meshgrid(_x, _y)
-                
-                ax.bar3d(_xx.flatten(), _yy.flatten(), np.zeros_like(_xx.flatten()), 0.5, 0.5, dz_list, color=c_list, shade=True)
-                
-            try:
-                fig.canvas.draw_idle()
-                fig.canvas.flush_events()
-            except: pass
-            last_print = now
+                            dz_list.append(val)
+                            norm_val = np.clip(val, -20, 20)
+                            c_list.append(plt.cm.coolwarm((norm_val+20)/40.0))
+                    
+                    # Joints Mesh grid logic
+                    _x = np.arange(5)
+                    _y = np.arange(3)
+                    _xx, _yy = np.meshgrid(_x, _y)
+                    
+                    ax.bar3d(_xx.flatten(), _yy.flatten(), np.zeros_like(_xx.flatten()), 0.5, 0.5, dz_list, color=c_list, shade=True)
+                    
+                try:
+                    fig.canvas.draw_idle()
+                    fig.canvas.flush_events()
+                except: pass
+                last_print = now
 
 csv_file.close()
 """
@@ -1238,12 +1261,21 @@ def generate_mujoco_motor_validation_script(model_filename: str) -> str:
     return f"""
 import time
 import json
-import mujoco
-import mujoco.viewer
-import numpy as np
 import os
 import argparse
 import csv
+
+# GLFW Error Fix: Set environment variables before importing MuJoCo
+os.environ['MUJOCO_GL'] = 'glfw'
+# Try to use a more compatible OpenGL version
+try:
+    import OpenGL
+    OpenGL.ERROR_CHECKING = False
+except: pass
+
+import mujoco
+import mujoco.viewer
+import numpy as np
 
 # Try importing matplotlib
 try:
@@ -1475,44 +1507,58 @@ csv_file = open(log_file_name, 'w', newline='')
 writer = csv.writer(csv_file)
 writer.writerow(['Time'] + list(joint_ids.keys()))
 
-with mujoco.viewer.launch_passive(model, data) as viewer:
-    print("Starting motor validation simulation...")
-    start_time = time.time()
-    last_print = 0
-    
-    while viewer.is_running():
-        now = time.time()
-        elapsed = now - start_time
-        if elapsed > duration:
-            start_time = now
-            elapsed = 0
-            
-        step_idx = int(elapsed / dt)
-        if step_idx >= n_steps: step_idx = n_steps - 1
+try:
+    viewer = mujoco.viewer.launch_passive(model, data)
+except Exception as e:
+    print(f"Error creating viewer: {{e}}")
+    print("Trying alternative rendering method...")
+    try:
+        os.environ['MUJOCO_GL'] = 'egl'
+        viewer = mujoco.viewer.launch_passive(model, data)
+    except Exception as e2:
+        print(f"Alternative method also failed: {{e2}}")
+        print("Running in headless mode (no visualization)")
+        viewer = None
+
+if viewer:
+    with viewer:
+        print("Starting motor validation simulation...")
+        start_time = time.time()
+        last_print = 0
         
-        # Forward Dynamics with Motor Parameters
-        for jname, jid in joint_ids.items():
-            target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
-            if jname in actuator_ids:
-                data.ctrl[actuator_ids[jname]] = target_q
-        
-        mujoco.mj_step(model, data)
-        viewer.sync()
-        
-        # Logging
-        if now - last_print > 0.1:
-            joint_vals = [data.qpos[model.jnt_qposadr[jid]] for jid in joint_ids.values()]
-            writer.writerow([elapsed] + joint_vals)
+        while viewer.is_running():
+            now = time.time()
+            elapsed = now - start_time
+            if elapsed > duration:
+                start_time = now
+                elapsed = 0
+                
+            step_idx = int(elapsed / dt)
+            if step_idx >= n_steps: step_idx = n_steps - 1
             
-            if HAS_MATPLOTLIB:
-                ax.clear()
-                ax.set_title(f"Motor Validation T={{elapsed:.2f}}s")
-                ax.set_zlim(-20, 20)
-                # Simple visualization placeholder
-                fig.canvas.draw_idle()
-                fig.canvas.flush_events()
+            # Forward Dynamics with Motor Parameters
+            for jname, jid in joint_ids.items():
+                target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
+                if jname in actuator_ids:
+                    data.ctrl[actuator_ids[jname]] = target_q
             
-            last_print = now
+            mujoco.mj_step(model, data)
+            viewer.sync()
+            
+            # Logging
+            if now - last_print > 0.1:
+                joint_vals = [data.qpos[model.jnt_qposadr[jid]] for jid in joint_ids.values()]
+                writer.writerow([elapsed] + joint_vals)
+                
+                if HAS_MATPLOTLIB:
+                    ax.clear()
+                    ax.set_title(f"Motor Validation T={{elapsed:.2f}}s")
+                    ax.set_zlim(-20, 20)
+                    # Simple visualization placeholder
+                    fig.canvas.draw_idle()
+                    fig.canvas.flush_events()
+                
+                last_print = now
 
 csv_file.close()
 print(f"Motor validation complete. Log saved to {{log_file_name}}")
