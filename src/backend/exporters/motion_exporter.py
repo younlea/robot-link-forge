@@ -1441,13 +1441,16 @@ print(f"Loaded {{rec['name']}}. Mode: Motor Validation")
 
 # --- Motor Parameter Management ---
 GLOBAL_MOTOR_PARAMS = {{
-    'kp': 100.0,
-    'kv': 10.0,
-    'forcelim': 50.0,
+    'kp': 500.0,      # Increased from 100
+    'kv': 50.0,       # Increased from 10
+    'forcelim': 100.0,
     'gear': 100.0,
     'armature': 0.001,
     'frictionloss': 0.1
 }}
+
+# Per-joint parameter storage (overrides global if set)
+per_joint_params = {{}}
 
 motor_params_file = "motor_parameters.json"
 if os.path.exists(motor_params_file):
@@ -1456,33 +1459,62 @@ if os.path.exists(motor_params_file):
             loaded = json.load(f)
             if 'global' in loaded:
                 GLOBAL_MOTOR_PARAMS.update(loaded['global'])
-        print(f"Loaded global motor parameters from {{motor_params_file}}")
+            if 'per_joint' in loaded:
+                per_joint_params = loaded['per_joint']
+        print(f"Loaded motor parameters from {{motor_params_file}}")
     except Exception as e:
         print(f"Warning: Could not load motor parameters: {{e}}")
 
-def apply_global_motor_params():
-    \"\"\"Apply global parameters to all actuators/joints\"\"\"
+def get_joint_params(jname):
+    \"\"\"Get effective parameters for a joint (per-joint override or global)\"\"\"
+    if jname in per_joint_params:
+        return per_joint_params[jname]
+    return GLOBAL_MOTOR_PARAMS
+
+def apply_all_motor_params():
+    \"\"\"Apply motor parameters to all actuators/joints\"\"\"
     for jname in joint_ids.keys():
         if jname not in actuator_ids: 
             continue
         aid = actuator_ids[jname]
         jid = joint_ids[jname]
         
-        model.actuator_gainprm[aid, 0] = GLOBAL_MOTOR_PARAMS['kp']
-        model.actuator_biasprm[aid, 1] = -GLOBAL_MOTOR_PARAMS['kv']
-        model.actuator_gear[aid, 0] = GLOBAL_MOTOR_PARAMS['gear']
-        model.actuator_forcerange[aid, :] = [-GLOBAL_MOTOR_PARAMS['forcelim'], GLOBAL_MOTOR_PARAMS['forcelim']]
-        model.dof_armature[model.jnt_dofadr[jid]] = GLOBAL_MOTOR_PARAMS['armature']
-        model.dof_frictionloss[model.jnt_dofadr[jid]] = GLOBAL_MOTOR_PARAMS['frictionloss']
+        params = get_joint_params(jname)
+        
+        model.actuator_gainprm[aid, 0] = params['kp']
+        model.actuator_biasprm[aid, 1] = -params['kv']
+        model.actuator_gear[aid, 0] = params['gear']
+        model.actuator_forcerange[aid, :] = [-params['forcelim'], params['forcelim']]
+        model.dof_armature[model.jnt_dofadr[jid]] = params['armature']
+        model.dof_frictionloss[model.jnt_dofadr[jid]] = params['frictionloss']
+
+def apply_joint_params(jname):
+    \"\"\"Apply parameters to a specific joint\"\"\"
+    if jname not in actuator_ids: 
+        return
+    aid = actuator_ids[jname]
+    jid = joint_ids[jname]
+    
+    params = get_joint_params(jname)
+    
+    model.actuator_gainprm[aid, 0] = params['kp']
+    model.actuator_biasprm[aid, 1] = -params['kv']
+    model.actuator_gear[aid, 0] = params['gear']
+    model.actuator_forcerange[aid, :] = [-params['forcelim'], params['forcelim']]
+    model.dof_armature[model.jnt_dofadr[jid]] = params['armature']
+    model.dof_frictionloss[model.jnt_dofadr[jid]] = params['frictionloss']
 
 def save_motor_params():
-    \"\"\"Save current global parameters to file\"\"\"
+    \"\"\"Save current global and per-joint parameters to file\"\"\"
     with open(motor_params_file, 'w') as f:
-        json.dump({{'global': GLOBAL_MOTOR_PARAMS}}, f, indent=2)
+        json.dump({{
+            'global': GLOBAL_MOTOR_PARAMS,
+            'per_joint': per_joint_params
+        }}, f, indent=2)
     print(f"Saved motor parameters to {{motor_params_file}}")
 
 # Apply initial parameters
-apply_global_motor_params()
+apply_all_motor_params()
 
 # --- Pre-calculate Trajectory ---
 duration = rec['duration'] / 1000.0
@@ -1519,25 +1551,29 @@ for jname, jid in joint_ids.items():
 # --- Interactive Motor Parameter UI ---
 if HAS_MATPLOTLIB:
     plt.ion()
-    fig = plt.figure(figsize=(16, 10))
+    fig = plt.figure(figsize=(18, 10))
     
-    # Create 3 panels: sliders, real-time plots, info
-    gs = fig.add_gridspec(3, 2, height_ratios=[1, 2, 1], width_ratios=[1, 1], 
-                          hspace=0.3, wspace=0.3, left=0.08, right=0.95, top=0.95, bottom=0.05)
+    # Create layout: joint selector (left), sliders (center-left), plots (right)
+    gs = fig.add_gridspec(3, 3, height_ratios=[1, 2, 1], width_ratios=[1, 1.5, 1.5], 
+                          hspace=0.3, wspace=0.3, left=0.05, right=0.97, top=0.95, bottom=0.05)
     
     ax_info = fig.add_subplot(gs[0, :])
-    ax_plot_tracking = fig.add_subplot(gs[1, 0])
-    ax_plot_torque = fig.add_subplot(gs[1, 1])
-    ax_sliders = fig.add_subplot(gs[2, :])
+    ax_joint_selector = fig.add_subplot(gs[1, 0])
+    ax_sliders_container = fig.add_subplot(gs[1, 1])
+    ax_plot_tracking = fig.add_subplot(gs[2, 0:2])
+    ax_plot_torque = fig.add_subplot(gs[2, 2])
     
     ax_info.axis('off')
-    ax_info.set_xlim(0, 1)
-    ax_info.set_ylim(0, 1)
+    ax_joint_selector.axis('off')
+    ax_sliders_container.axis('off')
     
-    info_text = ax_info.text(0.5, 0.5, "Motor Parameters\\n\\nAdjust sliders to tune motor behavior", 
-                             ha='center', va='center', fontsize=11)
+    info_text = ax_info.text(0.5, 0.5, "Motor Validation", ha='center', va='center', fontsize=11)
     
-    # Real-time data storage for plots
+    # State
+    selected_joint = None
+    current_mode = 'global'  # 'global' or 'per_joint'
+    
+    # Real-time data storage
     plot_history = {{
         'time': [],
         'tracking_error': [],
@@ -1545,52 +1581,99 @@ if HAS_MATPLOTLIB:
         'saturated_count': 0
     }}
     
-    # Global Parameter Sliders
+    # Joint selector buttons
+    from matplotlib.widgets import RadioButtons, Button
+    
+    joint_list = ['[GLOBAL]'] + sorted(joint_ids.keys())
+    ax_radio_joints = plt.axes([0.02, 0.25, 0.12, 0.4])
+    radio_joints = RadioButtons(ax_radio_joints, joint_list[:min(15, len(joint_list))])
+    
+    # Parameter sliders
     slider_specs = [
-        ('kp', 'Kp (Gain)', 0, 500, GLOBAL_MOTOR_PARAMS['kp']),
-        ('kv', 'Kv (Damping)', 0, 50, GLOBAL_MOTOR_PARAMS['kv']),
-        ('forcelim', 'Force Limit (Nm)', 0, 200, GLOBAL_MOTOR_PARAMS['forcelim']),
-        ('gear', 'Gear Ratio', 1, 500, GLOBAL_MOTOR_PARAMS['gear']),
-        ('armature', 'Armature (inertia)', 0, 0.01, GLOBAL_MOTOR_PARAMS['armature']),
-        ('frictionloss', 'Friction Loss', 0, 1, GLOBAL_MOTOR_PARAMS['frictionloss'])
+        ('kp', 'Kp (Gain)', 0, 1000, 500),
+        ('kv', 'Kv (Damping)', 0, 100, 50),
+        ('forcelim', 'Force Limit (Nm)', 0, 200, 100),
+        ('gear', 'Gear Ratio', 1, 500, 100),
+        ('armature', 'Armature', 0, 0.01, 0.001),
+        ('frictionloss', 'Friction', 0, 1, 0.1)
     ]
     
     sliders = {{}}
-    ax_sliders.axis('off')
     
     for i, (key, label, vmin, vmax, vinit) in enumerate(slider_specs):
-        ax_slider = plt.axes([0.15, 0.12 - i*0.015, 0.7, 0.01])
+        ax_slider = plt.axes([0.32, 0.48 - i*0.06, 0.28, 0.025])
         slider = Slider(ax_slider, label, vmin, vmax, valinit=vinit, valstep=(vmax-vmin)/1000.0)
         sliders[key] = slider
-        
-        def make_update(param_key):
-            def update(val):
-                GLOBAL_MOTOR_PARAMS[param_key] = val
-                apply_global_motor_params()
-                update_info_text()
-            return update
-        
-        slider.on_changed(make_update(key))
     
-    # Save Button
-    ax_save = plt.axes([0.88, 0.02, 0.1, 0.02])
-    btn_save = Button(ax_save, 'Save Params')
+    # Buttons
+    ax_btn_apply = plt.axes([0.32, 0.08, 0.10, 0.04])
+    btn_apply = Button(ax_btn_apply, 'Apply')
+    
+    ax_btn_reset = plt.axes([0.44, 0.08, 0.10, 0.04])
+    btn_reset = Button(ax_btn_reset, 'Reset to Global')
+    
+    ax_btn_save = plt.axes([0.56, 0.08, 0.10, 0.04])
+    btn_save = Button(ax_btn_save, 'Save All')
+    
+    def update_slider_values(params):
+        \"\"\"Update slider positions from parameter dict\"\"\"
+        for key in sliders:
+            if key in params:
+                sliders[key].set_val(params[key])
+    
+    def get_current_slider_values():
+        \"\"\"Get current slider values as dict\"\"\"
+        return {{key: sliders[key].val for key in sliders}}
+    
+    def on_joint_select(label):
+        global selected_joint, current_mode
+        if label == '[GLOBAL]':
+            current_mode = 'global'
+            selected_joint = None
+            update_slider_values(GLOBAL_MOTOR_PARAMS)
+        else:
+            current_mode = 'per_joint'
+            selected_joint = label
+            params = get_joint_params(label)
+            update_slider_values(params)
+        update_info_text()
+    
+    def on_apply(event):
+        params = get_current_slider_values()
+        if current_mode == 'global':
+            GLOBAL_MOTOR_PARAMS.update(params)
+            apply_all_motor_params()
+        else:
+            per_joint_params[selected_joint] = params.copy()
+            apply_joint_params(selected_joint)
+        update_info_text()
+    
+    def on_reset(event):
+        if current_mode == 'per_joint' and selected_joint:
+            if selected_joint in per_joint_params:
+                del per_joint_params[selected_joint]
+            apply_joint_params(selected_joint)
+            update_slider_values(GLOBAL_MOTOR_PARAMS)
+            update_info_text()
     
     def on_save(event):
         save_motor_params()
         update_info_text()
     
+    radio_joints.on_clicked(on_joint_select)
+    btn_apply.on_clicked(on_apply)
+    btn_reset.on_clicked(on_reset)
     btn_save.on_clicked(on_save)
     
     def update_info_text():
-        info_str = f"Motor Validation - Real-time Analysis\\n"
-        info_str += f"Kp: {{GLOBAL_MOTOR_PARAMS['kp']:.1f}} | Kv: {{GLOBAL_MOTOR_PARAMS['kv']:.1f}} | "
-        info_str += f"Force Limit: {{GLOBAL_MOTOR_PARAMS['forcelim']:.1f}} Nm | "
-        info_str += f"Gear: {{GLOBAL_MOTOR_PARAMS['gear']:.0f}}\\n"
+        mode_str = "GLOBAL" if current_mode == 'global' else f"Joint: {{selected_joint}}"
+        override_count = len(per_joint_params)
+        info_str = f"Motor Validation | Mode: {{mode_str}} | Overrides: {{override_count}} | "
         info_str += f"Time: {{elapsed:.2f}}s / {{duration:.2f}}s"
         if plot_history['saturated_count'] > 0:
-            info_str += f"  |  ⚠️ TORQUE SATURATION: {{plot_history['saturated_count']}} actuators"
+            info_str += f" | ⚠️ SATURATION: {{plot_history['saturated_count']}}"
         info_text.set_text(info_str)
+
     
     def update_plots():
         # Tracking Error Plot
@@ -1615,8 +1698,17 @@ if HAS_MATPLOTLIB:
             ax_plot_torque.grid(True, alpha=0.3)
             ax_plot_torque.set_xlim(max(0, elapsed - 5), elapsed + 0.5)
     
+    # Initialize UI
+    on_joint_select('[GLOBAL]')
+    plt.show(block=False)
+    plt.pause(0.001)
+    
     elapsed = 0.0
     update_info_text()
+
+print("\\n=== Motor Validation Mode Started ===\")
+print(f"Duration: {{duration:.2f}}s | Joints: {{len(joint_ids)}} | CSV: motor_validation_log.csv\")
+print("UI: Select joint from left panel, adjust parameters, click Apply\")
 
 # --- Main Simulation Loop ---
 log_file_name = "motor_validation_log.csv"
