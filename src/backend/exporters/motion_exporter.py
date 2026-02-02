@@ -1744,15 +1744,6 @@ try:
                 
                 last_print = now
 
-                        exec('elapsed = elapsed_for_ui')
-                    update_info_text()
-                    try:
-                        fig.canvas.draw_idle()
-                        fig.canvas.flush_events()
-                    except: pass
-                
-                last_print = now
-
         print("Motor validation simulation completed successfully")
 except Exception as e:
     import traceback
