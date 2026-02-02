@@ -114,6 +114,14 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
             euler_str = "0 0 0"
 
         xml.append(f'{indent}<body name="{body_name}" pos="{pos_str}" euler="{euler_str}">')
+        
+        # Add default inertial properties for non-fixed bodies
+        # MuJoCo requires mass and inertia for moving bodies
+        if parent_joint_id:
+            joint = robot.joints.get(parent_joint_id)
+            if joint and joint.type != 'fixed':
+                # Add minimal but valid inertial properties
+                xml.append(f'{indent}  <inertial pos="0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001" />')
 
         if parent_joint_id:
             joint = robot.joints.get(parent_joint_id)
