@@ -1048,46 +1048,46 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             
         step_idx = int(elapsed / dt)
         if step_idx >= n_steps: step_idx = n_steps - 1
-                
-            # --- PHYSICS STEP ---
-            if args.mode == 'inverse' or args.mode == 'sensors':
-                # 1. INVERSE DYNAMICS / KINEMATIC Mode
-                # "Mode 1" Logic: Forced State
-                # This ensures EXACT trajectory following for Sensors Mode too.
-                data.qpos[:model.nq] = qpos_traj[step_idx]
-                data.qvel[:model.nv] = qvel_traj[step_idx]
-                data.qacc[:model.nv] = qacc_traj[step_idx]
-                mujoco.mj_inverse(model, data)
-                
-                # Note: For sensors to work in Inverse Mode, relying on overlap?
-                # mj_inverse -> mj_collision -> mj_sensor?
-                # Actually mj_inverse calculates forces. Sensors usually depend on FWD pipeline (mj_step).
-                # If we just force qpos, we can call mj_fwdPosition -> mj_sensor?
-                # But mj_inverse does checks.
-                # To get valid sensor data (Contacts), we might need `mj_forward` AFTER setting qpos?
-                # No, `mj_inverse` is full inverse.
-                # Let's try `mujoco.mj_step` but OVERRIDING position?
-                # No, that's unstable.
-                # Best for Sensors is often: `data.qpos = target; mujoco.mj_forward(model, data)`
-                # This ignores inertia but computes static forces/contacts at that pose.
-                if args.mode == 'sensors':
-                    # Force kinematic state, then compute sensors/contacts statically
-                    mujoco.mj_forward(model, data)
-
-            viewer.sync()
-
             
+        # --- PHYSICS STEP ---
+        if args.mode == 'inverse' or args.mode == 'sensors':
+            # 1. INVERSE DYNAMICS / KINEMATIC Mode
+            # "Mode 1" Logic: Forced State
+            # This ensures EXACT trajectory following for Sensors Mode too.
+            data.qpos[:model.nq] = qpos_traj[step_idx]
+            data.qvel[:model.nv] = qvel_traj[step_idx]
+            data.qacc[:model.nv] = qacc_traj[step_idx]
+            mujoco.mj_inverse(model, data)
+            
+            # Note: For sensors to work in Inverse Mode, relying on overlap?
+            # mj_inverse -> mj_collision -> mj_sensor?
+            # Actually mj_inverse calculates forces. Sensors usually depend on FWD pipeline (mj_step).
+            # If we just force qpos, we can call mj_fwdPosition -> mj_sensor?
+            # But mj_inverse does checks.
+            # To get valid sensor data (Contacts), we might need `mj_forward` AFTER setting qpos?
+            # No, `mj_inverse` is full inverse.
+            # Let's try `mujoco.mj_step` but OVERRIDING position?
+            # No, that's unstable.
+            # Best for Sensors is often: `data.qpos = target; mujoco.mj_forward(model, data)`
+            # This ignores inertia but computes static forces/contacts at that pose.
+            if args.mode == 'sensors':
+                # Force kinematic state, then compute sensors/contacts statically
+                mujoco.mj_forward(model, data)
+
+        viewer.sync()
+
+        
 # --- VISUALIZATION & LOGGING ---
-            # Collect Data
-            vals_to_plot = []
+        # Collect Data
+        vals_to_plot = []
+        
+        if args.mode == 'inverse':
+            # Plot qfrc_inverse (Actuator Force required)
+            vals_to_plot = [data.qfrc_inverse[model.jnt_dofadr[joint_ids[n]]] for n in data_source_names]
             
-            if args.mode == 'inverse':
-                # Plot qfrc_inverse (Actuator Force required)
-                vals_to_plot = [data.qfrc_inverse[model.jnt_dofadr[joint_ids[n]]] for n in data_source_names]
-                
-            elif args.mode == 'sensors':
-                # Plot Sensor Data
-                vals_to_plot = [data.sensordata[sensor_ids[n]] for n in data_source_names]
+        elif args.mode == 'sensors':
+            # Plot Sensor Data
+            vals_to_plot = [data.sensordata[sensor_ids[n]] for n in data_source_names]
 
             # Log
             row = [elapsed] + vals_to_plot
@@ -1492,22 +1492,22 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             
         step_idx = int(elapsed / dt)
         if step_idx >= n_steps: step_idx = n_steps - 1
+        
+        # Forward Dynamics with Motor Parameters
+        for jname, jid in joint_ids.items():
+            target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
+            if jname in actuator_ids:
+                data.ctrl[actuator_ids[jname]] = target_q
+        
+        mujoco.mj_step(model, data)
+        viewer.sync()
+        
+        # Logging
+        if now - last_print > 0.1:
+            joint_vals = [data.qpos[model.jnt_qposadr[jid]] for jid in joint_ids.values()]
+            writer.writerow([elapsed] + joint_vals)
             
-            # Forward Dynamics with Motor Parameters
-            for jname, jid in joint_ids.items():
-                target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
-                if jname in actuator_ids:
-                    data.ctrl[actuator_ids[jname]] = target_q
-            
-            mujoco.mj_step(model, data)
-            viewer.sync()
-            
-            # Logging
-            if now - last_print > 0.1:
-                joint_vals = [data.qpos[model.jnt_qposadr[jid]] for jid in joint_ids.values()]
-                writer.writerow([elapsed] + joint_vals)
-                
-                if HAS_MATPLOTLIB:
+            if HAS_MATPLOTLIB:
                     ax.clear()
                     ax.set_title(f"Motor Validation T={{elapsed:.2f}}s")
                     ax.set_zlim(-20, 20)
