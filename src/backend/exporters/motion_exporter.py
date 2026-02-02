@@ -862,17 +862,15 @@ import argparse
 import sys
 import csv
 
-# GLFW Error Fix: Set environment variables before importing MuJoCo
-os.environ['MUJOCO_GL'] = 'glfw'
-# Try to use a more compatible OpenGL version
-try:
-    import OpenGL
-    OpenGL.ERROR_CHECKING = False
-except: pass
+# GLFW Error Fix: Try EGL backend first (works better on servers)
+# EGL doesn't require X11/display, works headless
+os.environ['MUJOCO_GL'] = 'egl'
 
 import mujoco
 import mujoco.viewer
 import numpy as np
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning)
 
 # Try importing matplotlib
 try:
@@ -1265,17 +1263,15 @@ import os
 import argparse
 import csv
 
-# GLFW Error Fix: Set environment variables before importing MuJoCo
-os.environ['MUJOCO_GL'] = 'glfw'
-# Try to use a more compatible OpenGL version
-try:
-    import OpenGL
-    OpenGL.ERROR_CHECKING = False
-except: pass
+# GLFW Error Fix: Try EGL backend first (works better on servers)
+# EGL doesn't require X11/display, works headless
+os.environ['MUJOCO_GL'] = 'egl'
 
 import mujoco
 import mujoco.viewer
 import numpy as np
+import warnings
+warnings.filterwarnings('ignore', category=UserWarning)
 
 # Try importing matplotlib
 try:
