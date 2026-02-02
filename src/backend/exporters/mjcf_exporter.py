@@ -78,6 +78,7 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
     actuators = []
     sensors = []
     generated_joints_info = []
+    actuator_counter = {}  # Track actuator names to avoid duplicates
 
     def build_body(link_id: str, parent_joint_id: Optional[str] = None, indent_level: int = 2):
         indent = '  ' * indent_level
@@ -141,7 +142,18 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                          xml.append(f'{indent}  <joint name="{joint_xml_name}" type="hinge" axis="{axis_str}" {range_str} />')
                          
                          ctrl_range = range_str.replace("range=", "ctrlrange=") if range_str else 'ctrlrange="-3.14 3.14"'
-                         actuators.append(f'{indent}    <position name="{joint_xml_name}_act" joint="{joint_xml_name}" kp="500" kv="30" {ctrl_range}/>')
+                         
+                         # Ensure unique actuator name
+                         act_name = f"{joint_xml_name}_act"
+                         if act_name in actuator_counter:
+                             actuator_counter[act_name] += 1
+                             new_act_name = f"{joint_xml_name}_act_{actuator_counter[act_name]}"
+                             print(f"WARNING: Duplicate actuator name '{act_name}' detected. Renamed to '{new_act_name}'")
+                             act_name = new_act_name
+                         else:
+                             actuator_counter[act_name] = 0
+                         
+                         actuators.append(f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" kp="500" kv="30" {ctrl_range}/>')
 
                      # Capture Info for Replay Mapping
                          # Note: for rotational joints we used 'active_axes' logic.
@@ -163,7 +175,18 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                     xml.append(f'{indent}  <joint name="{joint.name}" type="slide" axis="{axis_str}" {range_str} />')
                     
                     ctrl_range = range_str.replace("range=", "ctrlrange=") if range_str else 'ctrlrange="-1 1"'
-                    actuators.append(f'{indent}    <position name="{joint.name}_act" joint="{joint.name}" kp="500" kv="30" {ctrl_range}/>')
+                    
+                    # Ensure unique actuator name
+                    act_name = f"{joint.name}_act"
+                    if act_name in actuator_counter:
+                        actuator_counter[act_name] += 1
+                        new_act_name = f"{joint.name}_act_{actuator_counter[act_name]}"
+                        print(f"WARNING: Duplicate actuator name '{act_name}' detected. Renamed to '{new_act_name}'")
+                        act_name = new_act_name
+                    else:
+                        actuator_counter[act_name] = 0
+                    
+                    actuators.append(f'{indent}    <position name="{act_name}" joint="{joint.name}" kp="500" kv="30" {ctrl_range}/>')
 
                     # Capture Info for Replay Mapping
                     generated_joints_info.append({
