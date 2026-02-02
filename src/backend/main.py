@@ -1,4 +1,12 @@
-from fastapi import FastAPI, File, UploadFile, HTTPException, Form, BackgroundTasks, Request
+from fastapi import (
+    FastAPI,
+    File,
+    UploadFile,
+    HTTPException,
+    Form,
+    BackgroundTasks,
+    Request,
+)
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
@@ -17,7 +25,12 @@ from robot_models import RobotData, RobotLink, RobotJoint, Visual
 from utils import to_snake_case, generate_unique_names, generate_unique_joint_names
 from exporters.urdf_exporter import generate_urdf_xml
 from exporters.mjcf_exporter import generate_mjcf_xml
-from exporters.gazebo_exporter import inject_gazebo_tags, generate_gazebo_launch, inject_gazebo_ros2_tags, generate_gazebo_ros2_launch
+from exporters.gazebo_exporter import (
+    inject_gazebo_tags,
+    generate_gazebo_launch,
+    inject_gazebo_ros2_tags,
+    generate_gazebo_ros2_launch,
+)
 from exporters.motion_exporter import (
     process_recordings_for_export,
     generate_ros2_playback_node,
@@ -27,7 +40,7 @@ from exporters.motion_exporter import (
     generate_demo_script,
     generate_mujoco_torque_replay_script,
     generate_mujoco_motor_validation_script,
-    generate_torque_launch_script
+    generate_torque_launch_script,
 )
 from exporters.stl_utils import ensure_binary_stl
 
@@ -57,53 +70,57 @@ os.makedirs(RECORDINGS_DIR, exist_ok=True)
 
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+
 @app.get("/api/recordings")
 def list_recordings():
     files = [f for f in os.listdir(RECORDINGS_DIR) if f.endswith(".json")]
     return {"files": files}
+
 
 @app.post("/api/recordings")
 async def save_recordings(request: Request):
     data = await request.json()
     filename = data.get("filename", "recordings")
     recordings = data.get("recordings", [])
-    
+
     # Sanitize filename
-    filename = re.sub(r'[^a-zA-Z0-9_\-\.]', '', filename)
-    if not filename.endswith(".json"):                  
+    filename = re.sub(r"[^a-zA-Z0-9_\-\.]", "", filename)
+    if not filename.endswith(".json"):
         filename += ".json"
-    
+
     filepath = os.path.join(RECORDINGS_DIR, filename)
     with open(filepath, "w") as f:
         json.dump(recordings, f, indent=2)
     return {"message": "Saved successfully", "filename": filename}
 
+
 @app.get("/api/recordings/{filename}")
 def load_recordings(filename: str):
     # Sanitize
-    filename = re.sub(r'[^a-zA-Z0-9_\-\.]', '', filename)
+    filename = re.sub(r"[^a-zA-Z0-9_\-\.]", "", filename)
     if not filename.endswith(".json"):
         filename += ".json"
-        
+
     filepath = os.path.join(RECORDINGS_DIR, filename)
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="Recording file not found")
-        
+
     with open(filepath, "r") as f:
         recordings = json.load(f)
     return {"recordings": recordings}
 
+
 @app.delete("/api/recordings/{filename}")
 def delete_recording_file(filename: str):
     # Sanitize
-    filename = re.sub(r'[^a-zA-Z0-9_\-\.]', '', filename)
+    filename = re.sub(r"[^a-zA-Z0-9_\-\.]", "", filename)
     if not filename.endswith(".json"):
         filename += ".json"
-        
+
     filepath = os.path.join(RECORDINGS_DIR, filename)
     if not os.path.exists(filepath):
         raise HTTPException(status_code=404, detail="Recording file not found")
-    
+
     try:
         os.remove(filepath)
         return {"message": "Deleted successfully"}
@@ -111,13 +128,12 @@ def delete_recording_file(filename: str):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-
 @app.post("/api/export-urdf")
 async def export_urdf_package(
     background_tasks: BackgroundTasks,
-    robot_data: str = Form(...), 
-    robot_name: str = Form(...), 
-    files: Optional[List[UploadFile]] = File(None)
+    robot_data: str = Form(...),
+    robot_name: str = Form(...),
+    files: Optional[List[UploadFile]] = File(None),
 ):
     try:
         data_dict = json.loads(robot_data)
@@ -128,9 +144,9 @@ async def export_urdf_package(
     sanitized_robot_name = to_snake_case(robot_name)
     if not sanitized_robot_name:
         sanitized_robot_name = "my_robot"
-    
+
     tmpdir = tempfile.mkdtemp()
-    
+
     package_dir = os.path.join(tmpdir, sanitized_robot_name)
     urdf_dir = os.path.join(package_dir, "urdf")
     mesh_dir = os.path.join(package_dir, "meshes")
@@ -149,11 +165,11 @@ async def export_urdf_package(
         for file in files:
             form_field_name = file.filename
             # Robustly parse link_id
-            if form_field_name and form_field_name.startswith('mesh_'):
-                link_id = form_field_name[5:] 
+            if form_field_name and form_field_name.startswith("mesh_"):
+                link_id = form_field_name[5:]
             else:
                 link_id = form_field_name
-            
+
             # print(f"DEBUG: Processing file {form_field_name}, extracted ID: {link_id}")
 
             if link_id in robot.links:
@@ -162,29 +178,31 @@ async def export_urdf_package(
                 clean_name = unique_link_names[link_id]
                 safe_filename = f"{clean_name}.stl"
                 file_path = os.path.join(mesh_dir, safe_filename)
-                
+
                 with open(file_path, "wb") as f:
                     shutil.copyfileobj(file.file, f)
-                
+
                 mesh_files_map[link_id] = safe_filename
             elif link_id in robot.joints:
-                 # print(f"DEBUG: ID {link_id} found in JOINTS")
-                 # It's a joint mesh. Use snake_case joint name.
-                 # Since joints don't have a global unique name map passed here yet effectively (unique_link_names is only links),
-                 # we will generate a safe name here.
-                 joint_name = to_snake_case(robot.joints[link_id].name)
-                 safe_filename = f"{joint_name}_{link_id[:4]}.stl" # Append ID snippet for collision avoidance
-                 file_path = os.path.join(mesh_dir, safe_filename)
+                # print(f"DEBUG: ID {link_id} found in JOINTS")
+                # It's a joint mesh. Use snake_case joint name.
+                # Since joints don't have a global unique name map passed here yet effectively (unique_link_names is only links),
+                # we will generate a safe name here.
+                joint_name = to_snake_case(robot.joints[link_id].name)
+                safe_filename = f"{joint_name}_{link_id[:4]}.stl"  # Append ID snippet for collision avoidance
+                file_path = os.path.join(mesh_dir, safe_filename)
 
-                 with open(file_path, "wb") as f:
+                with open(file_path, "wb") as f:
                     shutil.copyfileobj(file.file, f)
-                 
-                 mesh_files_map[link_id] = safe_filename
+
+                mesh_files_map[link_id] = safe_filename
             else:
-                pass # print(f"DEBUG: ID {link_id} NOT FOUND ...")
+                pass  # print(f"DEBUG: ID {link_id} NOT FOUND ...")
 
     # Generate and save URDF file
-    urdf_content, base_link_name, _ = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
+    urdf_content, base_link_name, _ = generate_urdf_xml(
+        robot, sanitized_robot_name, mesh_files_map, unique_link_names
+    )
     with open(os.path.join(urdf_dir, f"{sanitized_robot_name}.urdf"), "w") as f:
         f.write(urdf_content)
 
@@ -197,11 +215,10 @@ async def export_urdf_package(
     with open(os.path.join(package_dir, "CMakeLists.txt"), "w") as f:
         f.write(cmakelists_txt)
 
-
     display_launch = f"""<launch>\n<arg name=\"model\" default=\"$(find {sanitized_robot_name})/urdf/{sanitized_robot_name}.urdf\"/>\n<arg name=\"gui\" default=\"true\" />\n<param name=\"robot_description\" textfile=\"$(arg model)\" />\n<node name=\"joint_state_publisher_gui\" pkg=\"joint_state_publisher_gui\" type=\"joint_state_publisher_gui\" />\n<node name=\"robot_state_publisher\" pkg=\"robot_state_publisher\" type=\"robot_state_publisher\" />\n<node name=\"rviz\" pkg=\"rviz\" type=\"rviz\" args=\"-d $(find {sanitized_robot_name})/launch/display.rviz\" required=\"true\" />\n</launch>\n"""
     with open(os.path.join(launch_dir, "display.launch"), "w") as f:
         f.write(display_launch)
-    
+
     rviz_config = f"""Panels:
 - Class: rviz/Displays
   Help Height: 78
@@ -305,27 +322,30 @@ Visualization Manager:
     with open(os.path.join(launch_dir, "display.rviz"), "w") as f:
         f.write(rviz_config)
 
-    guide_src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'URDF_export.md'))
+    guide_src_path = os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "URDF_export.md")
+    )
     if os.path.exists(guide_src_path):
-        shutil.copy(guide_src_path, os.path.join(package_dir, 'URDF_export_guide.md'))
+        shutil.copy(guide_src_path, os.path.join(package_dir, "URDF_export_guide.md"))
 
     # Create the zip archive
     archive_path = shutil.make_archive(
         base_name=os.path.join(tmpdir, sanitized_robot_name),
-        format='zip',
+        format="zip",
         root_dir=tmpdir,
-        base_dir=sanitized_robot_name
+        base_dir=sanitized_robot_name,
     )
-    
+
     # Add a background task to clean up the temporary directory after the response is sent
     background_tasks.add_task(shutil.rmtree, tmpdir)
-    
+
     # Return the zip file from disk
     return FileResponse(
-        path=archive_path, 
-        media_type='application/zip', 
-        filename=f"{sanitized_robot_name}_ros_package.zip"
+        path=archive_path,
+        media_type="application/zip",
+        filename=f"{sanitized_robot_name}_ros_package.zip",
     )
+
 
 @app.post("/api/export-urdf-ros2")
 async def export_urdf_package_ros2(
@@ -333,21 +353,23 @@ async def export_urdf_package_ros2(
     robot_data: str = Form(...),
     robot_name: str = Form(...),
     recordings: Optional[str] = Form(None),
-    files: Optional[List[UploadFile]] = File(None)
+    files: Optional[List[UploadFile]] = File(None),
 ):
     try:
         try:
             data_dict = json.loads(robot_data)
             robot = RobotData.parse_obj(data_dict)
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid robot data format: {e}"
+            )
 
         sanitized_robot_name = to_snake_case(robot_name)
         if not sanitized_robot_name:
             sanitized_robot_name = "my_robot"
-        
+
         tmpdir = tempfile.mkdtemp()
-        
+
         package_dir = os.path.join(tmpdir, sanitized_robot_name)
         urdf_dir = os.path.join(package_dir, "urdf")
         mesh_dir = os.path.join(package_dir, "meshes")
@@ -359,7 +381,7 @@ async def export_urdf_package_ros2(
         os.makedirs(launch_dir, exist_ok=True)
         os.makedirs(rviz_dir, exist_ok=True)
         os.makedirs(rviz_dir, exist_ok=True)
-        
+
         # Pre-calculate unique names for consistent file mapping and URDF naming
         unique_link_names = generate_unique_names(robot)
 
@@ -369,20 +391,20 @@ async def export_urdf_package_ros2(
             for file in files:
                 form_field_name = file.filename
                 # Robustly parse link_id
-                if form_field_name and form_field_name.startswith('mesh_'):
-                    link_id = form_field_name[5:] 
+                if form_field_name and form_field_name.startswith("mesh_"):
+                    link_id = form_field_name[5:]
                 else:
                     link_id = form_field_name
-                
+
                 if link_id in robot.links:
                     # Use clean unique name for file (e.g. leg_1.stl)
                     clean_name = unique_link_names[link_id]
                     safe_filename = f"{clean_name}.stl"
                     file_path = os.path.join(mesh_dir, safe_filename)
-                    
+
                     with open(file_path, "wb") as f:
                         shutil.copyfileobj(file.file, f)
-                    
+
                     mesh_files_map[link_id] = safe_filename
                 elif link_id in robot.joints:
                     # It's a joint mesh. Use snake_case joint name.
@@ -392,11 +414,13 @@ async def export_urdf_package_ros2(
 
                     with open(file_path, "wb") as f:
                         shutil.copyfileobj(file.file, f)
-                    
+
                     mesh_files_map[link_id] = safe_filename
 
         # Generate and save URDF file
-        urdf_content, base_link_name, generated_joints_info = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names)
+        urdf_content, base_link_name, generated_joints_info = generate_urdf_xml(
+            robot, sanitized_robot_name, mesh_files_map, unique_link_names
+        )
         with open(os.path.join(urdf_dir, f"{sanitized_robot_name}.urdf"), "w") as f:
             f.write(urdf_content)
 
@@ -408,19 +432,21 @@ async def export_urdf_package_ros2(
         # Process Motion Recordings if present
         extra_install_dirs = "urdf launch meshes rviz"
         install_program_cmds = ""
-        
+
         if recordings:
             try:
                 recs_raw = json.loads(recordings)
-                processed_recs = process_recordings_for_export(recs_raw, generated_joints_info, robot)
-                
+                processed_recs = process_recordings_for_export(
+                    recs_raw, generated_joints_info, robot
+                )
+
                 # 1. Save recordings.json to config/
                 config_dir = os.path.join(package_dir, "config")
                 os.makedirs(config_dir, exist_ok=True)
                 with open(os.path.join(config_dir, "recordings.json"), "w") as f:
                     json.dump(processed_recs, f, indent=2)
                 extra_install_dirs += " config"
-                
+
                 # 2. Generate Replay Node in scripts/
                 scripts_dir = os.path.join(package_dir, "scripts")
                 os.makedirs(scripts_dir, exist_ok=True)
@@ -429,7 +455,7 @@ async def export_urdf_package_ros2(
                 with open(replay_script_path, "w") as f:
                     f.write(replay_script)
                 os.chmod(replay_script_path, 0o755)
-                
+
                 # Install replay_node.py to lib/pkg_name so 'ros2 run' finds it
                 # We also assume 'rclpy' is available.
                 install_program_cmds += f"install(PROGRAMS scripts/replay_node.py DESTINATION lib/${{PROJECT_NAME}})\n"
@@ -499,10 +525,10 @@ def generate_launch_description():
 
                 # 4. Generate Shell Scripts for each recording
                 for i, rec in enumerate(processed_recs):
-                    rec_name_clean = to_snake_case(rec.get('name', f'rec_{i}'))
+                    rec_name_clean = to_snake_case(rec.get("name", f"rec_{i}"))
                     sh_filename = f"replay_{i}_{rec_name_clean}.sh"
                     sh_path = os.path.join(package_dir, sh_filename)
-                    
+
                     sh_content = f"""#!/bin/bash
 # Replay recording #{i}: {rec.get('name')}
 # Runs the Replay Node ONLY.
@@ -522,10 +548,10 @@ ros2 run {sanitized_robot_name} replay_node.py --ros-args -p recording_index:={i
                     with open(sh_path, "w") as f:
                         f.write(sh_content)
                     os.chmod(sh_path, 0o755)
-                
+
                 # Install visualize_passive.sh script as regular program (optional but good)
                 install_program_cmds += f"install(PROGRAMS visualize_passive.sh DESTINATION lib/${{PROJECT_NAME}})\n"
-                
+
             except Exception as e:
                 print(f"Error processing recordings: {e}")
 
@@ -621,7 +647,7 @@ def generate_launch_description():
 """
         with open(os.path.join(launch_dir, "display.launch.py"), "w") as f:
             f.write(display_launch_py)
-            
+
         # Generate visualize_passive.sh
         passive_sh = f"""#!/bin/bash
 # Launch RViz without Joint State Publisher (Passive Mode)
@@ -738,9 +764,13 @@ Visualization Manager:
         with open(os.path.join(rviz_dir, "display.rviz"), "w") as f:
             f.write(rviz_config)
 
-        guide_src_path = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'URDF_export_ros2.md'))
+        guide_src_path = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "..", "..", "URDF_export_ros2.md")
+        )
         if os.path.exists(guide_src_path):
-            shutil.copy(guide_src_path, os.path.join(package_dir, 'URDF_export_guide_ros2.md'))
+            shutil.copy(
+                guide_src_path, os.path.join(package_dir, "URDF_export_guide_ros2.md")
+            )
 
         # Create build_and_launch.sh script
         build_script = f"""#!/bin/bash
@@ -781,7 +811,7 @@ fi
         script_path = os.path.join(package_dir, "build_and_launch.sh")
         with open(script_path, "w") as f:
             f.write(build_script)
-        
+
         # Make executable
         os.chmod(script_path, 0o755)
 
@@ -803,7 +833,7 @@ ros2 launch {sanitized_robot_name} display.launch.py
 ```
 """
         if recordings:
-             readme_content += f"""
+            readme_content += f"""
 ## Motion Replay
 This package includes exported motion recordings (from Robot Link Forge).
 
@@ -827,22 +857,24 @@ To play back the recorded motions:
         # Create the zip archive
         archive_path = shutil.make_archive(
             base_name=os.path.join(tmpdir, sanitized_robot_name),
-            format='zip',
+            format="zip",
             root_dir=tmpdir,
-            base_dir=sanitized_robot_name
+            base_dir=sanitized_robot_name,
         )
-        
+
         background_tasks.add_task(shutil.rmtree, tmpdir)
-        
+
         return FileResponse(
-            path=archive_path, 
-            media_type='application/zip', 
-            filename=f"{sanitized_robot_name}_ros2_package.zip"
+            path=archive_path,
+            media_type="application/zip",
+            filename=f"{sanitized_robot_name}_ros2_package.zip",
         )
     except Exception as e:
         import traceback
+
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Export Failed: {str(e)}")
+
 
 @app.get("/")
 def read_root():
@@ -851,12 +883,16 @@ def read_root():
     """
     return {"message": "RobotLinkForge Backend is running."}
 
+
 # --- API Endpoints for File Upload and Project Management ---
+
 
 @app.post("/api/upload-stl")
 async def upload_stl_file(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith('.stl'):
-        raise HTTPException(status_code=400, detail="Invalid file type. Only .stl files are accepted.")
+    if not file.filename.lower().endswith(".stl"):
+        raise HTTPException(
+            status_code=400, detail="Invalid file type. Only .stl files are accepted."
+        )
 
     unique_filename = f"{uuid.uuid4().hex}.stl"
     file_path = os.path.join(MESH_DIR, unique_filename)
@@ -872,16 +908,19 @@ async def upload_stl_file(file: UploadFile = File(...)):
 
 # --- Project Save/Load Endpoints ---
 
+
 @app.post("/api/projects")
 async def save_project(file: UploadFile = File(...), project_name: str = Form(...)):
     # Sanitize project name
-    safe_name = "".join(c for c in project_name if c.isalnum() or c in (' ', '_', '-')).strip()
+    safe_name = "".join(
+        c for c in project_name if c.isalnum() or c in (" ", "_", "-")
+    ).strip()
     if not safe_name:
         raise HTTPException(status_code=400, detail="Invalid project name")
-    
+
     filename = f"{safe_name}.zip"
     file_location = os.path.join(PROJECTS_DIR, filename)
-    
+
     try:
         with open(file_location, "wb+") as file_object:
             file_object.write(await file.read())
@@ -889,16 +928,22 @@ async def save_project(file: UploadFile = File(...), project_name: str = Form(..
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to save project: {str(e)}")
 
+
 @app.get("/api/projects")
 async def list_projects():
     try:
         if not os.path.exists(PROJECTS_DIR):
             return {"projects": []}
         # Filter out "soft deleted" files (part of the prompt requirement)
-        files = [f for f in os.listdir(PROJECTS_DIR) if f.endswith('.zip') and "_deleted_" not in f]
+        files = [
+            f
+            for f in os.listdir(PROJECTS_DIR)
+            if f.endswith(".zip") and "_deleted_" not in f
+        ]
         return {"projects": sorted(files)}
     except Exception as e:
         return {"projects": [], "error": str(e)}
+
 
 @app.delete("/api/projects/{filename}")
 async def delete_project(filename: str, request: Request):
@@ -909,36 +954,40 @@ async def delete_project(filename: str, request: Request):
     file_path = os.path.join(PROJECTS_DIR, filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Project not found")
-    
+
     try:
         # Get client IP
         client_ip = request.client.host if request.client else "unknown_ip"
-        
+
         # Get Timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        
+
         # Construct new filename
         # Assume valid zip extension from list_projects filtering
         original_stem = os.path.splitext(filename)[0]
         # Format: ProjectName_deleted_20260105_123.123.123.123.zip
         new_filename = f"{original_stem}_deleted_{timestamp}_{client_ip}.zip"
         new_file_path = os.path.join(PROJECTS_DIR, new_filename)
-        
+
         os.rename(file_path, new_file_path)
-        
-        return {"message": f"Project soft-deleted. Renamed to {new_filename}", "deleted_tag": new_filename}
+
+        return {
+            "message": f"Project soft-deleted. Renamed to {new_filename}",
+            "deleted_tag": new_filename,
+        }
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete project: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to delete project: {str(e)}"
+        )
+
 
 @app.get("/api/projects/{filename}")
 async def load_project(filename: str):
     file_path = os.path.join(PROJECTS_DIR, filename)
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Project not found")
-    return FileResponse(file_path, media_type='application/zip', filename=filename)
-
-
+    return FileResponse(file_path, media_type="application/zip", filename=filename)
 
 
 @app.post("/api/export-mujoco-urdf")
@@ -947,11 +996,12 @@ async def export_mujoco_urdf(
     robot_data: str = Form(...),
     robot_name: str = Form(...),
     recordings: Optional[str] = Form(None),
-    files: Optional[List[UploadFile]] = File(None)
+    files: Optional[List[UploadFile]] = File(None),
 ):
     try:
         # DEBUG: Log entry
         import time as _debug_time
+
         with open("DEBUG_EXPORT_START.txt", "w") as df:
             df.write(f"Endpoint Hit at {_debug_time.time()}\\n")
             df.write(f"Robot Name: {robot_name}\\n")
@@ -965,86 +1015,103 @@ async def export_mujoco_urdf(
             data_dict = json.loads(robot_data)
             robot = RobotData.parse_obj(data_dict)
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid robot data format: {e}"
+            )
 
         sanitized_robot_name = to_snake_case(robot_name) or "my_robot"
         tmpdir = tempfile.mkdtemp()
         package_dir = os.path.join(tmpdir, sanitized_robot_name)
         mesh_dir = os.path.join(package_dir, "meshes")
         os.makedirs(mesh_dir, exist_ok=True)
-        
+
         unique_link_names = generate_unique_names(robot)
         mesh_files_map = {}
-        
+
         if files:
             for file in files:
-                link_id = file.filename[5:] if file.filename.startswith('mesh_') else file.filename
+                link_id = (
+                    file.filename[5:]
+                    if file.filename.startswith("mesh_")
+                    else file.filename
+                )
                 if link_id in robot.links:
                     clean_name = unique_link_names[link_id]
                     safe_filename = f"{clean_name}.stl"
                     dest_path = os.path.join(mesh_dir, safe_filename)
                     # Save upload to temp file first to process it
                     with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
-                         shutil.copyfileobj(file.file, tmp_upload)
-                         tmp_upload_path = tmp_upload.name
-                    
+                        shutil.copyfileobj(file.file, tmp_upload)
+                        tmp_upload_path = tmp_upload.name
+
                     try:
                         ensure_binary_stl(tmp_upload_path, dest_path)
                     finally:
-                         if os.path.exists(tmp_upload_path):
-                             os.remove(tmp_upload_path)
+                        if os.path.exists(tmp_upload_path):
+                            os.remove(tmp_upload_path)
 
                     mesh_files_map[link_id] = safe_filename
                 elif link_id in robot.joints:
-                     joint_name = to_snake_case(robot.joints[link_id].name)
-                     safe_filename = f"{joint_name}_{link_id[:4]}.stl"
-                     dest_path = os.path.join(mesh_dir, safe_filename)
-                     
-                     with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
-                         shutil.copyfileobj(file.file, tmp_upload)
-                         tmp_upload_path = tmp_upload.name
+                    joint_name = to_snake_case(robot.joints[link_id].name)
+                    safe_filename = f"{joint_name}_{link_id[:4]}.stl"
+                    dest_path = os.path.join(mesh_dir, safe_filename)
 
-                     try:
+                    with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
+                        shutil.copyfileobj(file.file, tmp_upload)
+                        tmp_upload_path = tmp_upload.name
+
+                    try:
                         ensure_binary_stl(tmp_upload_path, dest_path)
-                     finally:
-                         if os.path.exists(tmp_upload_path):
-                             os.remove(tmp_upload_path)
+                    finally:
+                        if os.path.exists(tmp_upload_path):
+                            os.remove(tmp_upload_path)
 
-                     mesh_files_map[link_id] = safe_filename
+                    mesh_files_map[link_id] = safe_filename
 
         # Generate URDF
-        urdf_content, _, joint_infos = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names, for_mujoco=True)
+        urdf_content, _, joint_infos = generate_urdf_xml(
+            robot,
+            sanitized_robot_name,
+            mesh_files_map,
+            unique_link_names,
+            for_mujoco=True,
+        )
 
         # Generate Actuators XML
         actuators_xml = ""
         for j_info in joint_infos:
-            j_name = j_info['name']
-            j_type = j_info['type']
+            j_name = j_info["name"]
+            j_type = j_info["type"]
             # Add position actuator for moving joints
             # Default kp=50 is decent for simple models.
             # ctrlrange limits the slider.
-            if j_info.get('limit'):
-                lower = j_info['limit'].lower
-                upper = j_info['limit'].upper
-                ctrl_range = f'{lower} {upper}'
+            if j_info.get("limit"):
+                lower = j_info["limit"].lower
+                upper = j_info["limit"].upper
+                ctrl_range = f"{lower} {upper}"
             else:
                 ctrl_range = "-3.14 3.14"
 
             actuators_xml += f'    <position name="{j_name}_act" joint="{j_name}" kp="50" ctrlrange="{ctrl_range}" />\n'
-        
-        # FIX for MuJoCo: 
+
+        # FIX for MuJoCo:
         # 1. Strip full package path to leave just filename: "package://robot/meshes/foo.stl" -> "foo.stl"
-        urdf_content = urdf_content.replace(f'package://{sanitized_robot_name}/meshes/', '')
-        
+        urdf_content = urdf_content.replace(
+            f"package://{sanitized_robot_name}/meshes/", ""
+        )
+
         # 2. Inject <mujoco> block with meshdir AND actuators
         # Find position after <robot ...>
         import re
+
         match = re.search(r'<robot\s+name="[^"]+">', urdf_content)
         if match:
             insert_pos = match.end()
             mujoco_tag = f'\n  <mujoco>\n    <compiler meshdir="meshes" balanceinertia="true" discardvisual="false"/>\n    <option gravity="0 0 -9.81"/>\n    <actuator>\n{actuators_xml}    </actuator>\n  </mujoco>'
-            urdf_content = urdf_content[:insert_pos] + mujoco_tag + urdf_content[insert_pos:]
-        
+            urdf_content = (
+                urdf_content[:insert_pos] + mujoco_tag + urdf_content[insert_pos:]
+            )
+
         urdf_filename = f"{sanitized_robot_name}.urdf"
         with open(os.path.join(package_dir, urdf_filename), "w") as f:
             f.write(urdf_content)
@@ -1111,12 +1178,14 @@ mujoco.viewer.launch(model, data)
         if recordings:
             try:
                 recs_raw = json.loads(recordings)
-                processed_recs = process_recordings_for_export(recs_raw, joint_infos, robot)
-                
+                processed_recs = process_recordings_for_export(
+                    recs_raw, joint_infos, robot
+                )
+
                 # Save recordings.json
                 with open(os.path.join(package_dir, "recordings.json"), "w") as f:
                     json.dump(processed_recs, f, indent=2)
-                
+
                 # Generate Replay Script
                 replay_py = generate_mujoco_playback_script(urdf_filename)
                 with open(os.path.join(package_dir, "replay_recording.py"), "w") as f:
@@ -1124,10 +1193,10 @@ mujoco.viewer.launch(model, data)
 
                 # Generate Shell Scripts for each recording (Bash)
                 for i, rec in enumerate(processed_recs):
-                    rec_name_clean = to_snake_case(rec.get('name', f'rec_{i}'))
+                    rec_name_clean = to_snake_case(rec.get("name", f"rec_{i}"))
                     sh_filename = f"replay_{i}_{rec_name_clean}.sh"
                     sh_path = os.path.join(package_dir, sh_filename)
-                    
+
                     sh_content = f"""#!/bin/bash
 # Replay recording #{i}: {rec.get('name')}
 python3 replay_recording.py {i}
@@ -1147,12 +1216,14 @@ python3 replay_recording.py {i}
                 torque_py = generate_mujoco_torque_replay_script(urdf_filename)
                 with open(os.path.join(package_dir, "replay_with_torque.py"), "w") as f:
                     f.write(torque_py)
-                
+
                 # Generate Motor Validation Script (Mode 2)
                 motor_py = generate_mujoco_motor_validation_script(urdf_filename)
-                with open(os.path.join(package_dir, "replay_motor_validation.py"), "w") as f:
+                with open(
+                    os.path.join(package_dir, "replay_motor_validation.py"), "w"
+                ) as f:
                     f.write(motor_py)
-                
+
                 # Generate Bash Script for Torque Replay (Generic)
                 torque_sh = f"""#!/bin/bash
 # Replay with Real-time Torque Visualization (Default #0)
@@ -1174,7 +1245,7 @@ python3 replay_with_torque.py 0 --mode $MODE
 
                 # Generate Individual Scripts
                 for i, rec in enumerate(processed_recs):
-                    rec_name_clean = to_snake_case(rec.get('name', f'rec_{i}'))
+                    rec_name_clean = to_snake_case(rec.get("name", f"rec_{i}"))
                     sh_filename = f"run_torque_replay_{i}_{rec_name_clean}.sh"
                     sh_path = os.path.join(package_dir, sh_filename)
                     sh_content = f"""#!/bin/bash
@@ -1302,10 +1373,15 @@ This will:
         with open(os.path.join(package_dir, "README.md"), "w") as f:
             f.write(readme_content)
 
-
         # Zip it
-        shutil.make_archive(package_dir, 'zip', root_dir=tmpdir, base_dir=sanitized_robot_name)
-        return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_mujoco_mjcf.zip")
+        shutil.make_archive(
+            package_dir, "zip", root_dir=tmpdir, base_dir=sanitized_robot_name
+        )
+        return FileResponse(
+            f"{package_dir}.zip",
+            media_type="application/zip",
+            filename=f"{sanitized_robot_name}_mujoco_mjcf.zip",
+        )
 
     except Exception as e:
         print(f"Export Error: {e}")
@@ -1317,14 +1393,16 @@ async def export_gazebo(
     background_tasks: BackgroundTasks,
     robot_data: str = Form(...),
     robot_name: str = Form(...),
-    files: Optional[List[UploadFile]] = File(None)
+    files: Optional[List[UploadFile]] = File(None),
 ):
     try:
         try:
             data_dict = json.loads(robot_data)
             robot = RobotData.parse_obj(data_dict)
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid robot data format: {e}"
+            )
 
         sanitized_robot_name = to_snake_case(robot_name) or "my_robot"
         tmpdir = tempfile.mkdtemp()
@@ -1332,58 +1410,72 @@ async def export_gazebo(
         urdf_dir = os.path.join(package_dir, "urdf")
         mesh_dir = os.path.join(package_dir, "meshes")
         launch_dir = os.path.join(package_dir, "launch")
-        
+
         os.makedirs(urdf_dir, exist_ok=True)
         os.makedirs(mesh_dir, exist_ok=True)
         os.makedirs(launch_dir, exist_ok=True)
-        
+
         unique_link_names = generate_unique_names(robot)
         mesh_files_map = {}
-        
+
         # Process Meshes
         if files:
             for file in files:
-                link_id = file.filename[5:] if file.filename.startswith('mesh_') else file.filename
+                link_id = (
+                    file.filename[5:]
+                    if file.filename.startswith("mesh_")
+                    else file.filename
+                )
                 if link_id in robot.links:
                     clean_name = unique_link_names[link_id]
                     safe_filename = f"{clean_name}.stl"
                     dest_path = os.path.join(mesh_dir, safe_filename)
                     with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
-                         shutil.copyfileobj(file.file, tmp_upload)
-                         tmp_upload_path = tmp_upload.name
-                    try: ensure_binary_stl(tmp_upload_path, dest_path)
-                    finally: 
-                        if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
+                        shutil.copyfileobj(file.file, tmp_upload)
+                        tmp_upload_path = tmp_upload.name
+                    try:
+                        ensure_binary_stl(tmp_upload_path, dest_path)
+                    finally:
+                        if os.path.exists(tmp_upload_path):
+                            os.remove(tmp_upload_path)
                     mesh_files_map[link_id] = safe_filename
                 elif link_id in robot.joints:
-                     joint_name = to_snake_case(robot.joints[link_id].name)
-                     safe_filename = f"{joint_name}_{link_id[:4]}.stl"
-                     dest_path = os.path.join(mesh_dir, safe_filename)
-                     with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
-                         shutil.copyfileobj(file.file, tmp_upload)
-                         tmp_upload_path = tmp_upload.name
-                     try: ensure_binary_stl(tmp_upload_path, dest_path)
-                     finally:
-                        if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
-                     mesh_files_map[link_id] = safe_filename
+                    joint_name = to_snake_case(robot.joints[link_id].name)
+                    safe_filename = f"{joint_name}_{link_id[:4]}.stl"
+                    dest_path = os.path.join(mesh_dir, safe_filename)
+                    with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
+                        shutil.copyfileobj(file.file, tmp_upload)
+                        tmp_upload_path = tmp_upload.name
+                    try:
+                        ensure_binary_stl(tmp_upload_path, dest_path)
+                    finally:
+                        if os.path.exists(tmp_upload_path):
+                            os.remove(tmp_upload_path)
+                    mesh_files_map[link_id] = safe_filename
 
         # Generate Base URDF
         # Note: Gazebo works best with standard URDF, collisions enabled.
         # We reuse the standard export and then inject tags.
-        urdf_content, _, _ = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names, for_mujoco=False)
-        
+        urdf_content, _, _ = generate_urdf_xml(
+            robot,
+            sanitized_robot_name,
+            mesh_files_map,
+            unique_link_names,
+            for_mujoco=False,
+        )
+
         # Inject Gazebo Tags
         urdf_content = inject_gazebo_tags(urdf_content, robot)
-        
+
         urdf_filename = f"{sanitized_robot_name}.urdf"
         with open(os.path.join(urdf_dir, urdf_filename), "w") as f:
             f.write(urdf_content)
-            
+
         # Generate Launch File
         launch_content = generate_gazebo_launch(sanitized_robot_name)
         with open(os.path.join(launch_dir, "gazebo.launch"), "w") as f:
             f.write(launch_content)
-            
+
         # CMakeLists and Package.xml for completeness (Minimal ROS package)
         package_xml = f"""<package format="2">
   <name>{sanitized_robot_name}</name>
@@ -1398,7 +1490,7 @@ async def export_gazebo(
 """
         with open(os.path.join(package_dir, "package.xml"), "w") as f:
             f.write(package_xml)
-            
+
         cmake_content = f"""cmake_minimum_required(VERSION 3.0.2)
 project({sanitized_robot_name})
 find_package(catkin REQUIRED COMPONENTS gazebo_ros)
@@ -1449,8 +1541,14 @@ This will:
             f.write(readme_content)
 
         # Zip it
-        shutil.make_archive(package_dir, 'zip', root_dir=tmpdir, base_dir=sanitized_robot_name)
-        return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_gazebo.zip")
+        shutil.make_archive(
+            package_dir, "zip", root_dir=tmpdir, base_dir=sanitized_robot_name
+        )
+        return FileResponse(
+            f"{package_dir}.zip",
+            media_type="application/zip",
+            filename=f"{sanitized_robot_name}_gazebo.zip",
+        )
 
     except Exception as e:
         print(f"Export Error: {e}")
@@ -1462,14 +1560,16 @@ async def export_gazebo_ros2(
     background_tasks: BackgroundTasks,
     robot_data: str = Form(...),
     robot_name: str = Form(...),
-    files: Optional[List[UploadFile]] = File(None)
+    files: Optional[List[UploadFile]] = File(None),
 ):
     try:
         try:
             data_dict = json.loads(robot_data)
             robot = RobotData.parse_obj(data_dict)
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid robot data format: {e}"
+            )
 
         sanitized_robot_name = to_snake_case(robot_name) or "my_robot"
         tmpdir = tempfile.mkdtemp()
@@ -1477,56 +1577,70 @@ async def export_gazebo_ros2(
         urdf_dir = os.path.join(package_dir, "urdf")
         mesh_dir = os.path.join(package_dir, "meshes")
         launch_dir = os.path.join(package_dir, "launch")
-        
+
         os.makedirs(urdf_dir, exist_ok=True)
         os.makedirs(mesh_dir, exist_ok=True)
         os.makedirs(launch_dir, exist_ok=True)
-        
+
         unique_link_names = generate_unique_names(robot)
         mesh_files_map = {}
-        
+
         # Process Meshes
         if files:
             for file in files:
-                link_id = file.filename[5:] if file.filename.startswith('mesh_') else file.filename
+                link_id = (
+                    file.filename[5:]
+                    if file.filename.startswith("mesh_")
+                    else file.filename
+                )
                 if link_id in robot.links:
                     clean_name = unique_link_names[link_id]
                     safe_filename = f"{clean_name}.stl"
                     dest_path = os.path.join(mesh_dir, safe_filename)
                     with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
-                         shutil.copyfileobj(file.file, tmp_upload)
-                         tmp_upload_path = tmp_upload.name
-                    try: ensure_binary_stl(tmp_upload_path, dest_path)
-                    finally: 
-                        if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
+                        shutil.copyfileobj(file.file, tmp_upload)
+                        tmp_upload_path = tmp_upload.name
+                    try:
+                        ensure_binary_stl(tmp_upload_path, dest_path)
+                    finally:
+                        if os.path.exists(tmp_upload_path):
+                            os.remove(tmp_upload_path)
                     mesh_files_map[link_id] = safe_filename
                 elif link_id in robot.joints:
-                     joint_name = to_snake_case(robot.joints[link_id].name)
-                     safe_filename = f"{joint_name}_{link_id[:4]}.stl"
-                     dest_path = os.path.join(mesh_dir, safe_filename)
-                     with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
-                         shutil.copyfileobj(file.file, tmp_upload)
-                         tmp_upload_path = tmp_upload.name
-                     try: ensure_binary_stl(tmp_upload_path, dest_path)
-                     finally:
-                        if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
-                     mesh_files_map[link_id] = safe_filename
+                    joint_name = to_snake_case(robot.joints[link_id].name)
+                    safe_filename = f"{joint_name}_{link_id[:4]}.stl"
+                    dest_path = os.path.join(mesh_dir, safe_filename)
+                    with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
+                        shutil.copyfileobj(file.file, tmp_upload)
+                        tmp_upload_path = tmp_upload.name
+                    try:
+                        ensure_binary_stl(tmp_upload_path, dest_path)
+                    finally:
+                        if os.path.exists(tmp_upload_path):
+                            os.remove(tmp_upload_path)
+                    mesh_files_map[link_id] = safe_filename
 
         # Generate Base URDF (Collision enabled)
-        urdf_content, _, _ = generate_urdf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names, for_mujoco=False)
-        
+        urdf_content, _, _ = generate_urdf_xml(
+            robot,
+            sanitized_robot_name,
+            mesh_files_map,
+            unique_link_names,
+            for_mujoco=False,
+        )
+
         # Inject ROS 2 Gazebo Tags
         urdf_content = inject_gazebo_ros2_tags(urdf_content, robot)
-        
+
         urdf_filename = f"{sanitized_robot_name}.urdf"
         with open(os.path.join(urdf_dir, urdf_filename), "w") as f:
             f.write(urdf_content)
-            
+
         # Generate Launch File (Python)
         launch_content = generate_gazebo_ros2_launch(sanitized_robot_name)
         with open(os.path.join(launch_dir, "gazebo.launch.py"), "w") as f:
             f.write(launch_content)
-            
+
         # package.xml (ament_cmake)
         package_xml = f"""<?xml version="1.0"?>
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
@@ -1553,7 +1667,7 @@ async def export_gazebo_ros2(
 """
         with open(os.path.join(package_dir, "package.xml"), "w") as f:
             f.write(package_xml)
-            
+
         # CMakeLists.txt (ament_cmake)
         cmake_content = f"""cmake_minimum_required(VERSION 3.8)
 project({sanitized_robot_name})
@@ -1705,19 +1819,23 @@ ros2 launch "$PACKAGE_NAME" gazebo.launch.py
         script_path = os.path.join(package_dir, "setup_and_launch.sh")
         with open(script_path, "w") as f:
             f.write(launch_script_content)
-        
+
         # Make executable
         os.chmod(script_path, 0o755)
 
         # Zip it
-        shutil.make_archive(package_dir, 'zip', root_dir=tmpdir, base_dir=sanitized_robot_name)
-        return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_gazebo_ros2.zip")
+        shutil.make_archive(
+            package_dir, "zip", root_dir=tmpdir, base_dir=sanitized_robot_name
+        )
+        return FileResponse(
+            f"{package_dir}.zip",
+            media_type="application/zip",
+            filename=f"{sanitized_robot_name}_gazebo_ros2.zip",
+        )
 
     except Exception as e:
         print(f"Export Error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
 
 
 @app.post("/api/export-mujoco-mjcf")
@@ -1728,54 +1846,69 @@ async def export_mujoco_mjcf(
     files: Optional[List[UploadFile]] = File(None),
     mesh_collision: bool = Form(False),
     direct_hand: bool = Form(False),
-    recordings: str = Form(None)
+    recordings: str = Form(None),
 ):
     try:
         try:
             data_dict = json.loads(robot_data)
             robot = RobotData.parse_obj(data_dict)
         except Exception as e:
-            raise HTTPException(status_code=400, detail=f"Invalid robot data format: {e}")
+            raise HTTPException(
+                status_code=400, detail=f"Invalid robot data format: {e}"
+            )
 
         sanitized_robot_name = to_snake_case(robot_name) or "my_robot"
         tmpdir = tempfile.mkdtemp()
         package_dir = os.path.join(tmpdir, sanitized_robot_name)
         mesh_dir = os.path.join(package_dir, "meshes")
         os.makedirs(mesh_dir, exist_ok=True)
-        
+
         unique_link_names = generate_unique_names(robot)
         mesh_files_map = {}
-        
+
         if files:
             for file in files:
-                link_id = file.filename[5:] if file.filename.startswith('mesh_') else file.filename
+                link_id = (
+                    file.filename[5:]
+                    if file.filename.startswith("mesh_")
+                    else file.filename
+                )
                 if link_id in robot.links:
                     clean_name = unique_link_names[link_id]
                     safe_filename = f"{clean_name}.stl"
                     dest_path = os.path.join(mesh_dir, safe_filename)
                     with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
-                         shutil.copyfileobj(file.file, tmp_upload)
-                         tmp_upload_path = tmp_upload.name
+                        shutil.copyfileobj(file.file, tmp_upload)
+                        tmp_upload_path = tmp_upload.name
                     try:
                         ensure_binary_stl(tmp_upload_path, dest_path)
                     finally:
-                        if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
+                        if os.path.exists(tmp_upload_path):
+                            os.remove(tmp_upload_path)
                     mesh_files_map[link_id] = safe_filename
                 elif link_id in robot.joints:
-                     joint_name = to_snake_case(robot.joints[link_id].name)
-                     safe_filename = f"{joint_name}_{link_id[:4]}.stl"
-                     dest_path = os.path.join(mesh_dir, safe_filename)
-                     with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
-                         shutil.copyfileobj(file.file, tmp_upload)
-                         tmp_upload_path = tmp_upload.name
-                     try:
+                    joint_name = to_snake_case(robot.joints[link_id].name)
+                    safe_filename = f"{joint_name}_{link_id[:4]}.stl"
+                    dest_path = os.path.join(mesh_dir, safe_filename)
+                    with tempfile.NamedTemporaryFile(delete=False) as tmp_upload:
+                        shutil.copyfileobj(file.file, tmp_upload)
+                        tmp_upload_path = tmp_upload.name
+                    try:
                         ensure_binary_stl(tmp_upload_path, dest_path)
-                     finally:
-                        if os.path.exists(tmp_upload_path): os.remove(tmp_upload_path)
-                     mesh_files_map[link_id] = safe_filename
+                    finally:
+                        if os.path.exists(tmp_upload_path):
+                            os.remove(tmp_upload_path)
+                    mesh_files_map[link_id] = safe_filename
 
         # Generate MJCF XML and get joint info
-        mjcf_content, generated_joints_info = generate_mjcf_xml(robot, sanitized_robot_name, mesh_files_map, unique_link_names, use_mesh_collision=mesh_collision, direct_hand=direct_hand)
+        mjcf_content, generated_joints_info = generate_mjcf_xml(
+            robot,
+            sanitized_robot_name,
+            mesh_files_map,
+            unique_link_names,
+            use_mesh_collision=mesh_collision,
+            direct_hand=direct_hand,
+        )
         mjcf_filename = f"{sanitized_robot_name}.xml"
         with open(os.path.join(package_dir, mjcf_filename), "w") as f:
             f.write(mjcf_content)
@@ -1814,7 +1947,7 @@ python3 visualize_mjcf.py "$@"
         interactive_script = generate_mujoco_interactive_script(mjcf_filename)
         with open(os.path.join(package_dir, "run_interactive.py"), "w") as f:
             f.write(interactive_script)
-            
+
         # Generate Interactive Bash Script
         slide_sh = generate_demo_script("run_interactive.py")
         with open(os.path.join(package_dir, "run_demo_slide.sh"), "w") as f:
@@ -1824,66 +1957,70 @@ python3 visualize_mjcf.py "$@"
         # Process Recordings for MuJoCo
         if recordings:
             try:
-                 recs_raw = json.loads(recordings)
-                 processed_recs = process_recordings_for_export(recs_raw, generated_joints_info, robot)
-                 
-                 # 1. Save recordings.json
-                 with open(os.path.join(package_dir, "recordings.json"), "w") as f:
-                     json.dump(processed_recs, f, indent=2)
-                     
-                 # 2. Generate Replay Script
-                 replay_script = generate_mujoco_playback_script(mjcf_filename)
-                 with open(os.path.join(package_dir, "replay_mujoco.py"), "w") as f:
-                     f.write(replay_script)
-                 
-                 # 3. Generate Replay Shell Scripts
-                 for i, rec in enumerate(processed_recs):
-                     rec_name_clean = to_snake_case(rec.get('name', f'rec_{i}'))
-                     sh_filename = f"replay_{i}_{rec_name_clean}.sh"
-                     sh_path = os.path.join(package_dir, sh_filename)
-                     
-                     sh_content = f"""#!/bin/bash
+                recs_raw = json.loads(recordings)
+                processed_recs = process_recordings_for_export(
+                    recs_raw, generated_joints_info, robot
+                )
+
+                # 1. Save recordings.json
+                with open(os.path.join(package_dir, "recordings.json"), "w") as f:
+                    json.dump(processed_recs, f, indent=2)
+
+                # 2. Generate Replay Script
+                replay_script = generate_mujoco_playback_script(mjcf_filename)
+                with open(os.path.join(package_dir, "replay_mujoco.py"), "w") as f:
+                    f.write(replay_script)
+
+                # 3. Generate Replay Shell Scripts
+                for i, rec in enumerate(processed_recs):
+                    rec_name_clean = to_snake_case(rec.get("name", f"rec_{i}"))
+                    sh_filename = f"replay_{i}_{rec_name_clean}.sh"
+                    sh_path = os.path.join(package_dir, sh_filename)
+
+                    sh_content = f"""#!/bin/bash
 # Replay recording #{i}: {rec.get('name')}
 python3 replay_mujoco.py {i}
 """
-                     with open(sh_path, "w") as f:
-                         f.write(sh_content)
-                     os.chmod(sh_path, 0o755)
+                    with open(sh_path, "w") as f:
+                        f.write(sh_content)
+                    os.chmod(sh_path, 0o755)
 
-                 # Generate Individual Scripts
-                 for i, rec in enumerate(processed_recs):
-                     rec_name_clean = to_snake_case(rec.get('name', f'rec_{i}'))
-                     sh_filename = f"run_torque_replay_{i}_{rec_name_clean}.sh"
-                     sh_path = os.path.join(package_dir, sh_filename)
-                     sh_content = generate_torque_launch_script("replay_with_torque.py", i)
-                     with open(sh_path, "w") as f:
-                         f.write(sh_content)
-                     os.chmod(sh_path, 0o755)
+                # Generate Individual Scripts
+                for i, rec in enumerate(processed_recs):
+                    rec_name_clean = to_snake_case(rec.get("name", f"rec_{i}"))
+                    sh_filename = f"run_torque_replay_{i}_{rec_name_clean}.sh"
+                    sh_path = os.path.join(package_dir, sh_filename)
+                    sh_content = generate_torque_launch_script(
+                        "replay_with_torque.py", i
+                    )
+                    with open(sh_path, "w") as f:
+                        f.write(sh_content)
+                    os.chmod(sh_path, 0o755)
 
             except Exception as e:
-                 print(f"Error processing MuJoCo recordings: {e}")
-                 with open("DEBUG_REC_ERROR.txt", "w") as f:
-                     f.write(str(e))
-                 # traceback
-                 import traceback
-                 with open("DEBUG_REC_TRACE.txt", "w") as f:
-                     f.write(traceback.format_exc())
+                print(f"Error processing MuJoCo recordings: {e}")
+                with open("DEBUG_REC_ERROR.txt", "w") as f:
+                    f.write(str(e))
+                # traceback
+                import traceback
+
+                with open("DEBUG_REC_TRACE.txt", "w") as f:
+                    f.write(traceback.format_exc())
 
         # Generate Torque Replay Scripts (Mode 1, 2, 3)
         torque_py = generate_mujoco_torque_replay_script(mjcf_filename)
         with open(os.path.join(package_dir, "replay_with_torque.py"), "w") as f:
             f.write(torque_py)
-        
+
         motor_py = generate_mujoco_motor_validation_script(mjcf_filename)
         with open(os.path.join(package_dir, "replay_motor_validation.py"), "w") as f:
             f.write(motor_py)
-        
+
         # Generate Bash Script for Torque Replay (Generic)
         torque_sh = generate_torque_launch_script("replay_with_torque.py", 0)
         with open(os.path.join(package_dir, "run_torque_replay.sh"), "w") as f:
             f.write(torque_sh)
         os.chmod(os.path.join(package_dir, "run_torque_replay.sh"), 0o755)
-
 
         launch_bat = f"""@echo off
 python visualize_mjcf.py %*
@@ -1894,7 +2031,7 @@ pause
 
         # Generate requirements.txt
         # Simplified requirements:
-        # 1. mediapipe installs its own opencv-contrib-python. 
+        # 1. mediapipe installs its own opencv-contrib-python.
         #    Installing 'opencv-python' alongside it causes conflicts.
         # 2. Letting mediapipe pick its own protobuf version (likely 3.19+ or 4.x)
         req_content = "mujoco\nmediapipe==0.10.14\nmatplotlib\nnumpy\n"
@@ -1951,7 +2088,6 @@ echo "Running with Python: $VENV_PYTHON"
         with open(os.path.join(package_dir, "run_demo.sh"), "w") as f:
             f.write(run_demo_sh)
         os.chmod(os.path.join(package_dir, "run_demo.sh"), 0o755)
-
 
         # Generate Demo Hand Control Script
         demo_script = f"""
@@ -2357,8 +2493,14 @@ python3 replay_mujoco.py [index]
 
         # Zip it
         # Zip it
-        shutil.make_archive(package_dir, 'zip', root_dir=tmpdir, base_dir=sanitized_robot_name)
-        return FileResponse(f"{package_dir}.zip", media_type='application/zip', filename=f"{sanitized_robot_name}_mujoco_mjcf.zip")
+        shutil.make_archive(
+            package_dir, "zip", root_dir=tmpdir, base_dir=sanitized_robot_name
+        )
+        return FileResponse(
+            f"{package_dir}.zip",
+            media_type="application/zip",
+            filename=f"{sanitized_robot_name}_mujoco_mjcf.zip",
+        )
 
     except Exception as e:
         print(f"Export Error: {e}")

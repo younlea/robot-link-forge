@@ -873,11 +873,6 @@ import os
 import argparse
 import sys
 import csv
-
-# Set rendering backend (try osmesa for headless servers)
-if 'MUJOCO_GL' not in os.environ:
-    os.environ['MUJOCO_GL'] = 'osmesa'
-
 import mujoco
 import mujoco.viewer
 import numpy as np
@@ -1260,11 +1255,6 @@ import json
 import os
 import argparse
 import csv
-
-# Set rendering backend (try osmesa for headless servers)
-if 'MUJOCO_GL' not in os.environ:
-    os.environ['MUJOCO_GL'] = 'osmesa'
-
 import mujoco
 import mujoco.viewer
 import numpy as np
