@@ -1041,12 +1041,16 @@ if HAS_MATPLOTLIB:
 # Main Loop
 print("Attempting to create visualization window...")
 use_viewer = True
-viewer = None
 
 try:
     print(f"Using rendering backend: {{os.environ.get('MUJOCO_GL', 'default')}}")
     viewer = mujoco.viewer.launch_passive(model, data)
+    print("Viewer object created, entering context...")
+    
+    # Context manager enter is where window creation actually happens
+    viewer.__enter__()
     print("Viewer created successfully!")
+    
 except Exception as e:
     print(f"ERROR: Failed to create viewer: {{e}}")
     print(f"Error type: {{type(e).__name__}}")
@@ -1055,9 +1059,10 @@ except Exception as e:
     traceback.print_exc()
     print("\\nContinuing without visualization (headless mode)...")
     use_viewer = False
+    viewer = None
 
 if use_viewer and viewer is not None:
-    with viewer:
+    try:
         print("Starting simulation loop with visualization...")
         start_time = time.time()
         last_print = 0
@@ -1254,6 +1259,12 @@ if use_viewer and viewer is not None:
                 except: pass
                 last_print = now
 
+    finally:
+        if viewer is not None:
+            try:
+                viewer.__exit__(None, None, None)
+            except: pass
+    
     csv_file.close()
     print(f"Simulation complete. Log saved to {{log_file_name}}")
 else:
@@ -1552,12 +1563,15 @@ writer.writerow(['Time'] + list(joint_ids.keys()))
 
 print("Attempting to create visualization window...")
 use_viewer = True
-viewer = None
 
 try:
     print(f"Using rendering backend: {{os.environ.get('MUJOCO_GL', 'default')}}")
     viewer = mujoco.viewer.launch_passive(model, data)
+    print("Viewer object created, entering context...")
+    
+    viewer.__enter__()
     print("Viewer created successfully!")
+    
 except Exception as e:
     print(f"ERROR: Failed to create viewer: {{e}}")
     print(f"Error type: {{type(e).__name__}}")
@@ -1566,9 +1580,10 @@ except Exception as e:
     traceback.print_exc()
     print("\\nContinuing without visualization (headless mode)...")
     use_viewer = False
+    viewer = None
 
 if use_viewer and viewer is not None:
-    with viewer:
+    try:
         print("Starting motor validation simulation...")
         start_time = time.time()
         last_print = 0
@@ -1607,6 +1622,12 @@ if use_viewer and viewer is not None:
                 
                 last_print = now
 
+    finally:
+        if viewer is not None:
+            try:
+                viewer.__exit__(None, None, None)
+            except: pass
+    
     csv_file.close()
     print(f"Motor validation complete. Log saved to {{log_file_name}}")
 else:
