@@ -857,18 +857,13 @@ def generate_mujoco_torque_replay_script(model_filename: str) -> str:
     return f"""
 import time
 import json
+import mujoco
+import mujoco.viewer
+import numpy as np
 import os
 import argparse
 import sys
 import csv
-
-# GLFW Error Fix: Try EGL backend first (works better on servers)
-# EGL doesn't require X11/display, works headless
-os.environ['MUJOCO_GL'] = 'egl'
-
-import mujoco
-import mujoco.viewer
-import numpy as np
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning)
 
@@ -1039,43 +1034,20 @@ if HAS_MATPLOTLIB:
 
 
 # Main Loop
-print("Attempting to create visualization window...")
-use_viewer = True
-
-try:
-    print(f"Using rendering backend: {{os.environ.get('MUJOCO_GL', 'default')}}")
-    viewer = mujoco.viewer.launch_passive(model, data)
-    print("Viewer object created, entering context...")
+with mujoco.viewer.launch_passive(model, data) as viewer:
+    print("Starting simulation loop...")
+    start_time = time.time()
+    last_print = 0
     
-    # Context manager enter is where window creation actually happens
-    viewer.__enter__()
-    print("Viewer created successfully!")
-    
-except Exception as e:
-    print(f"ERROR: Failed to create viewer: {{e}}")
-    print(f"Error type: {{type(e).__name__}}")
-    import traceback
-    print("Full traceback:")
-    traceback.print_exc()
-    print("\\nContinuing without visualization (headless mode)...")
-    use_viewer = False
-    viewer = None
-
-if use_viewer and viewer is not None:
-    try:
-        print("Starting simulation loop with visualization...")
-        start_time = time.time()
-        last_print = 0
-        
-        while viewer.is_running():
-            now = time.time()
-            elapsed = now - start_time
-            if elapsed > duration:
-                start_time = now
-                elapsed = 0
-                
-            step_idx = int(elapsed / dt)
-            if step_idx >= n_steps: step_idx = n_steps - 1
+    while viewer.is_running():
+        now = time.time()
+        elapsed = now - start_time
+        if elapsed > duration:
+            start_time = now
+            elapsed = 0
+            
+        step_idx = int(elapsed / dt)
+        if step_idx >= n_steps: step_idx = n_steps - 1
                 
             # --- PHYSICS STEP ---
             if args.mode == 'inverse' or args.mode == 'sensors':
@@ -1259,57 +1231,7 @@ if use_viewer and viewer is not None:
                 except: pass
                 last_print = now
 
-    finally:
-        if viewer is not None:
-            try:
-                viewer.__exit__(None, None, None)
-            except: pass
-    
-    csv_file.close()
-    print(f"Simulation complete. Log saved to {{log_file_name}}")
-else:
-    # Headless mode - run without viewer
-    print("Running in headless mode (no viewer)...")
-    start_time = time.time()
-    last_print = 0
-    
-    while True:
-        now = time.time()
-        elapsed = now - start_time
-        if elapsed > duration:
-            break
-            
-        step_idx = int(elapsed / dt)
-        if step_idx >= n_steps: step_idx = n_steps - 1
-            
-        # --- PHYSICS STEP ---
-        if args.mode == 'inverse' or args.mode == 'sensors':
-            data.qpos[:model.nq] = qpos_traj[step_idx]
-            data.qvel[:model.nv] = qvel_traj[step_idx]
-            data.qacc[:model.nv] = qacc_traj[step_idx]
-            mujoco.mj_inverse(model, data)
-            
-            if args.mode == 'sensors':
-                mujoco.mj_forward(model, data)
-
-        # Collect Data
-        vals_to_plot = []
-        
-        if args.mode == 'inverse':
-            vals_to_plot = [data.qfrc_inverse[model.jnt_dofadr[joint_ids[n]]] for n in data_source_names]
-        elif args.mode == 'sensors':
-            vals_to_plot = [data.sensordata[sensor_ids[n]] for n in data_source_names]
-
-        # Log
-        if now - last_print > 0.1:
-            row = [elapsed] + vals_to_plot
-            writer.writerow(row)
-            last_print = now
-            print(f"Time: {{elapsed:.2f}}s / {{duration:.2f}}s", end='\\r')
-    
-    csv_file.close()
-    print(f"\\nHeadless simulation complete. Log saved to {{log_file_name}}")
-
+csv_file.close()
 """
 
 def generate_mujoco_motor_validation_script(model_filename: str) -> str:
@@ -1317,17 +1239,12 @@ def generate_mujoco_motor_validation_script(model_filename: str) -> str:
     return f"""
 import time
 import json
-import os
-import argparse
-import csv
-
-# GLFW Error Fix: Try EGL backend first (works better on servers)
-# EGL doesn't require X11/display, works headless
-os.environ['MUJOCO_GL'] = 'egl'
-
 import mujoco
 import mujoco.viewer
 import numpy as np
+import os
+import argparse
+import csv
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning)
 
@@ -1561,42 +1478,20 @@ csv_file = open(log_file_name, 'w', newline='')
 writer = csv.writer(csv_file)
 writer.writerow(['Time'] + list(joint_ids.keys()))
 
-print("Attempting to create visualization window...")
-use_viewer = True
-
-try:
-    print(f"Using rendering backend: {{os.environ.get('MUJOCO_GL', 'default')}}")
-    viewer = mujoco.viewer.launch_passive(model, data)
-    print("Viewer object created, entering context...")
+with mujoco.viewer.launch_passive(model, data) as viewer:
+    print("Starting motor validation simulation...")
+    start_time = time.time()
+    last_print = 0
     
-    viewer.__enter__()
-    print("Viewer created successfully!")
-    
-except Exception as e:
-    print(f"ERROR: Failed to create viewer: {{e}}")
-    print(f"Error type: {{type(e).__name__}}")
-    import traceback
-    print("Full traceback:")
-    traceback.print_exc()
-    print("\\nContinuing without visualization (headless mode)...")
-    use_viewer = False
-    viewer = None
-
-if use_viewer and viewer is not None:
-    try:
-        print("Starting motor validation simulation...")
-        start_time = time.time()
-        last_print = 0
-        
-        while viewer.is_running():
-            now = time.time()
-            elapsed = now - start_time
-            if elapsed > duration:
-                start_time = now
-                elapsed = 0
-                
-            step_idx = int(elapsed / dt)
-            if step_idx >= n_steps: step_idx = n_steps - 1
+    while viewer.is_running():
+        now = time.time()
+        elapsed = now - start_time
+        if elapsed > duration:
+            start_time = now
+            elapsed = 0
+            
+        step_idx = int(elapsed / dt)
+        if step_idx >= n_steps: step_idx = n_steps - 1
             
             # Forward Dynamics with Motor Parameters
             for jname, jid in joint_ids.items():
@@ -1622,44 +1517,6 @@ if use_viewer and viewer is not None:
                 
                 last_print = now
 
-    finally:
-        if viewer is not None:
-            try:
-                viewer.__exit__(None, None, None)
-            except: pass
-    
-    csv_file.close()
-    print(f"Motor validation complete. Log saved to {{log_file_name}}")
-else:
-    # Headless mode
-    print("Running in headless mode (no viewer)...")
-    start_time = time.time()
-    last_print = 0
-    
-    while True:
-        now = time.time()
-        elapsed = now - start_time
-        if elapsed > duration:
-            break
-            
-        step_idx = int(elapsed / dt)
-        if step_idx >= n_steps: step_idx = n_steps - 1
-        
-        # Forward Dynamics with Motor Parameters
-        for jname, jid in joint_ids.items():
-            target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
-            if jname in actuator_ids:
-                data.ctrl[actuator_ids[jname]] = target_q
-        
-        mujoco.mj_step(model, data)
-        
-        # Logging
-        if now - last_print > 0.1:
-            joint_vals = [data.qpos[model.jnt_qposadr[jid]] for jid in joint_ids.values()]
-            writer.writerow([elapsed] + joint_vals)
-            last_print = now
-            print(f"Time: {{elapsed:.2f}}s / {{duration:.2f}}s", end='\\r')
-    
-    csv_file.close()
-    print(f"\\nHeadless motor validation complete. Log saved to {{log_file_name}}")
+csv_file.close()
+print(f"Motor validation complete. Log saved to {{log_file_name}}")
 """
