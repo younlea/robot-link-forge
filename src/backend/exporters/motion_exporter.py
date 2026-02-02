@@ -1516,6 +1516,15 @@ def save_motor_params():
 # Apply initial parameters
 apply_all_motor_params()
 
+# Debug: Print actuator configuration
+print("\\nActuator Configuration:")
+for jname in list(joint_ids.keys())[:3]:  # Print first 3 joints
+    if jname in actuator_ids:
+        aid = actuator_ids[jname]
+        params = get_joint_params(jname)
+        print(f"  {{jname}}: kp={{model.actuator_gainprm[aid, 0]:.1f}}, kv={{-model.actuator_biasprm[aid, 1]:.1f}}, "
+              f"gear={{model.actuator_gear[aid, 0]:.1f}}, forcelim={{model.actuator_forcerange[aid, 1]:.1f}}\")
+
 # --- Pre-calculate Trajectory ---
 duration = rec['duration'] / 1000.0
 if duration <= 0: duration = 1.0
@@ -1553,19 +1562,19 @@ if HAS_MATPLOTLIB:
     plt.ion()
     fig = plt.figure(figsize=(18, 10))
     
-    # Create layout: joint selector (left), sliders (center-left), plots (right)
-    gs = fig.add_gridspec(3, 3, height_ratios=[1, 2, 1], width_ratios=[1, 1.5, 1.5], 
-                          hspace=0.3, wspace=0.3, left=0.05, right=0.97, top=0.95, bottom=0.05)
+    # Create layout: info (top), sliders (left), plots (right)
+    gs = fig.add_gridspec(3, 2, height_ratios=[0.5, 2, 1.5], width_ratios=[1, 1.5], 
+                          hspace=0.35, wspace=0.35, left=0.08, right=0.97, top=0.95, bottom=0.08)
     
     ax_info = fig.add_subplot(gs[0, :])
-    ax_joint_selector = fig.add_subplot(gs[1, 0])
-    ax_sliders_container = fig.add_subplot(gs[1, 1])
-    ax_plot_tracking = fig.add_subplot(gs[2, 0:2])
-    ax_plot_torque = fig.add_subplot(gs[2, 2])
+    ax_sliders_container = fig.add_subplot(gs[1, 0])
+    ax_joint_selector_container = fig.add_subplot(gs[2, 0])
+    ax_plot_tracking = fig.add_subplot(gs[1, 1])
+    ax_plot_torque = fig.add_subplot(gs[2, 1])
     
     ax_info.axis('off')
-    ax_joint_selector.axis('off')
     ax_sliders_container.axis('off')
+    ax_joint_selector_container.axis('off')
     
     info_text = ax_info.text(0.5, 0.5, "Motor Validation", ha='center', va='center', fontsize=11)
     
@@ -1581,14 +1590,15 @@ if HAS_MATPLOTLIB:
         'saturated_count': 0
     }}
     
-    # Joint selector buttons
+    # Joint selector buttons (bottom left, below sliders)
     from matplotlib.widgets import RadioButtons, Button
     
     joint_list = ['[GLOBAL]'] + sorted(joint_ids.keys())
-    ax_radio_joints = plt.axes([0.02, 0.25, 0.12, 0.4])
-    radio_joints = RadioButtons(ax_radio_joints, joint_list[:min(15, len(joint_list))])
+    # Place radio buttons in dedicated area below sliders
+    ax_radio_joints = plt.axes([0.09, 0.10, 0.12, 0.18])
+    radio_joints = RadioButtons(ax_radio_joints, joint_list[:min(10, len(joint_list))], activecolor='blue')
     
-    # Parameter sliders
+    # Parameter sliders (left side, above joint selector)
     slider_specs = [
         ('kp', 'Kp (Gain)', 0, 1000, 500),
         ('kv', 'Kv (Damping)', 0, 100, 50),
@@ -1601,18 +1611,18 @@ if HAS_MATPLOTLIB:
     sliders = {{}}
     
     for i, (key, label, vmin, vmax, vinit) in enumerate(slider_specs):
-        ax_slider = plt.axes([0.32, 0.48 - i*0.06, 0.28, 0.025])
+        ax_slider = plt.axes([0.10, 0.71 - i*0.055, 0.28, 0.02])
         slider = Slider(ax_slider, label, vmin, vmax, valinit=vinit, valstep=(vmax-vmin)/1000.0)
         sliders[key] = slider
     
-    # Buttons
-    ax_btn_apply = plt.axes([0.32, 0.08, 0.10, 0.04])
+    # Buttons (above joint selector)
+    ax_btn_apply = plt.axes([0.09, 0.33, 0.09, 0.03])
     btn_apply = Button(ax_btn_apply, 'Apply')
     
-    ax_btn_reset = plt.axes([0.44, 0.08, 0.10, 0.04])
-    btn_reset = Button(ax_btn_reset, 'Reset to Global')
+    ax_btn_reset = plt.axes([0.19, 0.33, 0.10, 0.03])
+    btn_reset = Button(ax_btn_reset, 'Reset')
     
-    ax_btn_save = plt.axes([0.56, 0.08, 0.10, 0.04])
+    ax_btn_save = plt.axes([0.30, 0.33, 0.08, 0.03])
     btn_save = Button(ax_btn_save, 'Save All')
     
     def update_slider_values(params):
@@ -1741,6 +1751,7 @@ try:
         print("Starting motor validation simulation...")
         start_time = time.time()
         last_print = 0
+        first_step_debug = True
         
         while viewer.is_running():
             now = time.time()
@@ -1767,6 +1778,17 @@ try:
             # Step simulation
             mujoco.mj_step(model, data)
             viewer.sync()
+            
+            # Debug first step
+            if first_step_debug:
+                first_step_debug = False
+                print("\\nFirst step debug:")
+                for jname in list(joint_ids.keys())[:2]:
+                    if jname in actuator_ids:
+                        aid = actuator_ids[jname]
+                        jid = joint_ids[jname]
+                        print(f"  {{jname}}: ctrl={{data.ctrl[aid]:.3f}}, qpos={{data.qpos[model.jnt_qposadr[jid]]:.3f}}, "
+                              f"force={{data.actuator_force[aid]:.3f}}, kp={{model.actuator_gainprm[aid,0]:.1f}}\")
             
             # Collect analysis data
             tracking_errors = []
