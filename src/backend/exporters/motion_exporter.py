@@ -1,72 +1,77 @@
-
 import re
 import json
 import math
 from typing import List, Dict, Any
 from robot_models import RobotData
 
-def process_recordings_for_export(recordings_raw: List[Dict], generated_joints_info: List[Dict], robot_data: RobotData) -> List[Dict]:
+
+def process_recordings_for_export(
+    recordings_raw: List[Dict], generated_joints_info: List[Dict], robot_data: RobotData
+) -> List[Dict]:
     """
     Converts raw UUID-based recordings into a clean Name-based format for export.
     Uses 'generated_joints_info' from URDF generation to ensure 100% name matching,
     supporting multi-DOF joints (split into _roll, _pitch, etc.).
     """
-    
+
     # Build lookup: (original_id, dof_suffix) -> urdf_joint_name
     # derived strings: 'roll', 'pitch', 'yaw', 'prism'
     joint_map = {}
     for info in generated_joints_info:
-        orig_id = info.get('original_id')
-        suffix = info.get('suffix')
-        name = info.get('name')
+        orig_id = info.get("original_id")
+        suffix = info.get("suffix")
+        name = info.get("name")
         if orig_id and suffix and name:
             joint_map[(orig_id, suffix)] = name
-            
+
     processed_recordings = []
-    
+
     # Collect ALL target URDF joint names to ensure complete state
     all_urdf_joints = set()
     for info in generated_joints_info:
-        if info.get('name'):
-            all_urdf_joints.add(info['name'])
+        if info.get("name"):
+            all_urdf_joints.add(info["name"])
 
     for rec in recordings_raw:
         clean_rec = {
             "id": rec.get("id"),
             "name": rec.get("name"),
             "duration": rec.get("duration"),
-            "keyframes": []
+            "keyframes": [],
         }
-        
+
         for kf in rec.get("keyframes", []):
             clean_kf = {
                 "timestamp": kf.get("timestamp"),
-                "joints": {name: 0.0 for name in all_urdf_joints} # Backfill default 0.0
+                "joints": {
+                    name: 0.0 for name in all_urdf_joints
+                },  # Backfill default 0.0
             }
-            
+
             for joint_id, values in kf.get("jointValues", {}).items():
                 if joint_id not in robot_data.joints:
                     continue
-                
+
                 # 1. Check for Rotational DOFs (roll, pitch, yaw)
-                for axis in ['roll', 'pitch', 'yaw']:
+                for axis in ["roll", "pitch", "yaw"]:
                     if (joint_id, axis) in joint_map:
                         urdf_name = joint_map[(joint_id, axis)]
                         val = values.get(axis, 0.0)
                         clean_kf["joints"][urdf_name] = val
-                        
+
                 # 2. Check for Prismatic DOF ('prism')
-                if (joint_id, 'prism') in joint_map:
-                    urdf_name = joint_map[(joint_id, 'prism')]
+                if (joint_id, "prism") in joint_map:
+                    urdf_name = joint_map[(joint_id, "prism")]
                     # Frontend calls it 'displacement'
-                    val = values.get('displacement', 0.0)
+                    val = values.get("displacement", 0.0)
                     clean_kf["joints"][urdf_name] = val
 
             clean_rec["keyframes"].append(clean_kf)
-        
+
         processed_recordings.append(clean_rec)
-            
+
     return processed_recordings
+
 
 def generate_ros2_playback_node(pkg_name: str) -> str:
     """Generates ROS 2 python node for playback."""
@@ -207,6 +212,7 @@ def main(args=None):
 if __name__ == '__main__':
     main()
 """
+
 
 def generate_mujoco_playback_script(model_filename: str) -> str:
     """Generates MuJoCo python script."""
@@ -382,6 +388,7 @@ else:
     if not sensor_history and model.nsensor > 0:
         print("No sensor data captured.")
 """
+
 
 def generate_mujoco_interactive_script(model_filename: str) -> str:
     """Generates MuJoCo python script for interactive control + LIVE sensor plotting with HIERARCHICAL UI."""
@@ -691,7 +698,7 @@ plt.show()
 
 def generate_replay_script(recording_id: str, recording_name: str) -> str:
     """Generates a python script to replay a specific recording in MuJoCo."""
-    sanitized_name = re.sub(r'[^a-zA-Z0-9_]', '_', recording_name)
+    sanitized_name = re.sub(r"[^a-zA-Z0-9_]", "_", recording_name)
     return f"""
 import mujoco
 import mujoco.viewer
@@ -747,6 +754,7 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
         viewer.sync()
 """
 
+
 def generate_demo_script(python_script_name: str) -> str:
     """
     Generates a bash script that:
@@ -784,7 +792,10 @@ echo "Running interactive viewer..."
 python3 {python_script_name} "$@"
 """
 
-def generate_torque_launch_script(python_script_name: str, default_rec_idx: int = 0) -> str:
+
+def generate_torque_launch_script(
+    python_script_name: str, default_rec_idx: int = 0
+) -> str:
     """
     Generates a bash script that sets up the environment and runs the torque replay.
     Includes interactive mode selection.
@@ -852,18 +863,24 @@ else
 fi
 """
 
+
 def generate_mujoco_torque_replay_script(model_filename: str) -> str:
     """Generates MuJoCo python script for Replay with Real-time Torque Visualization and Interactive Tuning."""
     return f"""
 import time
 import json
-import mujoco
-import mujoco.viewer
-import numpy as np
 import os
 import argparse
 import sys
 import csv
+
+# Set rendering backend (try osmesa for headless servers)
+if 'MUJOCO_GL' not in os.environ:
+    os.environ['MUJOCO_GL'] = 'osmesa'
+
+import mujoco
+import mujoco.viewer
+import numpy as np
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning)
 
@@ -1234,17 +1251,23 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
 csv_file.close()
 """
 
+
 def generate_mujoco_motor_validation_script(model_filename: str) -> str:
     """Generates Mode 2: Motor Sizing Validation Script (Separate from Mode 1 and 3)"""
     return f"""
 import time
 import json
-import mujoco
-import mujoco.viewer
-import numpy as np
 import os
 import argparse
 import csv
+
+# Set rendering backend (try osmesa for headless servers)
+if 'MUJOCO_GL' not in os.environ:
+    os.environ['MUJOCO_GL'] = 'osmesa'
+
+import mujoco
+import mujoco.viewer
+import numpy as np
 import warnings
 warnings.filterwarnings('ignore', category=UserWarning)
 
@@ -1508,14 +1531,14 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
             writer.writerow([elapsed] + joint_vals)
             
             if HAS_MATPLOTLIB:
-                    ax.clear()
-                    ax.set_title(f"Motor Validation T={{elapsed:.2f}}s")
-                    ax.set_zlim(-20, 20)
-                    # Simple visualization placeholder
-                    fig.canvas.draw_idle()
-                    fig.canvas.flush_events()
-                
-                last_print = now
+                ax.clear()
+                ax.set_title(f"Motor Validation T={{elapsed:.2f}}s")
+                ax.set_zlim(-20, 20)
+                # Simple visualization placeholder
+                fig.canvas.draw_idle()
+                fig.canvas.flush_events()
+            
+            last_print = now
 
 csv_file.close()
 print(f"Motor validation complete. Log saved to {{log_file_name}}")
