@@ -79,6 +79,7 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
     sensors = []
     generated_joints_info = []
     actuator_counter = {}  # Track actuator names to avoid duplicates
+    joint_counter = {}  # Track joint names to avoid duplicates
 
     def build_body(link_id: str, parent_joint_id: Optional[str] = None, indent_level: int = 2):
         indent = '  ' * indent_level
@@ -134,6 +135,15 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                          suffix = f"_{dof_name}" if len(active_axes) > 1 else ""
                          joint_xml_name = f"{joint.name}{suffix}"
                          
+                         # Ensure unique joint name
+                         if joint_xml_name in joint_counter:
+                             joint_counter[joint_xml_name] += 1
+                             new_joint_name = f"{joint_xml_name}_{joint_counter[joint_xml_name]}"
+                             print(f"WARNING: Duplicate joint name '{joint_xml_name}' detected. Renamed to '{new_joint_name}'")
+                             joint_xml_name = new_joint_name
+                         else:
+                             joint_counter[joint_xml_name] = 0
+                         
                          limit = joint.limits.get(dof_name)
                          range_str = ""
                          if limit:
@@ -172,27 +182,37 @@ def generate_mjcf_xml(robot: RobotData, robot_name: str, mesh_files_map: Dict[st
                     if curr_limit:
                         range_str = f'range="{curr_limit.lower} {curr_limit.upper}"'
                     
-                    xml.append(f'{indent}  <joint name="{joint.name}" type="slide" axis="{axis_str}" {range_str} />')
+                    # Ensure unique joint name
+                    joint_xml_name = joint.name
+                    if joint_xml_name in joint_counter:
+                        joint_counter[joint_xml_name] += 1
+                        new_joint_name = f"{joint_xml_name}_{joint_counter[joint_xml_name]}"
+                        print(f"WARNING: Duplicate joint name '{joint_xml_name}' detected. Renamed to '{new_joint_name}'")
+                        joint_xml_name = new_joint_name
+                    else:
+                        joint_counter[joint_xml_name] = 0
+                    
+                    xml.append(f'{indent}  <joint name="{joint_xml_name}" type="slide" axis="{axis_str}" {range_str} />')
                     
                     ctrl_range = range_str.replace("range=", "ctrlrange=") if range_str else 'ctrlrange="-1 1"'
                     
                     # Ensure unique actuator name
-                    act_name = f"{joint.name}_act"
+                    act_name = f"{joint_xml_name}_act"
                     if act_name in actuator_counter:
                         actuator_counter[act_name] += 1
-                        new_act_name = f"{joint.name}_act_{actuator_counter[act_name]}"
+                        new_act_name = f"{joint_xml_name}_act_{actuator_counter[act_name]}"
                         print(f"WARNING: Duplicate actuator name '{act_name}' detected. Renamed to '{new_act_name}'")
                         act_name = new_act_name
                     else:
                         actuator_counter[act_name] = 0
                     
-                    actuators.append(f'{indent}    <position name="{act_name}" joint="{joint.name}" kp="500" kv="30" {ctrl_range}/>')
+                    actuators.append(f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" kp="500" kv="30" {ctrl_range}/>')
 
                     # Capture Info for Replay Mapping
                     generated_joints_info.append({
                         'original_id': parent_joint_id,
                         'suffix': 'prism',
-                        'name': joint.name
+                        'name': joint_xml_name
                     })
 
         # --- Joint Visuals ---
