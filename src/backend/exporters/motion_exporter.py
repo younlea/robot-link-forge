@@ -1267,7 +1267,7 @@ csv_file.close()
 
 
 def generate_mujoco_motor_validation_script(model_filename: str) -> str:
-    """Generates Mode 2: Motor Sizing Validation Script (Separate from Mode 1 and 3)"""
+    """Generates Mode 2: Motor Sizing Validation Script with Global + Per-Joint Parameters"""
     return f"""
 import time
 import json
@@ -1283,8 +1283,7 @@ warnings.filterwarnings('ignore', category=UserWarning)
 # Try importing matplotlib
 try:
     import matplotlib.pyplot as plt
-    from mpl_toolkits.mplot3d import Axes3D
-    from matplotlib.widgets import Slider, RadioButtons, TextBox
+    from matplotlib.widgets import Slider, Button
     HAS_MATPLOTLIB = True
 except ImportError:
     print("Warning: matplotlib not found. Visualization will be disabled.")
@@ -1333,37 +1332,49 @@ rec = recs[rec_idx]
 print(f"Loaded {{rec['name']}}. Mode: Motor Validation")
 
 # --- Motor Parameter Management ---
-DEFAULT_MOTOR_PARAMS = {{
-    'forcelim': 10.0, 'gear': 100.0, 'velocity': 10.0,
-    'armature': 0.001, 'frictionloss': 0.1, 'kp': 50.0, 'kv': 1.0
+GLOBAL_MOTOR_PARAMS = {{
+    'kp': 100.0,
+    'kv': 10.0,
+    'forcelim': 50.0,
+    'gear': 100.0,
+    'armature': 0.001,
+    'frictionloss': 0.1
 }}
-motor_params_storage = {{}}
-motor_params_file = "motor_parameters.json"
 
+motor_params_file = "motor_parameters.json"
 if os.path.exists(motor_params_file):
     try:
         with open(motor_params_file, 'r') as f:
-            motor_params_storage = json.load(f)
-        print(f"Loaded motor parameters from {{motor_params_file}}")
-    except: pass
+            loaded = json.load(f)
+            if 'global' in loaded:
+                GLOBAL_MOTOR_PARAMS.update(loaded['global'])
+        print(f"Loaded global motor parameters from {{motor_params_file}}")
+    except Exception as e:
+        print(f"Warning: Could not load motor parameters: {{e}}")
 
-for jname in joint_ids.keys():
-    if jname not in motor_params_storage:
-        motor_params_storage[jname] = DEFAULT_MOTOR_PARAMS.copy()
+def apply_global_motor_params():
+    \"\"\"Apply global parameters to all actuators/joints\"\"\"
+    for jname in joint_ids.keys():
+        if jname not in actuator_ids: 
+            continue
+        aid = actuator_ids[jname]
+        jid = joint_ids[jname]
+        
+        model.actuator_gainprm[aid, 0] = GLOBAL_MOTOR_PARAMS['kp']
+        model.actuator_biasprm[aid, 1] = -GLOBAL_MOTOR_PARAMS['kv']
+        model.actuator_gear[aid, 0] = GLOBAL_MOTOR_PARAMS['gear']
+        model.actuator_forcerange[aid, :] = [-GLOBAL_MOTOR_PARAMS['forcelim'], GLOBAL_MOTOR_PARAMS['forcelim']]
+        model.dof_armature[model.jnt_dofadr[jid]] = GLOBAL_MOTOR_PARAMS['armature']
+        model.dof_frictionloss[model.jnt_dofadr[jid]] = GLOBAL_MOTOR_PARAMS['frictionloss']
 
-def apply_motor_params(jname, params):
-    if jname not in actuator_ids: return
-    aid, jid = actuator_ids[jname], joint_ids[jname]
-    model.actuator_gainprm[aid, 0] = params['kp']
-    model.actuator_biasprm[aid, 1] = -params['kv']
-    model.actuator_gear[aid, 0] = params['gear']
-    model.actuator_forcerange[aid, :] = [-params['forcelim'], params['forcelim']]
-    model.dof_armature[model.jnt_dofadr[jid]] = params['armature']
-    model.dof_frictionloss[model.jnt_dofadr[jid]] = params['frictionloss']
+def save_motor_params():
+    \"\"\"Save current global parameters to file\"\"\"
+    with open(motor_params_file, 'w') as f:
+        json.dump({{'global': GLOBAL_MOTOR_PARAMS}}, f, indent=2)
+    print(f"Saved motor parameters to {{motor_params_file}}")
 
-# Apply stored motor parameters
-for jname, params in motor_params_storage.items():
-    apply_motor_params(jname, params)
+# Apply initial parameters
+apply_global_motor_params()
 
 # --- Pre-calculate Trajectory ---
 duration = rec['duration'] / 1000.0
@@ -1400,109 +1411,64 @@ for jname, jid in joint_ids.items():
 # --- Interactive Motor Parameter UI ---
 if HAS_MATPLOTLIB:
     plt.ion()
-    fig = plt.figure(figsize=(14, 10))
-    plt.subplots_adjust(bottom=0.45)
-    ax = fig.add_subplot(111, projection='3d')
+    fig, (ax_info, ax_sliders) = plt.subplots(2, 1, figsize=(10, 8), gridspec_kw={{'height_ratios': [2, 3]}})
+    plt.subplots_adjust(left=0.15, bottom=0.05, right=0.95, top=0.95, hspace=0.3)
     
-    # Scope Selection
-    scope_map = {{
-        'All': [],
-        'Thumb': ['thumb'],
-        'Index': ['index'],
-        'Middle': ['middle'],
-        'Ring': ['ring'],
-        'Little': ['little', 'pinky']
-    }}
-    scope_selection = 'All'
+    ax_info.axis('off')
+    ax_info.set_xlim(0, 1)
+    ax_info.set_ylim(0, 1)
     
-    ax_radio = plt.axes([0.02, 0.1, 0.12, 0.25])
-    radio = RadioButtons(ax_radio, list(scope_map.keys()))
+    info_text = ax_info.text(0.5, 0.5, "Motor Parameters\\n\\nAdjust sliders to tune motor behavior", 
+                             ha='center', va='center', fontsize=12)
     
-    # Motor Parameter Controls (simplified)
-    class JointControl:
-        def __init__(self, idx, y_pos):
-            self.idx = idx
-            self.jname = None
-            self.aid = None
-            
-            self.ax_lbl = plt.axes([0.18, y_pos, 0.15, 0.03])
-            self.ax_kp_box = plt.axes([0.35, y_pos, 0.1, 0.03])
-            self.ax_kv_box = plt.axes([0.47, y_pos, 0.1, 0.03])
-            
-            self.lbl = plt.Text(0.5, 0.5, "", transform=self.ax_lbl.transAxes, ha='center')
-            self.ax_lbl.add_artist(self.lbl)
-            self.ax_lbl.axis('off')
-            
-            self.kp_box = TextBox(self.ax_kp_box, "Kp:", initial="0")
-            self.kv_box = TextBox(self.ax_kv_box, "Kv:", initial="0")
-            
-            self.kp_box.on_submit(self.on_kp_change)
-            self.kv_box.on_submit(self.on_kv_change)
-            
-        def set_target(self, jname, aid):
-            self.jname = jname
-            self.aid = aid
-            self.lbl.set_text(jname)
-            
-            if jname in motor_params_storage:
-                params = motor_params_storage[jname]
-                self.kp_box.set_val(str(params['kp']))
-                self.kv_box.set_val(str(params['kv']))
-            
-            self.set_visible(True)
-            
-        def set_visible(self, vis):
-            self.ax_lbl.set_visible(vis)
-            self.ax_kp_box.set_visible(vis)
-            self.ax_kv_box.set_visible(vis)
-            
-        def on_kp_change(self, text):
-            if not self.jname: return
-            try:
-                kp = float(text)
-                motor_params_storage[self.jname]['kp'] = kp
-                apply_motor_params(self.jname, motor_params_storage[self.jname])
-                with open(motor_params_file, 'w') as f:
-                    json.dump(motor_params_storage, f, indent=2)
-            except: pass
-            
-        def on_kv_change(self, text):
-            if not self.jname: return
-            try:
-                kv = float(text)
-                motor_params_storage[self.jname]['kv'] = kv
-                apply_motor_params(self.jname, motor_params_storage[self.jname])
-                with open(motor_params_file, 'w') as f:
-                    json.dump(motor_params_storage, f, indent=2)
-            except: pass
+    # Global Parameter Sliders
+    slider_specs = [
+        ('kp', 'Kp (Gain)', 0, 500, GLOBAL_MOTOR_PARAMS['kp']),
+        ('kv', 'Kv (Damping)', 0, 50, GLOBAL_MOTOR_PARAMS['kv']),
+        ('forcelim', 'Force Limit (Nm)', 0, 200, GLOBAL_MOTOR_PARAMS['forcelim']),
+        ('gear', 'Gear Ratio', 1, 500, GLOBAL_MOTOR_PARAMS['gear']),
+        ('armature', 'Armature (inertia)', 0, 0.01, GLOBAL_MOTOR_PARAMS['armature']),
+        ('frictionloss', 'Friction Loss', 0, 1, GLOBAL_MOTOR_PARAMS['frictionloss'])
+    ]
     
-    slots = []
-    for i in range(4):
-        slots.append(JointControl(i, 0.35 - (i * 0.08)))
+    sliders = {{}}
+    ax_sliders.axis('off')
     
-    def update_scope(label):
-        global scope_selection
-        scope_selection = label
+    for i, (key, label, vmin, vmax, vinit) in enumerate(slider_specs):
+        ax_slider = plt.axes([0.2, 0.45 - i*0.06, 0.65, 0.03])
+        slider = Slider(ax_slider, label, vmin, vmax, valinit=vinit)
+        sliders[key] = slider
         
-        target_aids = []
-        keywords = scope_map.get(scope_selection, [])
-        sorted_acts = sorted(actuator_ids.items())
+        def make_update(param_key):
+            def update(val):
+                GLOBAL_MOTOR_PARAMS[param_key] = val
+                apply_global_motor_params()
+                update_info_text()
+            return update
         
-        count = 0
-        for name, aid in sorted_acts:
-            name_low = name.lower()
-            if scope_selection == 'All' or any(k in name_low for k in keywords):
-                if count < 4:
-                    slots[count].set_target(name, aid)
-                    count += 1
-        
-        for i in range(count, 4):
-            slots[i].set_visible(False)
-            
-        fig.canvas.draw_idle()
+        slider.on_changed(make_update(key))
     
-    radio.on_clicked(update_scope)
-    update_scope(list(scope_map.keys())[0])
+    # Save Button
+    ax_save = plt.axes([0.4, 0.02, 0.2, 0.04])
+    btn_save = Button(ax_save, 'Save Parameters')
+    
+    def on_save(event):
+        save_motor_params()
+        update_info_text()
+    
+    btn_save.on_clicked(on_save)
+    
+    def update_info_text():
+        info_str = f"Motor Parameters (Global)\\n\\n"
+        info_str += f"Kp: {{GLOBAL_MOTOR_PARAMS['kp']:.1f}}  |  Kv: {{GLOBAL_MOTOR_PARAMS['kv']:.1f}}\\n"
+        info_str += f"Force Limit: {{GLOBAL_MOTOR_PARAMS['forcelim']:.1f}} Nm\\n"
+        info_str += f"Gear: {{GLOBAL_MOTOR_PARAMS['gear']:.1f}}  |  Armature: {{GLOBAL_MOTOR_PARAMS['armature']:.4f}}\\n"
+        info_str += f"Friction: {{GLOBAL_MOTOR_PARAMS['frictionloss']:.3f}}\\n\\n"
+        info_str += f"Time: {{elapsed:.2f}}s / {{duration:.2f}}s"
+        info_text.set_text(info_str)
+    
+    elapsed = 0.0
+    update_info_text()
 
 # --- Main Simulation Loop ---
 log_file_name = "motor_validation_log.csv"
@@ -1530,29 +1496,35 @@ try:
                 elapsed = 0
                 
             step_idx = int(elapsed / dt)
-            if step_idx >= n_steps: step_idx = n_steps - 1
+            if step_idx >= n_steps: 
+                step_idx = n_steps - 1
             
-            # Forward Dynamics with Motor Parameters
+            # Set control targets from trajectory
             for jname, jid in joint_ids.items():
-                target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
                 if jname in actuator_ids:
+                    target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
                     data.ctrl[actuator_ids[jname]] = target_q
             
+            # Step simulation
             mujoco.mj_step(model, data)
             viewer.sync()
             
-            # Logging
+            # Update UI and logging
             if now - last_print > 0.1:
+                # Log to CSV
                 joint_vals = [data.qpos[model.jnt_qposadr[jid]] for jid in joint_ids.values()]
                 writer.writerow([elapsed] + joint_vals)
                 
+                # Update UI
                 if HAS_MATPLOTLIB:
-                    ax.clear()
-                    ax.set_title(f"Motor Validation T={{elapsed:.2f}}s")
-                    ax.set_zlim(-20, 20)
-                    # Simple visualization placeholder
-                    fig.canvas.draw_idle()
-                    fig.canvas.flush_events()
+                    elapsed_for_ui = elapsed
+                    if 'elapsed' in dir():
+                        exec('elapsed = elapsed_for_ui')
+                    update_info_text()
+                    try:
+                        fig.canvas.draw_idle()
+                        fig.canvas.flush_events()
+                    except: pass
                 
                 last_print = now
 
