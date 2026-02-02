@@ -1517,13 +1517,20 @@ def save_motor_params():
 apply_all_motor_params()
 
 # Debug: Print actuator configuration
-print("\\nActuator Configuration:")
+print("\\nActuator Configuration (first 3 joints):")
+print(f"Total joints: {{len(joint_ids)}}, Total actuators: {{len(actuator_ids)}}\")
 for jname in list(joint_ids.keys())[:3]:  # Print first 3 joints
     if jname in actuator_ids:
         aid = actuator_ids[jname]
+        jid = joint_ids[jname]
         params = get_joint_params(jname)
-        print(f"  {{jname}}: kp={{model.actuator_gainprm[aid, 0]:.1f}}, kv={{-model.actuator_biasprm[aid, 1]:.1f}}, "
-              f"gear={{model.actuator_gear[aid, 0]:.1f}}, forcelim={{model.actuator_forcerange[aid, 1]:.1f}}\")
+        print(f"  {{jname}}:")
+        print(f"    actuator_id={{aid}}, joint_id={{jid}}\")
+        print(f"    kp={{model.actuator_gainprm[aid, 0]:.1f}}, kv={{-model.actuator_biasprm[aid, 1]:.1f}}\")
+        print(f"    gear={{model.actuator_gear[aid, 0]:.1f}}, forcelim={{model.actuator_forcerange[aid, 1]:.1f}}\")
+        print(f"    joint qpos0={{data.qpos[model.jnt_qposadr[jid]]:.3f}}\")
+    else:
+        print(f"  {{jname}}: NO ACTUATOR FOUND\")
 
 # --- Pre-calculate Trajectory ---
 duration = rec['duration'] / 1000.0
@@ -1752,6 +1759,9 @@ if HAS_MATPLOTLIB:
             ax_plot_torque.legend(loc='upper right')
             ax_plot_torque.grid(True, alpha=0.3)
             ax_plot_torque.set_xlim(max(0, elapsed - 5), elapsed + 0.5)
+            # Auto-scale Y axis but ensure it shows 0
+            max_val = max(plot_history['max_torque']) if plot_history['max_torque'] else 10
+            ax_plot_torque.set_ylim(0, max(max_val * 1.2, 10))
     
     # Initialize elapsed before UI setup
     elapsed = 0.0
@@ -1824,16 +1834,24 @@ try:
             mujoco.mj_step(model, data)
             viewer.sync()
             
-            # Debug first step
+            # Debug first step with detailed actuator info
             if first_step_debug:
                 first_step_debug = False
-                print("\\nFirst step debug:")
-                for jname in list(joint_ids.keys())[:2]:
+                print("\\n=== First Step Debug (after mj_step) ===\")
+                for jname in list(joint_ids.keys())[:3]:
                     if jname in actuator_ids:
                         aid = actuator_ids[jname]
                         jid = joint_ids[jname]
-                        print(f"  {{jname}}: ctrl={{data.ctrl[aid]:.3f}}, qpos={{data.qpos[model.jnt_qposadr[jid]]:.3f}}, "
-                              f"force={{data.actuator_force[aid]:.3f}}, kp={{model.actuator_gainprm[aid,0]:.1f}}\")
+                        qadr = model.jnt_qposadr[jid]
+                        target = data.ctrl[aid]
+                        actual = data.qpos[qadr]
+                        error = target - actual
+                        force = data.actuator_force[aid]
+                        print(f"  {{jname}}:")
+                        print(f"    target={{target:.4f}}, actual={{actual:.4f}}, error={{error:.4f}}\")
+                        print(f"    force={{force:.4f}}, kp={{model.actuator_gainprm[aid,0]:.1f}}\")
+                        print(f"    expected_force = kp * error = {{model.actuator_gainprm[aid,0] * error:.4f}}\")
+                print()
             
             # Collect analysis data
             tracking_errors = []

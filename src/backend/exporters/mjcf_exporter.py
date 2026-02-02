@@ -214,8 +214,10 @@ def generate_mjcf_xml(
                         else:
                             actuator_counter[act_name] = 0
 
+                        # Add forcelimited and forcerange so runtime can modify limits
                         actuators.append(
-                            f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" kp="500" kv="30" {ctrl_range}/>'
+                            f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
+                            f'kp="500" kv="30" forcelimited="true" forcerange="-100 100" {ctrl_range}/>'
                         )
 
                         # Capture Info for Replay Mapping
@@ -275,8 +277,10 @@ def generate_mjcf_xml(
                     else:
                         actuator_counter[act_name] = 0
 
+                    # Add forcelimited and forcerange for runtime modification
                     actuators.append(
-                        f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" kp="500" kv="30" {ctrl_range}/>'
+                        f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
+                        f'kp="500" kv="30" forcelimited="true" forcerange="-100 100" {ctrl_range}/>'
                     )
 
                     # Capture Info for Replay Mapping
