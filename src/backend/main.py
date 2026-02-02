@@ -41,6 +41,7 @@ from exporters.motion_exporter import (
     generate_mujoco_torque_replay_script,
     generate_mujoco_motor_validation_script,
     generate_torque_launch_script,
+    generate_motor_analysis_script,
 )
 from exporters.stl_utils import ensure_binary_stl
 
@@ -1223,6 +1224,14 @@ python3 replay_recording.py {i}
                     os.path.join(package_dir, "replay_motor_validation.py"), "w"
                 ) as f:
                     f.write(motor_py)
+                
+                # Generate Motor Analysis Script
+                analysis_py = generate_motor_analysis_script()
+                with open(
+                    os.path.join(package_dir, "analyze_motor_validation.py"), "w"
+                ) as f:
+                    f.write(analysis_py)
+                os.chmod(os.path.join(package_dir, "analyze_motor_validation.py"), 0o755)
 
                 # Generate Bash Script for Torque Replay (Generic)
                 torque_sh = f"""#!/bin/bash
@@ -2015,6 +2024,12 @@ python3 replay_mujoco.py {i}
         motor_py = generate_mujoco_motor_validation_script(mjcf_filename)
         with open(os.path.join(package_dir, "replay_motor_validation.py"), "w") as f:
             f.write(motor_py)
+        
+        # Generate Motor Analysis Script
+        analysis_py = generate_motor_analysis_script()
+        with open(os.path.join(package_dir, "analyze_motor_validation.py"), "w") as f:
+            f.write(analysis_py)
+        os.chmod(os.path.join(package_dir, "analyze_motor_validation.py"), 0o755)
 
         # Generate Bash Script for Torque Replay (Generic)
         torque_sh = generate_torque_launch_script("replay_with_torque.py", 0)

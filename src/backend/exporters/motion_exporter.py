@@ -793,6 +793,114 @@ python3 {python_script_name} "$@"
 """
 
 
+def generate_motor_analysis_script() -> str:
+    """Generates post-processing analysis script for motor validation data"""
+    return """
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import os
+
+def analyze_motor_validation(csv_file='motor_validation_log.csv'):
+    \"\"\"
+    Analyze motor validation log and generate comprehensive report
+    \"\"\"
+    if not os.path.exists(csv_file):
+        print(f"Error: {{csv_file}} not found. Run motor validation first (Mode 2).")
+        return
+    
+    print(f"Loading data from {{csv_file}}...")
+    df = pd.read_csv(csv_file)
+    
+    # Extract metrics
+    time = df['Time'].values
+    rms_error = df['RMS_tracking_error'].values
+    max_torque = df['Max_torque'].values
+    num_saturated = df['Num_saturated'].values
+    
+    # Analysis
+    avg_rms_error = np.mean(rms_error)
+    max_rms_error = np.max(rms_error)
+    avg_torque = np.mean(max_torque)
+    peak_torque = np.max(max_torque)
+    saturation_events = np.sum(num_saturated > 0)
+    saturation_pct = 100 * saturation_events / len(time) if len(time) > 0 else 0
+    
+    # Thermal load (simplified RMS torque)
+    thermal_rms = np.sqrt(np.mean(max_torque ** 2))
+    
+    print("\\n" + "="*60)
+    print("MOTOR VALIDATION ANALYSIS REPORT")
+    print("="*60)
+    print(f"\\nTracking Performance:")
+    print(f"  Average RMS Error: {{avg_rms_error:.6f}} rad ({{np.rad2deg(avg_rms_error):.3f}} deg)")
+    print(f"  Maximum RMS Error: {{max_rms_error:.6f}} rad ({{np.rad2deg(max_rms_error):.3f}} deg)")
+    print(f"\\nTorque Analysis:")
+    print(f"  Average Torque: {{avg_torque:.2f}} Nm")
+    print(f"  Peak Torque: {{peak_torque:.2f}} Nm")
+    print(f"  RMS Thermal Load: {{thermal_rms:.2f}} Nm")
+    print(f"\\nSaturation:")
+    print(f"  Saturation Events: {{saturation_events}} / {{len(time)}} samples ({{saturation_pct:.1f}}%)")
+    
+    if saturation_pct > 10:
+        print(f"  ⚠️ WARNING: High saturation rate! Consider increasing force limit.")
+    elif saturation_pct > 0:
+        print(f"  ⚠️ CAUTION: Some saturation detected.")
+    else:
+        print(f"  ✓ No saturation detected.")
+    
+    print("\\n" + "="*60)
+    
+    # Generate plots
+    fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+    
+    # Tracking error
+    axes[0].plot(time, rms_error, 'b-', linewidth=1.5)
+    axes[0].set_ylabel('RMS Tracking Error (rad)')
+    axes[0].set_title('Tracking Performance Over Time')
+    axes[0].grid(True, alpha=0.3)
+    axes[0].axhline(y=avg_rms_error, color='r', linestyle='--', label=f'Average: {{avg_rms_error:.6f}}')
+    axes[0].legend()
+    
+    # Torque
+    axes[1].plot(time, max_torque, 'r-', linewidth=1.5, label='Max Torque')
+    axes[1].axhline(y=avg_torque, color='orange', linestyle='--', label=f'Average: {{avg_torque:.2f}} Nm')
+    axes[1].set_ylabel('Torque (Nm)')
+    axes[1].set_title('Actuator Torque')
+    axes[1].grid(True, alpha=0.3)
+    axes[1].legend()
+    
+    # Saturation
+    axes[2].plot(time, num_saturated, 'orange', linewidth=1.5)
+    axes[2].set_xlabel('Time (s)')
+    axes[2].set_ylabel('Number of Saturated Actuators')
+    axes[2].set_title('Torque Saturation Events')
+    axes[2].grid(True, alpha=0.3)
+    axes[2].fill_between(time, 0, num_saturated, alpha=0.3, color='orange')
+    
+    plt.tight_layout()
+    
+    # Save figure
+    output_file = csv_file.replace('.csv', '_analysis.png')
+    plt.savefig(output_file, dpi=150, bbox_inches='tight')
+    print(f"\\nAnalysis plot saved to: {{output_file}}")
+    
+    plt.show()
+    
+    return {{
+        'avg_rms_error': avg_rms_error,
+        'peak_torque': peak_torque,
+        'thermal_rms': thermal_rms,
+        'saturation_pct': saturation_pct
+    }}
+
+if __name__ == '__main__':
+    import sys
+    csv_file = sys.argv[1] if len(sys.argv) > 1 else 'motor_validation_log.csv'
+    analyze_motor_validation(csv_file)
+"""
+
+
 def generate_torque_launch_script(
     python_script_name: str, default_rec_idx: int = 0
 ) -> str:
@@ -1411,15 +1519,31 @@ for jname, jid in joint_ids.items():
 # --- Interactive Motor Parameter UI ---
 if HAS_MATPLOTLIB:
     plt.ion()
-    fig, (ax_info, ax_sliders) = plt.subplots(2, 1, figsize=(10, 8), gridspec_kw={{'height_ratios': [2, 3]}})
-    plt.subplots_adjust(left=0.15, bottom=0.05, right=0.95, top=0.95, hspace=0.3)
+    fig = plt.figure(figsize=(16, 10))
+    
+    # Create 3 panels: sliders, real-time plots, info
+    gs = fig.add_gridspec(3, 2, height_ratios=[1, 2, 1], width_ratios=[1, 1], 
+                          hspace=0.3, wspace=0.3, left=0.08, right=0.95, top=0.95, bottom=0.05)
+    
+    ax_info = fig.add_subplot(gs[0, :])
+    ax_plot_tracking = fig.add_subplot(gs[1, 0])
+    ax_plot_torque = fig.add_subplot(gs[1, 1])
+    ax_sliders = fig.add_subplot(gs[2, :])
     
     ax_info.axis('off')
     ax_info.set_xlim(0, 1)
     ax_info.set_ylim(0, 1)
     
     info_text = ax_info.text(0.5, 0.5, "Motor Parameters\\n\\nAdjust sliders to tune motor behavior", 
-                             ha='center', va='center', fontsize=12)
+                             ha='center', va='center', fontsize=11)
+    
+    # Real-time data storage for plots
+    plot_history = {{
+        'time': [],
+        'tracking_error': [],
+        'max_torque': [],
+        'saturated_count': 0
+    }}
     
     # Global Parameter Sliders
     slider_specs = [
@@ -1435,8 +1559,8 @@ if HAS_MATPLOTLIB:
     ax_sliders.axis('off')
     
     for i, (key, label, vmin, vmax, vinit) in enumerate(slider_specs):
-        ax_slider = plt.axes([0.2, 0.45 - i*0.06, 0.65, 0.03])
-        slider = Slider(ax_slider, label, vmin, vmax, valinit=vinit)
+        ax_slider = plt.axes([0.15, 0.12 - i*0.015, 0.7, 0.01])
+        slider = Slider(ax_slider, label, vmin, vmax, valinit=vinit, valstep=(vmax-vmin)/1000.0)
         sliders[key] = slider
         
         def make_update(param_key):
@@ -1449,8 +1573,8 @@ if HAS_MATPLOTLIB:
         slider.on_changed(make_update(key))
     
     # Save Button
-    ax_save = plt.axes([0.4, 0.02, 0.2, 0.04])
-    btn_save = Button(ax_save, 'Save Parameters')
+    ax_save = plt.axes([0.88, 0.02, 0.1, 0.02])
+    btn_save = Button(ax_save, 'Save Params')
     
     def on_save(event):
         save_motor_params()
@@ -1459,13 +1583,37 @@ if HAS_MATPLOTLIB:
     btn_save.on_clicked(on_save)
     
     def update_info_text():
-        info_str = f"Motor Parameters (Global)\\n\\n"
-        info_str += f"Kp: {{GLOBAL_MOTOR_PARAMS['kp']:.1f}}  |  Kv: {{GLOBAL_MOTOR_PARAMS['kv']:.1f}}\\n"
-        info_str += f"Force Limit: {{GLOBAL_MOTOR_PARAMS['forcelim']:.1f}} Nm\\n"
-        info_str += f"Gear: {{GLOBAL_MOTOR_PARAMS['gear']:.1f}}  |  Armature: {{GLOBAL_MOTOR_PARAMS['armature']:.4f}}\\n"
-        info_str += f"Friction: {{GLOBAL_MOTOR_PARAMS['frictionloss']:.3f}}\\n\\n"
+        info_str = f"Motor Validation - Real-time Analysis\\n"
+        info_str += f"Kp: {{GLOBAL_MOTOR_PARAMS['kp']:.1f}} | Kv: {{GLOBAL_MOTOR_PARAMS['kv']:.1f}} | "
+        info_str += f"Force Limit: {{GLOBAL_MOTOR_PARAMS['forcelim']:.1f}} Nm | "
+        info_str += f"Gear: {{GLOBAL_MOTOR_PARAMS['gear']:.0f}}\\n"
         info_str += f"Time: {{elapsed:.2f}}s / {{duration:.2f}}s"
+        if plot_history['saturated_count'] > 0:
+            info_str += f"  |  ⚠️ TORQUE SATURATION: {{plot_history['saturated_count']}} actuators"
         info_text.set_text(info_str)
+    
+    def update_plots():
+        # Tracking Error Plot
+        ax_plot_tracking.clear()
+        if len(plot_history['time']) > 0:
+            ax_plot_tracking.plot(plot_history['time'], plot_history['tracking_error'], 'b-', linewidth=2)
+            ax_plot_tracking.set_xlabel('Time (s)')
+            ax_plot_tracking.set_ylabel('RMS Tracking Error (rad)')
+            ax_plot_tracking.set_title('Tracking Performance')
+            ax_plot_tracking.grid(True, alpha=0.3)
+            ax_plot_tracking.set_xlim(max(0, elapsed - 5), elapsed + 0.5)
+        
+        # Torque Plot
+        ax_plot_torque.clear()
+        if len(plot_history['time']) > 0:
+            ax_plot_torque.plot(plot_history['time'], plot_history['max_torque'], 'r-', linewidth=2, label='Max Torque')
+            ax_plot_torque.axhline(y=GLOBAL_MOTOR_PARAMS['forcelim'], color='orange', linestyle='--', label='Force Limit')
+            ax_plot_torque.set_xlabel('Time (s)')
+            ax_plot_torque.set_ylabel('Torque (Nm)')
+            ax_plot_torque.set_title('Actuator Force')
+            ax_plot_torque.legend(loc='upper right')
+            ax_plot_torque.grid(True, alpha=0.3)
+            ax_plot_torque.set_xlim(max(0, elapsed - 5), elapsed + 0.5)
     
     elapsed = 0.0
     update_info_text()
@@ -1474,7 +1622,21 @@ if HAS_MATPLOTLIB:
 log_file_name = "motor_validation_log.csv"
 csv_file = open(log_file_name, 'w', newline='')
 writer = csv.writer(csv_file)
-writer.writerow(['Time'] + list(joint_ids.keys()))
+
+# Extended CSV header with analysis data
+header = ['Time']
+for jname in joint_ids.keys():
+    header.extend([
+        f'{{jname}}_target_pos',
+        f'{{jname}}_actual_pos',
+        f'{{jname}}_error',
+        f'{{jname}}_velocity',
+        f'{{jname}}_torque',
+        f'{{jname}}_ctrl_signal',
+        f'{{jname}}_saturated'
+    ])
+header.extend(['RMS_tracking_error', 'Max_torque', 'Num_saturated'])
+writer.writerow(header)
 
 # Debug: Print environment info
 print(f"DISPLAY: {{os.environ.get('DISPLAY', 'NOT SET')}}")
@@ -1494,6 +1656,11 @@ try:
             if elapsed > duration:
                 start_time = now
                 elapsed = 0
+                if HAS_MATPLOTLIB:
+                    plot_history['time'].clear()
+                    plot_history['tracking_error'].clear()
+                    plot_history['max_torque'].clear()
+                    plot_history['saturated_count'] = 0
                 
             step_idx = int(elapsed / dt)
             if step_idx >= n_steps: 
@@ -1509,16 +1676,74 @@ try:
             mujoco.mj_step(model, data)
             viewer.sync()
             
+            # Collect analysis data
+            tracking_errors = []
+            torques = []
+            saturated_count = 0
+            
             # Update UI and logging
             if now - last_print > 0.1:
-                # Log to CSV
-                joint_vals = [data.qpos[model.jnt_qposadr[jid]] for jid in joint_ids.values()]
-                writer.writerow([elapsed] + joint_vals)
+                # Collect detailed data for each joint
+                row_data = [elapsed]
                 
-                # Update UI
+                for jname, jid in joint_ids.items():
+                    qadr = model.jnt_qposadr[jid]
+                    dof_adr = model.jnt_dofadr[jid]
+                    
+                    target_pos = qpos_traj[step_idx, qadr]
+                    actual_pos = data.qpos[qadr]
+                    error = target_pos - actual_pos
+                    velocity = data.qvel[dof_adr]
+                    
+                    tracking_errors.append(error ** 2)
+                    
+                    # Get actuator force/torque
+                    torque = 0.0
+                    ctrl_signal = 0.0
+                    is_saturated = 0
+                    if jname in actuator_ids:
+                        aid = actuator_ids[jname]
+                        ctrl_signal = data.ctrl[aid]
+                        torque = data.actuator_force[aid]
+                        torques.append(abs(torque))
+                        
+                        # Check saturation
+                        if abs(torque) >= GLOBAL_MOTOR_PARAMS['forcelim'] * 0.95:
+                            is_saturated = 1
+                            saturated_count += 1
+                    
+                    row_data.extend([target_pos, actual_pos, error, velocity, torque, ctrl_signal, is_saturated])
+                
+                # Calculate metrics
+                rms_error = np.sqrt(np.mean(tracking_errors)) if tracking_errors else 0.0
+                max_torque = max(torques) if torques else 0.0
+                
+                row_data.extend([rms_error, max_torque, saturated_count])
+                writer.writerow(row_data)
+                
+                # Update real-time plots
                 if HAS_MATPLOTLIB:
-                    elapsed_for_ui = elapsed
-                    if 'elapsed' in dir():
+                    plot_history['time'].append(elapsed)
+                    plot_history['tracking_error'].append(rms_error)
+                    plot_history['max_torque'].append(max_torque)
+                    plot_history['saturated_count'] = saturated_count
+                    
+                    # Keep only last 50 data points for smooth plotting
+                    if len(plot_history['time']) > 500:
+                        plot_history['time'] = plot_history['time'][-500:]
+                        plot_history['tracking_error'] = plot_history['tracking_error'][-500:]
+                        plot_history['max_torque'] = plot_history['max_torque'][-500:]
+                    
+                    update_info_text()
+                    update_plots()
+                    
+                    try:
+                        fig.canvas.draw_idle()
+                        fig.canvas.flush_events()
+                    except: pass
+                
+                last_print = now
+
                         exec('elapsed = elapsed_for_ui')
                     update_info_text()
                     try:
