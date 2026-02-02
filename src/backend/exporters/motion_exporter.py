@@ -1698,13 +1698,13 @@ if HAS_MATPLOTLIB:
             ax_plot_torque.grid(True, alpha=0.3)
             ax_plot_torque.set_xlim(max(0, elapsed - 5), elapsed + 0.5)
     
+    # Initialize elapsed before UI setup
+    elapsed = 0.0
+    
     # Initialize UI
     on_joint_select('[GLOBAL]')
     plt.show(block=False)
     plt.pause(0.001)
-    
-    elapsed = 0.0
-    update_info_text()
 
 print("\\n=== Motor Validation Mode Started ===\")
 print(f"Duration: {{duration:.2f}}s | Joints: {{len(joint_ids)}} | CSV: motor_validation_log.csv\")
