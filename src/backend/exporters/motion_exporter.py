@@ -1581,6 +1581,8 @@ if HAS_MATPLOTLIB:
     # State
     selected_joint = None
     current_mode = 'global'  # 'global' or 'per_joint'
+    joint_page = 0
+    joints_per_page = 20
     
     # Real-time data storage
     plot_history = {{
@@ -1590,13 +1592,31 @@ if HAS_MATPLOTLIB:
         'saturated_count': 0
     }}
     
-    # Joint selector buttons (bottom left, below sliders)
+    # Joint selector with pagination
     from matplotlib.widgets import RadioButtons, Button
     
-    joint_list = ['[GLOBAL]'] + sorted(joint_ids.keys())
-    # Place radio buttons in dedicated area below sliders
-    ax_radio_joints = plt.axes([0.09, 0.10, 0.12, 0.18])
-    radio_joints = RadioButtons(ax_radio_joints, joint_list[:min(10, len(joint_list))], activecolor='blue')
+    joint_list_full = ['[GLOBAL]'] + sorted(joint_ids.keys())
+    total_pages = (len(joint_list_full) + joints_per_page - 1) // joints_per_page
+    
+    def get_current_page_joints():
+        start = joint_page * joints_per_page
+        end = min(start + joints_per_page, len(joint_list_full))
+        return joint_list_full[start:end]
+    
+    # RadioButtons area - expanded to show more items
+    ax_radio_joints = plt.axes([0.09, 0.10, 0.14, 0.22])
+    radio_joints = RadioButtons(ax_radio_joints, get_current_page_joints(), activecolor='blue')
+    
+    # Pagination buttons (below radio buttons)
+    ax_btn_prev = plt.axes([0.09, 0.06, 0.06, 0.025])
+    btn_prev = Button(ax_btn_prev, '< Prev')
+    
+    ax_page_text_ax = plt.axes([0.155, 0.06, 0.04, 0.025])
+    ax_page_text_ax.axis('off')
+    page_text = ax_page_text_ax.text(0.5, 0.5, f'{{joint_page+1}}/{{total_pages}}', ha='center', va='center', fontsize=9)
+    
+    ax_btn_next = plt.axes([0.20, 0.06, 0.06, 0.025])
+    btn_next = Button(ax_btn_next, 'Next >')
     
     # Parameter sliders (left side, above joint selector)
     slider_specs = [
@@ -1634,6 +1654,28 @@ if HAS_MATPLOTLIB:
     def get_current_slider_values():
         \"\"\"Get current slider values as dict\"\"\"
         return {{key: sliders[key].val for key in sliders}}
+    
+    def update_radio_buttons():
+        \"\"\"Recreate RadioButtons with current page joints\"\"\"
+        global radio_joints, ax_radio_joints
+        ax_radio_joints.clear()
+        ax_radio_joints.set_position([0.09, 0.10, 0.14, 0.22])
+        radio_joints = RadioButtons(ax_radio_joints, get_current_page_joints(), activecolor='blue')
+        radio_joints.on_clicked(on_joint_select)
+        page_text.set_text(f'{{joint_page+1}}/{{total_pages}}')
+        fig.canvas.draw_idle()
+    
+    def on_prev_page(event):
+        global joint_page
+        if joint_page > 0:
+            joint_page -= 1
+            update_radio_buttons()
+    
+    def on_next_page(event):
+        global joint_page
+        if joint_page < total_pages - 1:
+            joint_page += 1
+            update_radio_buttons()
     
     def on_joint_select(label):
         global selected_joint, current_mode
@@ -1674,11 +1716,14 @@ if HAS_MATPLOTLIB:
     btn_apply.on_clicked(on_apply)
     btn_reset.on_clicked(on_reset)
     btn_save.on_clicked(on_save)
+    btn_prev.on_clicked(on_prev_page)
+    btn_next.on_clicked(on_next_page)
     
     def update_info_text():
         mode_str = "GLOBAL" if current_mode == 'global' else f"Joint: {{selected_joint}}"
         override_count = len(per_joint_params)
-        info_str = f"Motor Validation | Mode: {{mode_str}} | Overrides: {{override_count}} | "
+        total_joints = len(joint_ids)
+        info_str = f"Motor Validation | Mode: {{mode_str}} | Overrides: {{override_count}}/{{total_joints}} | "
         info_str += f"Time: {{elapsed:.2f}}s / {{duration:.2f}}s"
         if plot_history['saturated_count'] > 0:
             info_str += f" | ⚠️ SATURATION: {{plot_history['saturated_count']}}"
