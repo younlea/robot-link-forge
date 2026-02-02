@@ -1044,9 +1044,15 @@ if HAS_MATPLOTLIB:
     fig = plt.figure(figsize=(14, 9))
     ax = fig.add_subplot(111, projection='3d')
 
+# Debug: Print environment info
+print(f"DISPLAY: {{os.environ.get('DISPLAY', 'NOT SET')}}")
+print(f"MUJOCO_GL: {{os.environ.get('MUJOCO_GL', 'NOT SET (using default)')}}")
+print(f"MuJoCo version: {{mujoco.__version__ if hasattr(mujoco, '__version__') else 'unknown'}}")
+print("Attempting to create viewer window...")
 
 # Main Loop
-with mujoco.viewer.launch_passive(model, data) as viewer:
+try:
+    with mujoco.viewer.launch_passive(model, data) as viewer:
     print("Starting simulation loop...")
     start_time = time.time()
     last_print = 0
@@ -1242,6 +1248,19 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                     fig.canvas.flush_events()
                 except: pass
                 last_print = now
+
+    print("Simulation completed successfully")
+except Exception as e:
+    import traceback
+    print(f"ERROR: Failed to create or run viewer: {{e}}")
+    print(f"Error type: {{type(e).__name__}}")
+    traceback.print_exc()
+    print("\\nTroubleshooting:")
+    print("1. Check if X11 display is available: echo $DISPLAY")
+    print("2. Try setting MUJOCO_GL environment: export MUJOCO_GL=glfw")
+    print("3. Check MuJoCo installation: pip show mujoco")
+    import sys
+    sys.exit(1)
 
 csv_file.close()
 """
@@ -1491,7 +1510,14 @@ csv_file = open(log_file_name, 'w', newline='')
 writer = csv.writer(csv_file)
 writer.writerow(['Time'] + list(joint_ids.keys()))
 
-with mujoco.viewer.launch_passive(model, data) as viewer:
+# Debug: Print environment info
+print(f"DISPLAY: {{os.environ.get('DISPLAY', 'NOT SET')}}")
+print(f"MUJOCO_GL: {{os.environ.get('MUJOCO_GL', 'NOT SET (using default)')}}")
+print(f"MuJoCo version: {{mujoco.__version__ if hasattr(mujoco, '__version__') else 'unknown'}}")
+print("Attempting to create viewer window...")
+
+try:
+    with mujoco.viewer.launch_passive(model, data) as viewer:
     print("Starting motor validation simulation...")
     start_time = time.time()
     last_print = 0
@@ -1529,6 +1555,19 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
                 fig.canvas.flush_events()
             
             last_print = now
+
+    print("Motor validation simulation completed successfully")
+except Exception as e:
+    import traceback
+    print(f"ERROR: Failed to create or run viewer: {{e}}")
+    print(f"Error type: {{type(e).__name__}}")
+    traceback.print_exc()
+    print("\\nTroubleshooting:")
+    print("1. Check if X11 display is available: echo $DISPLAY")
+    print("2. Try setting MUJOCO_GL environment: export MUJOCO_GL=glfw")
+    print("3. Check MuJoCo installation: pip show mujoco")
+    import sys
+    sys.exit(1)
 
 csv_file.close()
 print(f"Motor validation complete. Log saved to {{log_file_name}}")
