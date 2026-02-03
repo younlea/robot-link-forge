@@ -1098,16 +1098,16 @@ def optimize_parameters(model_file='{model_file}'):
         
         # Ask user if they want to proceed to Mode 2
         while True:
-            response = input("\n>>  Would you like to open Mode 2 (Interactive Motor Tuning)? [Y/n]: ").strip().lower()
+            response = input("\\n>>  Would you like to open Mode 2 (Interactive Motor Tuning)? [Y/n]: ").strip().lower()
             if response in ['', 'y', 'yes']:
-                print("\n" + "="*70)
+                print("\\n" + "="*70)
                 print("[MODE 2] LAUNCHING INTERACTIVE MOTOR TUNING")
                 print("="*70)
-                print("You can now fine-tune parameters per-joint...\n")
+                print("You can now fine-tune parameters per-joint...\\n")
                 # Return special code to launch Mode 2
                 return 'launch_mode2'
             elif response in ['n', 'no']:
-                print("\nOptimization complete. Exiting...")
+                print("\\nOptimization complete. Exiting...")
                 return True
             else:
                 print("Please enter 'y' or 'n'")
