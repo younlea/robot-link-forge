@@ -1441,9 +1441,9 @@ print(f"Loaded {{rec['name']}}. Mode: Motor Validation")
 
 # --- Motor Parameter Management ---
 GLOBAL_MOTOR_PARAMS = {{
-    'kp': 100.0,      # Position gain - start conservative
-    'kv': 10.0,       # Velocity damping
-    'forcelim': 50.0, # Force limit (Nm)
+    'kp': 300.0,      # Position gain - optimized for good tracking
+    'kv': 20.0,       # Velocity damping - about 6-7% of kp for stability
+    'forcelim': 100.0, # Force limit (Nm)
     'gear': 1.0,      # Gear ratio (1 = direct drive)
     'armature': 0.001,
     'frictionloss': 0.1
@@ -1612,9 +1612,9 @@ if HAS_MATPLOTLIB:
     
     # Parameter sliders (left side, top area)
     slider_specs = [
-        ('kp', 'Kp (Gain)', 0, 1000, 100),
-        ('kv', 'Kv (Damping)', 0, 100, 10),
-        ('forcelim', 'Force Limit (Nm)', 0, 200, 50),
+        ('kp', 'Kp (Gain)', 0, 1000, 300),
+        ('kv', 'Kv (Damping)', 0, 100, 20),
+        ('forcelim', 'Force Limit (Nm)', 0, 200, 100),
         ('gear', 'Gear Ratio', 0.1, 200, 1),
         ('armature', 'Armature', 0, 0.01, 0.001),
         ('frictionloss', 'Friction', 0, 1, 0.1)

@@ -214,11 +214,11 @@ def generate_mjcf_xml(
                         else:
                             actuator_counter[act_name] = 0
 
-                        # Lower default values for stability, runtime can increase if needed
-                        # gear=1 (no gear ratio), moderate kp/kv, limited force
+                        # Optimized defaults for good trajectory tracking
+                        # kp=300: strong position tracking, kv=20: good damping
                         actuators.append(
                             f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
-                            f'kp="100" kv="10" gear="1" forcelimited="true" forcerange="-50 50" {ctrl_range}/>'
+                            f'kp="300" kv="20" gear="1" forcelimited="true" forcerange="-100 100" {ctrl_range}/>'
                         )
 
                         # Capture Info for Replay Mapping
@@ -278,10 +278,10 @@ def generate_mjcf_xml(
                     else:
                         actuator_counter[act_name] = 0
 
-                    # Lower default values for stability
+                    # Optimized defaults for good trajectory tracking
                     actuators.append(
                         f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
-                        f'kp="100" kv="10" gear="1" forcelimited="true" forcerange="-50 50" {ctrl_range}/>'
+                        f'kp="300" kv="20" gear="1" forcelimited="true" forcerange="-100 100" {ctrl_range}/>'
                     )
 
                     # Capture Info for Replay Mapping
