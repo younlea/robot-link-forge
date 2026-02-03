@@ -1947,22 +1947,38 @@ qacc_traj = np.zeros((n_steps, model.nv))
 kf_times = [k['timestamp']/1000.0 for k in rec['keyframes']]
 kf_joints = rec['keyframes']
 
+# Track which joints are actually in the recording
+joints_in_recording = set()
+for kf in kf_joints:
+    joints_in_recording.update(kf['joints'].keys())
+
 for jname, jid in joint_ids.items():
     qadr = model.jnt_qposadr[jid]
     dof_adr = model.jnt_dofadr[jid]
     
-    y_points = []
-    first_val = kf_joints[0]['joints'].get(jname, 0.0)
-    prev_val = first_val
-    for kf in kf_joints:
-        val = kf['joints'].get(jname, prev_val)
-        y_points.append(val)
-        prev_val = val
-    
-    q_interp = np.interp(trajectory_times, kf_times, y_points)
-    qpos_traj[:, qadr] = q_interp
-    qvel_traj[:, dof_adr] = np.gradient(q_interp, dt)
-    qacc_traj[:, dof_adr] = np.gradient(qvel_traj[:, dof_adr], dt)
+    # CRITICAL: Only interpolate joints that are in the recording!
+    if jname in joints_in_recording:
+        y_points = []
+        first_val = kf_joints[0]['joints'].get(jname, 0.0)
+        prev_val = first_val
+        for kf in kf_joints:
+            val = kf['joints'].get(jname, prev_val)
+            y_points.append(val)
+            prev_val = val
+        
+        q_interp = np.interp(trajectory_times, kf_times, y_points)
+        qpos_traj[:, qadr] = q_interp
+        qvel_traj[:, dof_adr] = np.gradient(q_interp, dt)
+        qacc_traj[:, dof_adr] = np.gradient(qvel_traj[:, dof_adr], dt)
+    else:
+        # Joint not in recording: use model's default qpos (usually 0)
+        default_qpos = model.qpos0[qadr] if hasattr(model, 'qpos0') else 0.0
+        qpos_traj[:, qadr] = default_qpos
+        qvel_traj[:, dof_adr] = 0.0
+        qacc_traj[:, dof_adr] = 0.0
+
+# Store initial qpos for reset
+initial_qpos = qpos_traj[0, :].copy()
 
 # --- Interactive Motor Parameter UI ---
 if HAS_MATPLOTLIB:
@@ -2237,9 +2253,16 @@ if HAS_MATPLOTLIB:
 
 print("\\n=== Motor Validation Mode Started ===\")
 print(f"Duration: {{duration:.2f}}s | Joints: {{len(joint_ids)}} | CSV: motor_validation_log.csv\")
+print(f"Joints in recording: {{len(joints_in_recording)}} / {{len(joint_ids)}}\")
 print("UI: Adjust Control (top), then Motor specs per joint (middle)\")
 print("    Click 'Apply Control to All' to update controller globally\")
 print("    Select joint, adjust motor specs, click 'Apply Motor' for that joint\")
+
+# CRITICAL: Initialize qpos to first keyframe before simulation
+data.qpos[:] = initial_qpos
+data.qvel[:] = 0.0
+mujoco.mj_forward(model, data)  # Update dependent quantities
+print(f"\\nInitialized robot to first keyframe position\")
 
 # --- Main Simulation Loop ---
 log_file_name = "motor_validation_log.csv"
@@ -2280,6 +2303,10 @@ try:
             if elapsed > duration:
                 start_time = now
                 elapsed = 0
+                # CRITICAL: Reset qpos to initial position
+                data.qpos[:] = initial_qpos
+                data.qvel[:] = 0.0
+                mujoco.mj_forward(model, data)
                 if HAS_MATPLOTLIB:
                     plot_history['time'].clear()
                     plot_history['tracking_error'].clear()
@@ -2291,10 +2318,12 @@ try:
                 step_idx = n_steps - 1
             
             # Set control targets from trajectory
+            # CRITICAL: Only control joints that are in the recording!
             for jname, jid in joint_ids.items():
                 if jname in actuator_ids:
                     target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
                     data.ctrl[actuator_ids[jname]] = target_q
+                    # Note: Joints not in recording keep their qpos0 (handled in trajectory generation)
             
             # Step simulation
             mujoco.mj_step(model, data)
