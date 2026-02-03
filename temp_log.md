@@ -1,13 +1,35 @@
 ========================================
-Enter choice [1]: 2
-Starting Motor Validation...
-Loading model: direct_hand_parm.xml
-Loaded Recording 1768623534448. Mode: Motor Validation
+  MuJoCo Motion Analysis Tool
+========================================
+
+Select Analysis Mode:
+
+0. Auto Parameter Optimization (NEW)
+   - Finds optimal motor parameters automatically
+   - Or diagnoses trajectory issues
+
+1. Joint Torque Visualization
+   - Theoretical torque (inverse dynamics)
+
+2. Motor Sizing Validation
+   - Set motor parameters and validate
+
+3. Fingertip Sensor Forces
+   - Contact force visualization
+
+========================================
+Enter choice [0 to auto-optimize, 2 for manual tuning]: 0
+Running automatic parameter optimization...
+======================================================================
+🔧 AUTOMATIC MOTOR PARAMETER OPTIMIZATION
+======================================================================
+Model: direct_hand_parm.xml
+
 Traceback (most recent call last):
-  File "/home/younleakim/Downloads/direct_hand_parm/replay_motor_validation.py", line 324, in <module>
-    on_joint_select('[GLOBAL]')
-  File "/home/younleakim/Downloads/direct_hand_parm/replay_motor_validation.py", line 261, in on_joint_select
-    update_info_text()
-  File "/home/younleakim/Downloads/direct_hand_parm/replay_motor_validation.py", line 294, in update_info_text
-    info_str += f"Time: {elapsed:.2f}s / {duration:.2f}s"
-NameError: name 'elapsed' is not defined
+  File "/home/younleakim/Downloads/direct_hand_parm/validate_motor_params.py", line 412, in <module>
+    success = optimize_parameters()
+  File "/home/younleakim/Downloads/direct_hand_parm/validate_motor_params.py", line 273, in optimize_parameters
+    kf_times = np.array([kf['time'] / 1000.0 for kf in kf_joints])
+  File "/home/younleakim/Downloads/direct_hand_parm/validate_motor_params.py", line 273, in <listcomp>
+    kf_times = np.array([kf['time'] / 1000.0 for kf in kf_joints])
+KeyError: 'time'
