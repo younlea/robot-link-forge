@@ -2349,28 +2349,50 @@ try:
             mujoco.mj_step(model, data)
             viewer.sync()
             
-            # Runtime monitoring every 1 second
-            if now - last_print >= 1.0:
-                # Check if non-recorded joints are moving (BUG DETECTION)
-                non_recorded_movement_detected = False
-                for jname in joints_not_in_recording:
-                    jid = joint_ids[jname]
+            # Runtime monitoring every 0.1 second (10Hz)
+            if now - last_print >= 0.1:
+                print(f"\\n[T={{elapsed:.2f}}s] Step {{step_idx}}/{{n_steps}}")
+                
+                # Show sample of moving joints (delta > 0.1 rad)
+                moving_joints = []
+                static_joints = []
+                for jname, jid in joint_ids.items():
                     qadr = model.jnt_qposadr[jid]
-                    actual_pos = data.qpos[qadr]
                     target_pos = qpos_traj[step_idx, qadr]
+                    actual_pos = data.qpos[qadr]
+                    error = target_pos - actual_pos
                     
-                    # Check if it moved from target (should be 0.0)
-                    if abs(actual_pos - target_pos) > 0.01:  # 0.01 rad threshold
-                        if not non_recorded_movement_detected:
-                            print(f"\\n⚠️  WARNING: Non-recorded joints are moving! (t={{elapsed:.2f}}s)")
-                            non_recorded_movement_detected = True
-                        
+                    # Determine if joint should be moving based on trajectory
+                    traj_range = np.max(qpos_traj[:, qadr]) - np.min(qpos_traj[:, qadr])
+                    
+                    if traj_range > 0.1:  # Should be moving (>5.7 degrees range)
+                        moving_joints.append((jname, target_pos, actual_pos, error, traj_range))
+                    elif abs(error) > 0.05:  # Should be static but has error
+                        static_joints.append((jname, target_pos, actual_pos, error))
+                
+                # Show first 3 moving joints
+                if moving_joints:
+                    print("  Moving joints (should track trajectory):")
+                    for jname, target, actual, error, traj_range in moving_joints[:3]:
                         if jname in actuator_ids:
                             aid = actuator_ids[jname]
-                            ctrl_signal = data.ctrl[aid]
+                            ctrl = data.ctrl[aid]
                             torque = data.actuator_force[aid]
-                            print(f"  {{jname}}: target={{target_pos:.4f}}, actual={{actual_pos:.4f}}, "
-                                  f"ctrl={{ctrl_signal:.4f}}, torque={{torque:.2f}}")
+                            print(f"    {{jname}}: target={{target:.3f}}, actual={{actual:.3f}}, "
+                                  f"error={{error:.3f}}, torque={{torque:.1f}}Nm (range={{traj_range:.3f}})")
+                
+                # Show problematic static joints
+                if static_joints:
+                    print("  ⚠️ Static joints with large error (should stay at 0):")
+                    for jname, target, actual, error in static_joints[:3]:
+                        if jname in actuator_ids:
+                            aid = actuator_ids[jname]
+                            ctrl = data.ctrl[aid]
+                            torque = data.actuator_force[aid]
+                            print(f"    {{jname}}: target={{target:.3f}}, actual={{actual:.3f}}, "
+                                  f"error={{error:.3f}}, ctrl={{ctrl:.3f}}, torque={{torque:.1f}}Nm")
+                
+                last_print = now
             
             # Debug first step with detailed actuator info
             if first_step_debug:
