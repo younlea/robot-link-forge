@@ -843,11 +843,11 @@ def analyze_motor_validation(csv_file='motor_validation_log.csv'):
     print(f"  Saturation Events: {{saturation_events}} / {{len(time)}} samples ({{saturation_pct:.1f}}%)")
     
     if saturation_pct > 10:
-        print(f"  ⚠️ WARNING: High saturation rate! Consider increasing force limit.")
+        print(f"  [WARNING] High saturation rate! Consider increasing force limit.")
     elif saturation_pct > 0:
-        print(f"  ⚠️ CAUTION: Some saturation detected.")
+        print(f"  [CAUTION] Some saturation detected.")
     else:
-        print(f"  ✓ No saturation detected.")
+        print(f"  [OK] No saturation detected.")
     
     print("\\n" + "="*60)
     
@@ -1008,7 +1008,7 @@ def optimize_parameters(model_file='{model_file}'):
     """Automatically find optimal parameters or diagnose issues"""
     
     print("="*70)
-    print("🔧 AUTOMATIC MOTOR PARAMETER OPTIMIZATION")
+    print("[MODE 0] AUTOMATIC MOTOR PARAMETER OPTIMIZATION")
     print("="*70)
     print(f"Model: {{model_file}}")
     print()
@@ -1033,7 +1033,7 @@ def optimize_parameters(model_file='{model_file}'):
     
     # If no joints found in recording, try to get from model
     if not joint_names:
-        print("⚠️  Warning: No joints in recording, using all model joints")
+        print("[WARNING] No joints in recording, using all model joints")
         joint_names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, i) 
                       for i in range(model.njnt)]
     
@@ -1084,30 +1084,30 @@ def optimize_parameters(model_file='{model_file}'):
     default_result = simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, 
                                          800, 80, 150, n_steps)
     
-    print(f"  Tracking Error: {{np.rad2deg(default_result['avg_error']):.2f}}° (max: {{np.rad2deg(default_result['max_error']):.2f}}°)")
+    print(f"  Tracking Error: {{np.rad2deg(default_result['avg_error']):.2f}}deg (max: {{np.rad2deg(default_result['max_error']):.2f}}deg)")
     print(f"  Saturation: {{default_result['saturation_pct']:.1f}}%")
     print(f"  Stability: {{default_result['stability_score']:.2f}}")
     print()
     
     if default_result['success']:
         print("="*70)
-        print("✅ DEFAULT PARAMETERS WORK PERFECTLY!")
+        print("[SUCCESS] DEFAULT PARAMETERS WORK PERFECTLY!")
         print("="*70)
         print("No optimization needed.")
         print()
         
         # Ask user if they want to proceed to Mode 2
         while True:
-            response = input("\n➡️  Would you like to open Mode 2 (Interactive Motor Tuning)? [Y/n]: ").strip().lower()
+            response = input("\n>>  Would you like to open Mode 2 (Interactive Motor Tuning)? [Y/n]: ").strip().lower()
             if response in ['', 'y', 'yes']:
                 print("\n" + "="*70)
-                print("🔧 LAUNCHING MODE 2: INTERACTIVE MOTOR TUNING")
+                print("[MODE 2] LAUNCHING INTERACTIVE MOTOR TUNING")
                 print("="*70)
                 print("You can now fine-tune parameters per-joint...\n")
                 # Return special code to launch Mode 2
                 return 'launch_mode2'
             elif response in ['n', 'no']:
-                print("\n✓ Optimization complete. Exiting...")
+                print("\nOptimization complete. Exiting...")
                 return True
             else:
                 print("Please enter 'y' or 'n'")
@@ -1141,14 +1141,14 @@ def optimize_parameters(model_file='{model_file}'):
             
             # If we found a working combination, we can stop early
             if result['success']:
-                print(f"  ✅ Found working parameters at test {{test_count}}/{{total_tests}}!")
+                print(f"  [SUCCESS] Found working parameters at test {{test_count}}/{{total_tests}}!")
                 break
     
     print()
     print("="*70)
     
     if best_result and best_result['success']:
-        print("✅ OPTIMAL PARAMETERS FOUND!")
+        print("[SUCCESS] OPTIMAL PARAMETERS FOUND!")
         print("="*70)
         print()
         print("Recommended parameters:")
@@ -1157,7 +1157,7 @@ def optimize_parameters(model_file='{model_file}'):
         print(f"  forcelim (force limit): {{best_params['forcelim']}} Nm")
         print()
         print("Performance with these parameters:")
-        print(f"  Tracking Error: {{np.rad2deg(best_result['avg_error']):.2f}}° (target: < {{np.rad2deg(MAX_ACCEPTABLE_ERROR)}}°)")
+        print(f"  Tracking Error: {{np.rad2deg(best_result['avg_error']):.2f}}deg (target: < {{np.rad2deg(MAX_ACCEPTABLE_ERROR)}}deg)")
         print(f"  Saturation: {{best_result['saturation_pct']:.1f}}% (target: < {{MAX_SATURATION_PCT}}%)")
         print(f"  Stability: {{best_result['stability_score']:.2f}} (target: > {{MIN_STABILITY_SCORE}})")
         print()
@@ -1172,60 +1172,60 @@ def optimize_parameters(model_file='{model_file}'):
         
         # Ask user if they want to proceed to Mode 2
         while True:
-            response = input("\\n\u27a1\ufe0f  Would you like to open Mode 2 (Interactive Motor Tuning)? [Y/n]: ").strip().lower()
+            response = input("\\n>>  Would you like to open Mode 2 (Interactive Motor Tuning)? [Y/n]: ").strip().lower()
             if response in ['', 'y', 'yes']:
                 print("\\n" + "="*70)
-                print("\ud83d\udd27 LAUNCHING MODE 2: INTERACTIVE MOTOR TUNING")
+                print("[MODE 2] LAUNCHING INTERACTIVE MOTOR TUNING")
                 print("="*70)
                 print("Applying optimized parameters as defaults...\\n")
                 # Return special code with best params
                 return ('launch_mode2', best_params)
             elif response in ['n', 'no']:
-                print("\\n\u2713 Optimization complete. Exiting...")
+                print("\\nOptimization complete. Exiting...")
                 return True
             else:
                 print("Please enter 'y' or 'n'")
         return True
     else:
         # No working parameters found
-        print("⚠️  NO WORKING PARAMETERS FOUND")
+        print("[WARNING] NO WORKING PARAMETERS FOUND")
         print("="*70)
         print()
         print("Best attempt (still failing):")
         if best_params:
             print(f"  kp={{best_params['kp']}}, kv={{best_params['kv']}}, forcelim={{best_params['forcelim']}}")
-            print(f"  Error: {{np.rad2deg(best_result['avg_error']):.2f}}° (limit: {{np.rad2deg(MAX_ACCEPTABLE_ERROR)}}°)")
+            print(f"  Error: {{np.rad2deg(best_result['avg_error']):.2f}}deg (limit: {{np.rad2deg(MAX_ACCEPTABLE_ERROR)}}deg)")
             print(f"  Saturation: {{best_result['saturation_pct']:.1f}}% (limit: {{MAX_SATURATION_PCT}}%)")
         print()
-        print("🔴 DIAGNOSIS: TRAJECTORY IS TOO AGGRESSIVE")
+        print("[DIAGNOSIS] TRAJECTORY IS TOO AGGRESSIVE")
         print()
         print("The recorded motion is physically impossible for this robot:")
         print()
         print("Possible causes:")
-        print("  1. ⚡ Motion is too fast")
+        print("  1. Motion is too fast")
         print("     - Joints accelerate/decelerate too quickly")
         print("     - Physics simulation cannot keep up")
         print()
-        print("  2. 📏 Joint angles exceed safe limits")
+        print("  2. Joint angles exceed safe limits")
         print("     - Motion tries to move joints beyond physical range")
         print("     - Check joint limits in MJCF/URDF")
         print()
-        print("  3. ⚖️  Model mass/inertia is too high")
+        print("  3. Model mass/inertia is too high")
         print("     - Heavy links require more force to move")
         print("     - Reduce link mass in the model")
         print()
-        print("  4. 🎯 Trajectory has sudden jumps")
+        print("  4. Trajectory has sudden jumps")
         print("     - Not enough keyframes for smooth interpolation")
         print("     - Add more intermediate keyframes")
         print()
         print("Suggested solutions:")
-        print("  ✓ Re-record motion at 50-70% speed")
-        print("  ✓ Add more keyframes (smoother transitions)")
-        print("  ✓ Check and adjust joint limits")
-        print("  ✓ Reduce link mass/inertia in model editor")
-        print("  ✓ Use simpler, slower movements for testing")
+        print("  - Re-record motion at 50-70% speed")
+        print("  - Add more keyframes (smoother transitions)")
+        print("  - Check and adjust joint limits")
+        print("  - Reduce link mass/inertia in model editor")
+        print("  - Use simpler, slower movements for testing")
         print()
-        print("⚠️  Parameter tuning CANNOT solve this issue.")
+        print("[WARNING] Parameter tuning CANNOT solve this issue.")
         print("    The trajectory itself must be modified.")
         print()
         print("="*70)
@@ -2157,7 +2157,7 @@ if HAS_MATPLOTLIB:
         info_str += f"{{mode_str}} | Overrides: {{override_count}}/{{total_joints}} | "
         info_str += f"Time: {{elapsed:.2f}}s / {{duration:.2f}}s"
         if plot_history['saturated_count'] > 0:
-            info_str += f" | ⚠️ SATURATION: {{plot_history['saturated_count']}}"
+            info_str += f" | [SAT] {{plot_history['saturated_count']}}"
         info_text.set_text(info_str)
 
     
