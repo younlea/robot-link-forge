@@ -93,6 +93,11 @@ def generate_mjcf_xml(
     xml.append("  <worldbody>")
     xml.append('    <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/>')
     xml.append('    <geom type="plane" size="5 5 0.1" rgba=".9 .9 .9 1"/>')
+    
+    # CRITICAL: Add a fixed base body to prevent robot from falling
+    # Without this, MuJoCo treats root as freejoint (6-DOF floating)
+    xml.append('    <body name="fixed_world" pos="0 0 0.5">')
+    xml.append('      <!-- Robot will be attached here -->')
 
     actuators = []
     sensors = []
@@ -719,8 +724,9 @@ def generate_mjcf_xml(
 
         xml.append(f"{indent}</body>")
 
-    build_body(robot.baseLinkId, indent_level=2)
-
+    build_body(robot.baseLinkId, indent_level=3)  # Indent 3 because inside fixed_world body
+    
+    xml.append('    </body>  <!-- End fixed_world -->')
     xml.append("  </worldbody>")
 
     if actuators:
