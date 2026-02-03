@@ -28,8 +28,8 @@ Model: direct_hand_parm.xml
 Traceback (most recent call last):
   File "/home/younleakim/Downloads/direct_hand_parm/validate_motor_params.py", line 412, in <module>
     success = optimize_parameters()
-  File "/home/younleakim/Downloads/direct_hand_parm/validate_motor_params.py", line 273, in optimize_parameters
-    kf_times = np.array([kf['time'] / 1000.0 for kf in kf_joints])
-  File "/home/younleakim/Downloads/direct_hand_parm/validate_motor_params.py", line 273, in <listcomp>
-    kf_times = np.array([kf['time'] / 1000.0 for kf in kf_joints])
-KeyError: 'time'
+  File "/home/younleakim/Downloads/direct_hand_parm/validate_motor_params.py", line 289, in optimize_parameters
+    q_interp = np.interp(trajectory_times, kf_times, y_points)
+  File "/home/younleakim/Downloads/direct_hand_parm/venv/lib/python3.10/site-packages/numpy/lib/function_base.py", line 1599, in interp
+    return interp_func(x, xp, fp, left, right)
+ValueError: fp and xp are not of the same length.
