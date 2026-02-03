@@ -52,7 +52,9 @@ def ensure_binary_stl(input_path: str, output_path: str):
             shutil.copy2(input_path, output_path)
 
 
-def calculate_inertia_from_stl(stl_path: str, density: float = 1000.0, scale: list = None):
+def calculate_inertia_from_stl(
+    stl_path: str, density: float = 1000.0, scale: list = None
+):
     """
     Calculate mass and inertia from STL file.
 
@@ -93,7 +95,9 @@ def calculate_inertia_from_stl(stl_path: str, density: float = 1000.0, scale: li
             scale_factor = scale[0] * scale[1] * scale[2]  # Volume scaling
             mass *= scale_factor
             # Inertia scaling: scale⁵ = scale³ (mass) * scale² (length²)
-            inertia_scale = scale_factor * (scale[0] * scale[0])  # Assuming uniform scale
+            inertia_scale = scale_factor * (
+                scale[0] * scale[0]
+            )  # Assuming uniform scale
             inertia *= inertia_scale
             center_of_mass *= scale[0]  # Linear scaling for COM
 

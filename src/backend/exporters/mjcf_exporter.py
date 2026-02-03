@@ -150,7 +150,11 @@ def generate_mjcf_xml(
                     stl_path = os.path.join(mesh_dir, stl_filename)
                     if os.path.exists(stl_path):
                         # Get scale from link visual properties
-                        scale = link.visual.meshScale if (link.visual and link.visual.meshScale) else None
+                        scale = (
+                            link.visual.meshScale
+                            if (link.visual and link.visual.meshScale)
+                            else None
+                        )
                         inertia_data = calculate_inertia_from_stl(stl_path, scale=scale)
 
                 if inertia_data:
