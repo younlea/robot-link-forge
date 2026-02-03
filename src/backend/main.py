@@ -2047,14 +2047,30 @@ python3 replay_mujoco.py {i}
 
         # Generate Quick Validation Script
         # Use first recording if available, otherwise create dummy recording
-        recording_data = processed_recs[0] if processed_recs else {
-            "duration": 5000,
-            "joints_info": [{"name": joint["name"]} for joint in generated_joints_info],
-            "keyframes": [
-                {"time": 0, "joints": {joint["name"]: 0.0 for joint in generated_joints_info}},
-                {"time": 5000, "joints": {joint["name"]: 0.0 for joint in generated_joints_info}}
-            ]
-        }
+        recording_data = (
+            processed_recs[0]
+            if processed_recs
+            else {
+                "duration": 5000,
+                "joints_info": [
+                    {"name": joint["name"]} for joint in generated_joints_info
+                ],
+                "keyframes": [
+                    {
+                        "time": 0,
+                        "joints": {
+                            joint["name"]: 0.0 for joint in generated_joints_info
+                        },
+                    },
+                    {
+                        "time": 5000,
+                        "joints": {
+                            joint["name"]: 0.0 for joint in generated_joints_info
+                        },
+                    },
+                ],
+            }
+        )
         validation_py = generate_validation_script(mjcf_filename, recording_data)
         with open(os.path.join(package_dir, "validate_motor_params.py"), "w") as f:
             f.write(validation_py)

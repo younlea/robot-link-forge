@@ -1046,7 +1046,9 @@ def optimize_parameters(model_file='{model_file}'):
     n_steps = len(trajectory_times)
     
     kf_joints = rec['keyframes']
-    kf_times = np.array([kf['timestamp'] / 1000.0 for kf in kf_joints])
+    # Build time array: start at 0.0, then add all keyframe timestamps
+    kf_times_raw = [kf['timestamp'] / 1000.0 for kf in kf_joints]
+    kf_times = np.array([0.0] + kf_times_raw)
     
     # Build trajectory
     qpos_traj = np.zeros((n_steps, model.nq))
