@@ -246,12 +246,13 @@ def generate_mjcf_xml(
                         else:
                             actuator_counter[act_name] = 0
 
-# Tuned for aggressive trajectory tracking
-                        # kp=2500, kv=250 (10% damping ratio), high force limit
-                        # User can adjust per-joint for different motor specs
+                        # Motor parameters for aggressive trajectories:
+                        # - gear=50: Torque amplification (main solution for insufficient torque)
+                        # - kp=800, kv=80: Moderate PD gains for stability
+                        # - forcerange=[-500, 500]: High motor force limit
                         actuators.append(
                             f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
-                            f'kp="2500" kv="250" gear="1" forcelimited="true" forcerange="-300 300" {ctrl_range}/>'  
+                            f'kp="800" kv="80" gear="50" forcelimited="true" forcerange="-500 500" {ctrl_range}/>'  
                         )
 
                         # Capture Info for Replay Mapping

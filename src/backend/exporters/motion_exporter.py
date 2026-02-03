@@ -922,11 +922,12 @@ MAX_SATURATION_PCT = 30.0    # Allow up to 30% force saturation
 MIN_STABILITY_SCORE = 0.6    # Stability metric (0-1)
 
 # Parameter search ranges
-KP_RANGE = [1500, 2000, 2500, 3000, 3500]
-KV_RANGE = [150, 200, 250, 300, 350]
-FORCELIM_RANGE = [200, 250, 300, 400, 500]
+KP_RANGE = [500, 800, 1000]  # Moderate PD gains
+KV_RANGE = [50, 80, 100]  # 10% damping ratio
+GEAR_RANGE = [10, 30, 50, 100, 150]  # Torque amplification (main parameter!)
+FORCELIM_RANGE = [300, 500, 800, 1000]  # Motor force limits
 
-def simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, kp, kv, forcelim, n_steps):
+def simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, kp, kv, gear, forcelim, n_steps):
     """Run simulation with given parameters and return metrics"""
     try:
         model = mujoco.MjModel.from_xml_path(model_file)
@@ -936,6 +937,7 @@ def simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, kp, kv,
         for i in range(model.nu):
             model.actuator_gainprm[i][0] = kp  # Position gain
             model.actuator_biasprm[i][1] = -kv  # Velocity damping (CRITICAL: index 1, not 2!)
+            model.actuator_gear[i][0] = gear  # Gear ratio for torque amplification
             model.actuator_forcerange[i] = [-forcelim, forcelim]
         
         # CRITICAL FIX: Initialize qpos to trajectory start
@@ -1079,10 +1081,10 @@ def optimize_parameters(model_file='{model_file}'):
         q_interp = np.interp(trajectory_times, kf_times, y_points)
         qpos_traj[:, qadr] = q_interp
     
-    print("Step 1: Testing default parameters (kp=2500, kv=250, forcelim=300)...")
+    print("Step 1: Testing default parameters (kp=800, kv=80, gear=50, forcelim=500)...")
     print("-" * 70)
     default_result = simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, 
-                                         2500, 250, 300, n_steps)
+                                         800, 80, 50, 500, n_steps)
     
     print(f"  Tracking Error: {{np.rad2deg(default_result['avg_error']):.2f}}deg (max: {{np.rad2deg(default_result['max_error']):.2f}}deg)")
     print(f"  Saturation: {{default_result['saturation_pct']:.1f}}%")
@@ -1114,20 +1116,20 @@ def optimize_parameters(model_file='{model_file}'):
         return True
     
     # Start optimization
-    print("❌ Default parameters not optimal. Starting automatic search...")
-    total_tests = len(KP_RANGE) * len(KV_RANGE) * len(FORCELIM_RANGE)
+    print("[X] Default parameters not optimal. Starting automatic search...")
+    total_tests = len(KP_RANGE) * len(KV_RANGE) * len(GEAR_RANGE) * len(FORCELIM_RANGE)
     print(f"   Testing {{total_tests}} parameter combinations...")
-    print(f"   (kp: {{len(KP_RANGE)}} values, kv: {{len(KV_RANGE)}} values, forcelim: {{len(FORCELIM_RANGE)}} values)")
+    print(f"   (kp: {{len(KP_RANGE)}} values, kv: {{len(KV_RANGE)}} values, gear: {{len(GEAR_RANGE)}} values, forcelim: {{len(FORCELIM_RANGE)}} values)")
     print()
     
     best_result = None
     best_params = None
     test_count = 0
     
-    for kp, kv, forcelim in product(KP_RANGE, KV_RANGE, FORCELIM_RANGE):
+    for kp, kv, gear, forcelim in product(KP_RANGE, KV_RANGE, GEAR_RANGE, FORCELIM_RANGE):
         test_count += 1
         result = simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids,
-                                     kp, kv, forcelim, n_steps)
+                                     kp, kv, gear, forcelim, n_steps)
         
         # Show progress every 10 tests
         if test_count % 10 == 0:
@@ -1137,7 +1139,7 @@ def optimize_parameters(model_file='{model_file}'):
         if best_result is None or (result['success'] and not best_result['success']) or \\
            (result['success'] == best_result['success'] and result['avg_error'] < best_result['avg_error']):
             best_result = result
-            best_params = {{'kp': kp, 'kv': kv, 'forcelim': forcelim}}
+            best_params = {{'kp': kp, 'kv': kv, 'gear': gear, 'forcelim': forcelim}}
             
             # If we found a working combination, we can stop early
             if result['success']:
@@ -1154,6 +1156,7 @@ def optimize_parameters(model_file='{model_file}'):
         print("Recommended parameters:")
         print(f"  kp (position gain):     {{best_params['kp']}}")
         print(f"  kv (velocity damping):  {{best_params['kv']}}")
+        print(f"  gear (torque amplif.):  {{best_params['gear']}} <-- KEY PARAMETER!")
         print(f"  forcelim (force limit): {{best_params['forcelim']}} Nm")
         print()
         print("Performance with these parameters:")
@@ -1163,8 +1166,8 @@ def optimize_parameters(model_file='{model_file}'):
         print()
         print("Next steps:")
         print("  1. Update these values in src/backend/exporters/mjcf_exporter.py:")
-        print(f"     - Line ~218: kp=\\"{{best_params['kp']}}\\" kv=\\"{{best_params['kv']}}\\"")
-        print(f"     - Line ~218: forcerange=\\"-{{best_params['forcelim']}} {{best_params['forcelim']}}\\"")
+        print(f"     - Line ~250: kp=\\"{{best_params['kp']}}\\" kv=\\"{{best_params['kv']}}\\" gear=\\"{{best_params['gear']}}\\"")
+        print(f"     - Line ~250: forcerange=\\"-{{best_params['forcelim']}} {{best_params['forcelim']}}\\"")
         print("  2. Re-export your robot model")
         print("  3. Or use Mode 2 to apply these per-joint")
         print()
@@ -1821,14 +1824,14 @@ print(f"Loaded {{rec['name']}}. Mode: Motor Validation")
 # --- Motor Parameter Management ---
 # Control parameters: applied globally to all actuators (controller tuning)
 GLOBAL_CONTROL_PARAMS = {{
-    'kp': 2500.0,  # Position gain (high for aggressive trajectory tracking)
-    'kv': 250.0,   # Velocity damping (10% of kp for good damping ratio)
+    'kp': 800.0,  # Position gain (moderate for stability)
+    'kv': 80.0,   # Velocity damping (10% of kp for good damping ratio)
 }}
 
 # Motor specifications: can be different per joint (hardware characteristics)
 GLOBAL_MOTOR_PARAMS = {{
-    'gear': 1.0,
-    'forcelim': 300.0,  # High force limit for aggressive trajectories
+    'gear': 50.0,  # Gear ratio - KEY for torque amplification!
+    'forcelim': 500.0,  # Motor force limit
     'ctrlrange_max': 10.0,  # Maximum velocity (rad/s or m/s)
     'armature': 0.001,
     'frictionloss': 0.1,
@@ -2006,8 +2009,8 @@ if HAS_MATPLOTLIB:
     
     # === GLOBAL CONTROL SETTINGS (top) ===
     control_specs = [
-        ('kp', 'Control Kp (Gain)', 0, 5000, 2500),
-        ('kv', 'Control Kv (Damping)', 0, 500, 250),
+        ('kp', 'Control Kp (Gain)', 0, 2000, 800),
+        ('kv', 'Control Kv (Damping)', 0, 200, 80),
     ]
     
     control_sliders = {{}}
@@ -2023,8 +2026,8 @@ if HAS_MATPLOTLIB:
     
     # === MOTOR SPECIFICATIONS (middle) ===
     motor_specs = [
-        ('gear', 'Motor Gear Ratio', 0.1, 200, 1),
-        ('forcelim', 'Motor Force Limit (Nm)', 0, 600, 300),  # Updated to 300
+        ('gear', 'Motor Gear Ratio', 1, 200, 50),  # KEY PARAMETER for torque!
+        ('forcelim', 'Motor Force Limit (Nm)', 0, 1000, 500),
         ('ctrlrange_max', 'Max Velocity (rad/s)', 0, 50, 10),
         ('armature', 'Motor Armature', 0, 0.01, 0.001),
         ('frictionloss', 'Motor Friction', 0, 1, 0.1),
