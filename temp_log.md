@@ -1,3 +1,6 @@
+:~/Downloads/direct_hand_parm$ ./run_torque_replay_0_recording_1768623534448.sh 
+Creating virtual environment...
+Installing dependencies (mujoco, matplotlib, numpy)...
 ========================================
   MuJoCo Motion Analysis Tool
 ========================================
@@ -25,11 +28,61 @@ Running automatic parameter optimization...
 ======================================================================
 Model: direct_hand_parm.xml
 
-Traceback (most recent call last):
-  File "/home/younleakim/Downloads/direct_hand_parm/validate_motor_params.py", line 412, in <module>
-    success = optimize_parameters()
-  File "/home/younleakim/Downloads/direct_hand_parm/validate_motor_params.py", line 289, in optimize_parameters
-    q_interp = np.interp(trajectory_times, kf_times, y_points)
-  File "/home/younleakim/Downloads/direct_hand_parm/venv/lib/python3.10/site-packages/numpy/lib/function_base.py", line 1599, in interp
-    return interp_func(x, xp, fp, left, right)
-ValueError: fp and xp are not of the same length.
+Step 1: Testing default parameters (kp=200, kv=40, forcelim=80)...
+----------------------------------------------------------------------
+  Tracking Error: 6.58° (max: 12.05°)
+  Saturation: 74.0%
+  Stability: 0.66
+
+❌ Default parameters not optimal. Starting automatic search...
+   Testing 80 parameter combinations...
+
+  Progress: 10/80 tests completed...
+  Progress: 20/80 tests completed...
+  Progress: 30/80 tests completed...
+  Progress: 40/80 tests completed...
+  Progress: 50/80 tests completed...
+  Progress: 60/80 tests completed...
+  Progress: 70/80 tests completed...
+  Progress: 80/80 tests completed...
+
+======================================================================
+⚠️  NO WORKING PARAMETERS FOUND
+======================================================================
+
+Best attempt (still failing):
+  kp=150, kv=40, forcelim=80
+  Error: 5.05° (limit: 8.594366926962348°)
+  Saturation: 74.0% (limit: 20.0%)
+
+🔴 DIAGNOSIS: TRAJECTORY IS TOO AGGRESSIVE
+
+The recorded motion is physically impossible for this robot:
+
+Possible causes:
+  1. ⚡ Motion is too fast
+     - Joints accelerate/decelerate too quickly
+     - Physics simulation cannot keep up
+
+  2. 📏 Joint angles exceed safe limits
+     - Motion tries to move joints beyond physical range
+     - Check joint limits in MJCF/URDF
+
+  3. ⚖️  Model mass/inertia is too high
+     - Heavy links require more force to move
+     - Reduce link mass in the model
+
+  4. 🎯 Trajectory has sudden jumps
+     - Not enough keyframes for smooth interpolation
+     - Add more intermediate keyframes
+
+Suggested solutions:
+  ✓ Re-record motion at 50-70% speed
+  ✓ Add more keyframes (smoother transitions)
+  ✓ Check and adjust joint limits
+  ✓ Reduce link mass/inertia in model editor
+  ✓ Use simpler, slower movements for testing
+
+⚠️  Parameter tuning CANNOT solve this issue.
+    The trajectory itself must be modified.
+
