@@ -1952,6 +1952,17 @@ joints_in_recording = set()
 for kf in kf_joints:
     joints_in_recording.update(kf['joints'].keys())
 
+print("\n" + "="*70)
+print("TRAJECTORY ANALYSIS")
+print("="*70)
+print(f"Total joints in model: {len(joint_ids)}")
+print(f"Joints in recording: {len(joints_in_recording)}")
+print(f"\nRecorded joints: {sorted(joints_in_recording)}")
+
+joints_not_in_recording = set(joint_ids.keys()) - joints_in_recording
+if joints_not_in_recording:
+    print(f"\nJoints NOT in recording (should stay still): {sorted(joints_not_in_recording)}")
+
 for jname, jid in joint_ids.items():
     qadr = model.jnt_qposadr[jid]
     dof_adr = model.jnt_dofadr[jid]
@@ -1970,6 +1981,12 @@ for jname, jid in joint_ids.items():
         qpos_traj[:, qadr] = q_interp
         qvel_traj[:, dof_adr] = np.gradient(q_interp, dt)
         qacc_traj[:, dof_adr] = np.gradient(qvel_traj[:, dof_adr], dt)
+        
+        # Log trajectory stats for recorded joints
+        traj_min = np.min(qpos_traj[:, qadr])
+        traj_max = np.max(qpos_traj[:, qadr])
+        traj_range = traj_max - traj_min
+        print(f"  {jname}: RECORDED - start={first_val:.4f}, range=[{traj_min:.4f}, {traj_max:.4f}], delta={traj_range:.4f}")
     else:
         # Joint not in recording: use model's default qpos (usually 0)
         default_qpos = model.qpos0[qadr] if hasattr(model, 'qpos0') else 0.0
@@ -2328,6 +2345,29 @@ try:
             # Step simulation
             mujoco.mj_step(model, data)
             viewer.sync()
+            
+            # Runtime monitoring every 1 second
+            if now - last_print >= 1.0:
+                # Check if non-recorded joints are moving (BUG DETECTION)
+                non_recorded_movement_detected = False
+                for jname in joints_not_in_recording:
+                    jid = joint_ids[jname]
+                    qadr = model.jnt_qposadr[jid]
+                    actual_pos = data.qpos[qadr]
+                    target_pos = qpos_traj[step_idx, qadr]
+                    
+                    # Check if it moved from target (should be 0.0)
+                    if abs(actual_pos - target_pos) > 0.01:  # 0.01 rad threshold
+                        if not non_recorded_movement_detected:
+                            print(f"\n⚠️  WARNING: Non-recorded joints are moving! (t={elapsed:.2f}s)")
+                            non_recorded_movement_detected = True
+                        
+                        if jname in actuator_ids:
+                            aid = actuator_ids[jname]
+                            ctrl_signal = data.ctrl[aid]
+                            torque = data.actuator_force[aid]
+                            print(f"  {jname}: target={target_pos:.4f}, actual={actual_pos:.4f}, "
+                                  f"ctrl={ctrl_signal:.4f}, torque={torque:.2f}")
             
             # Debug first step with detailed actuator info
             if first_step_debug:
