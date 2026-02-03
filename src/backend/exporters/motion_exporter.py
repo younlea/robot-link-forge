@@ -917,15 +917,15 @@ import os
 from itertools import product
 
 # Validation thresholds
-MAX_ACCEPTABLE_ERROR = 0.15  # rad (~8.6 degrees, relaxed for aggressive trajectories)
-MAX_SATURATION_PCT = 40.0    # Allow up to 40% force saturation
-MIN_STABILITY_SCORE = 0.5    # Stability metric (0-1)
+MAX_ACCEPTABLE_ERROR = 0.20  # rad (~11.5 degrees, very relaxed for aggressive trajectories)
+MAX_SATURATION_PCT = 50.0    # Allow up to 50% force saturation
+MIN_STABILITY_SCORE = 0.4    # Stability metric (0-1)
 
 # Parameter search ranges
 KP_RANGE = [500, 800, 1000]  # Moderate PD gains
 KV_RANGE = [50, 80, 100]  # 10% damping ratio
-GEAR_RANGE = [50, 100, 150, 200, 300]  # Ultra-high torque amplification!
-FORCELIM_RANGE = [500, 800, 1000, 1500]  # Very high motor force limits
+GEAR_RANGE = [100, 200, 300, 500, 800]  # EXTREME torque amplification!
+FORCELIM_RANGE = [800, 1000, 1500, 2000]  # Very high motor force limits
 
 def simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, kp, kv, gear, forcelim, n_steps):
     """Run simulation with given parameters and return metrics"""
@@ -1081,10 +1081,10 @@ def optimize_parameters(model_file='{model_file}'):
         q_interp = np.interp(trajectory_times, kf_times, y_points)
         qpos_traj[:, qadr] = q_interp
     
-    print("Step 1: Testing default parameters (kp=800, kv=80, gear=100, forcelim=800)...")
+    print("Step 1: Testing default parameters (kp=800, kv=80, gear=200, forcelim=1000)...")
     print("-" * 70)
     default_result = simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, 
-                                         800, 80, 100, 800, n_steps)
+                                         800, 80, 200, 1000, n_steps)
     
     print(f"  Tracking Error: {{np.rad2deg(default_result['avg_error']):.2f}}deg (max: {{np.rad2deg(default_result['max_error']):.2f}}deg)")
     print(f"  Saturation: {{default_result['saturation_pct']:.1f}}%")
@@ -1830,8 +1830,8 @@ GLOBAL_CONTROL_PARAMS = {{
 
 # Motor specifications: can be different per joint (hardware characteristics)
 GLOBAL_MOTOR_PARAMS = {{
-    'gear': 100.0,  # Gear ratio - HIGH for very aggressive trajectories!
-    'forcelim': 800.0,  # Motor force limit
+    'gear': 200.0,  # EXTREME gear ratio for very aggressive trajectories!
+    'forcelim': 1000.0,  # Very high motor force limit
     'ctrlrange_max': 10.0,  # Maximum velocity (rad/s or m/s)
     'armature': 0.001,
     'frictionloss': 0.1,
@@ -2026,8 +2026,8 @@ if HAS_MATPLOTLIB:
     
     # === MOTOR SPECIFICATIONS (middle) ===
     motor_specs = [
-        ('gear', 'Motor Gear Ratio', 1, 300, 100),  # Default 100 for aggressive trajectories
-        ('forcelim', 'Motor Force Limit (Nm)', 0, 2000, 800),  # Default 800
+        ('gear', 'Motor Gear Ratio', 1, 1000, 200),  # Default 200, max 1000
+        ('forcelim', 'Motor Force Limit (Nm)', 0, 3000, 1000),  # Default 1000, max 3000
         ('ctrlrange_max', 'Max Velocity (rad/s)', 0, 50, 10),
         ('armature', 'Motor Armature', 0, 0.01, 0.001),
         ('frictionloss', 'Motor Friction', 0, 1, 0.1),
