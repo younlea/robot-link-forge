@@ -246,7 +246,7 @@ def generate_mjcf_xml(
                         else:
                             actuator_counter[act_name] = 0
 
-# Motor parameters - BALANCED approach:
+                        # Motor parameters - BALANCED approach:
                         # - gear=50: Realistic gear ratio (allows fast movement)
                         # - kp=200: Moderate position gain
                         # - kv=20: 10% damping ratio for stability
@@ -254,7 +254,7 @@ def generate_mjcf_xml(
                         # Physics: High gear → slow speed! Use moderate gear for trajectory tracking
                         actuators.append(
                             f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
-                            f'kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" {ctrl_range}/>'  
+                            f'kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" {ctrl_range}/>'
                         )
 
                         # Capture Info for Replay Mapping
