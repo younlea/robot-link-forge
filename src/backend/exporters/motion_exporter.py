@@ -1440,16 +1440,21 @@ rec = recs[rec_idx]
 print(f"Loaded {{rec['name']}}. Mode: Motor Validation")
 
 # --- Motor Parameter Management ---
+# Control parameters: applied globally to all actuators (controller tuning)
+GLOBAL_CONTROL_PARAMS = {{
+    'kp': 300.0,  # Position gain
+    'kv': 20.0,   # Velocity damping
+}}
+
+# Motor specifications: can be different per joint (hardware characteristics)
 GLOBAL_MOTOR_PARAMS = {{
-    'kp': 300.0,      # Position gain - optimized for good tracking
-    'kv': 20.0,       # Velocity damping - about 6-7% of kp for stability
-    'forcelim': 100.0, # Force limit (Nm)
-    'gear': 1.0,      # Gear ratio (1 = direct drive)
+    'gear': 1.0,
+    'forcelim': 100.0,
     'armature': 0.001,
     'frictionloss': 0.1
 }}
 
-# Per-joint parameter storage (overrides global if set)
+# Per-joint motor parameter storage (overrides global motor specs if set)
 per_joint_params = {{}}
 
 motor_params_file = "motor_parameters.json"
@@ -1457,80 +1462,86 @@ if os.path.exists(motor_params_file):
     try:
         with open(motor_params_file, 'r') as f:
             loaded = json.load(f)
-            if 'global' in loaded:
-                GLOBAL_MOTOR_PARAMS.update(loaded['global'])
+            if 'control' in loaded:
+                GLOBAL_CONTROL_PARAMS.update(loaded['control'])
+            if 'motor_global' in loaded:
+                GLOBAL_MOTOR_PARAMS.update(loaded['motor_global'])
             if 'per_joint' in loaded:
                 per_joint_params = loaded['per_joint']
         print(f"Loaded motor parameters from {{motor_params_file}}")
     except Exception as e:
         print(f"Warning: Could not load motor parameters: {{e}}")
 
-def get_joint_params(jname):
-    \"\"\"Get effective parameters for a joint (per-joint override or global)\"\"\"
+def get_joint_motor_params(jname):
+    \"\"\"Get effective motor parameters for a joint (per-joint override or global)\"\"\"
     if jname in per_joint_params:
         return per_joint_params[jname]
     return GLOBAL_MOTOR_PARAMS
 
-def apply_all_motor_params():
-    \"\"\"Apply motor parameters to all actuators/joints\"\"\"
+def apply_control_params_all():
+    \"\"\"Apply control parameters (kp, kv) to all actuators\"\"\"
+    for jname in joint_ids.keys():
+        if jname not in actuator_ids: 
+            continue
+        aid = actuator_ids[jname]
+        
+        model.actuator_gainprm[aid, 0] = GLOBAL_CONTROL_PARAMS['kp']
+        model.actuator_biasprm[aid, 1] = -GLOBAL_CONTROL_PARAMS['kv']
+
+def apply_motor_params_all():
+    \"\"\"Apply motor specifications to all joints\"\"\"
     for jname in joint_ids.keys():
         if jname not in actuator_ids: 
             continue
         aid = actuator_ids[jname]
         jid = joint_ids[jname]
         
-        params = get_joint_params(jname)
+        params = get_joint_motor_params(jname)
         
-        model.actuator_gainprm[aid, 0] = params['kp']
-        model.actuator_biasprm[aid, 1] = -params['kv']
         model.actuator_gear[aid, 0] = params['gear']
         model.actuator_forcerange[aid, :] = [-params['forcelim'], params['forcelim']]
         model.dof_armature[model.jnt_dofadr[jid]] = params['armature']
         model.dof_frictionloss[model.jnt_dofadr[jid]] = params['frictionloss']
 
-def apply_joint_params(jname):
-    \"\"\"Apply parameters to a specific joint\"\"\"
+def apply_motor_params_joint(jname):
+    \"\"\"Apply motor parameters to a specific joint\"\"\"
     if jname not in actuator_ids: 
         return
     aid = actuator_ids[jname]
     jid = joint_ids[jname]
     
-    params = get_joint_params(jname)
+    params = get_joint_motor_params(jname)
     
-    model.actuator_gainprm[aid, 0] = params['kp']
-    model.actuator_biasprm[aid, 1] = -params['kv']
     model.actuator_gear[aid, 0] = params['gear']
     model.actuator_forcerange[aid, :] = [-params['forcelim'], params['forcelim']]
     model.dof_armature[model.jnt_dofadr[jid]] = params['armature']
     model.dof_frictionloss[model.jnt_dofadr[jid]] = params['frictionloss']
 
 def save_motor_params():
-    \"\"\"Save current global and per-joint parameters to file\"\"\"
+    \"\"\"Save current control and motor parameters to file\"\"\"
     with open(motor_params_file, 'w') as f:
         json.dump({{
-            'global': GLOBAL_MOTOR_PARAMS,
+            'control': GLOBAL_CONTROL_PARAMS,
+            'motor_global': GLOBAL_MOTOR_PARAMS,
             'per_joint': per_joint_params
         }}, f, indent=2)
     print(f"Saved motor parameters to {{motor_params_file}}")
 
 # Apply initial parameters
-apply_all_motor_params()
+apply_control_params_all()
+apply_motor_params_all()
 
-# Debug: Print actuator configuration
-print("\\nActuator Configuration (first 3 joints):")
+# Debug: Print configuration
+print("\\n=== Configuration ===\")
+print(f"Control Params (global): kp={{GLOBAL_CONTROL_PARAMS['kp']:.1f}}, kv={{GLOBAL_CONTROL_PARAMS['kv']:.1f}}\")
+print(f"Motor Specs (default): gear={{GLOBAL_MOTOR_PARAMS['gear']:.1f}}, forcelim={{GLOBAL_MOTOR_PARAMS['forcelim']:.1f}}\")
 print(f"Total joints: {{len(joint_ids)}}, Total actuators: {{len(actuator_ids)}}\")
+print("\\nFirst 3 joints:")
 for jname in list(joint_ids.keys())[:3]:  # Print first 3 joints
     if jname in actuator_ids:
         aid = actuator_ids[jname]
-        jid = joint_ids[jname]
-        params = get_joint_params(jname)
-        print(f"  {{jname}}:")
-        print(f"    actuator_id={{aid}}, joint_id={{jid}}\")
-        print(f"    kp={{model.actuator_gainprm[aid, 0]:.1f}}, kv={{-model.actuator_biasprm[aid, 1]:.1f}}\")
-        print(f"    gear={{model.actuator_gear[aid, 0]:.1f}}, forcelim={{model.actuator_forcerange[aid, 1]:.1f}}\")
-        print(f"    joint qpos0={{data.qpos[model.jnt_qposadr[jid]]:.3f}}\")
-    else:
-        print(f"  {{jname}}: NO ACTUATOR FOUND\")
+        params = get_joint_motor_params(jname)
+        print(f"  {{jname}}: gear={{params['gear']:.1f}}, forcelim={{params['forcelim']:.1f}}\")
 
 # --- Pre-calculate Trajectory ---
 duration = rec['duration'] / 1000.0
@@ -1610,26 +1621,41 @@ if HAS_MATPLOTLIB:
         end = min(start + joints_per_page, len(joint_list_full))
         return joint_list_full[start:end]
     
-    # Parameter sliders (left side, top area)
-    slider_specs = [
-        ('kp', 'Kp (Gain)', 0, 1000, 300),
-        ('kv', 'Kv (Damping)', 0, 100, 20),
-        ('forcelim', 'Force Limit (Nm)', 0, 200, 100),
-        ('gear', 'Gear Ratio', 0.1, 200, 1),
-        ('armature', 'Armature', 0, 0.01, 0.001),
-        ('frictionloss', 'Friction', 0, 1, 0.1)
+    # === GLOBAL CONTROL SETTINGS (top) ===
+    control_specs = [
+        ('kp', 'Control Kp (Gain)', 0, 1000, 300),
+        ('kv', 'Control Kv (Damping)', 0, 100, 20),
     ]
     
-    sliders = {{}}
-    
-    for i, (key, label, vmin, vmax, vinit) in enumerate(slider_specs):
-        ax_slider = plt.axes([0.10, 0.77 - i*0.055, 0.28, 0.02])
+    control_sliders = {{}}
+    y_start = 0.88
+    for i, (key, label, vmin, vmax, vinit) in enumerate(control_specs):
+        ax_slider = plt.axes([0.10, y_start - i*0.05, 0.28, 0.02])
         slider = Slider(ax_slider, label, vmin, vmax, valinit=vinit, valstep=(vmax-vmin)/1000.0)
-        sliders[key] = slider
+        control_sliders[key] = slider
     
-    # Buttons (middle area, aligned horizontally)
+    # Control apply button
+    ax_btn_apply_control = plt.axes([0.10, y_start - 0.12, 0.28, 0.03])
+    btn_apply_control = Button(ax_btn_apply_control, 'Apply Control to All')
+    
+    # === MOTOR SPECIFICATIONS (middle) ===
+    motor_specs = [
+        ('gear', 'Motor Gear Ratio', 0.1, 200, 1),
+        ('forcelim', 'Motor Force Limit (Nm)', 0, 200, 100),
+        ('armature', 'Motor Armature', 0, 0.01, 0.001),
+        ('frictionloss', 'Motor Friction', 0, 1, 0.1)
+    ]
+    
+    motor_sliders = {{}}
+    y_start = 0.65
+    for i, (key, label, vmin, vmax, vinit) in enumerate(motor_specs):
+        ax_slider = plt.axes([0.10, y_start - i*0.05, 0.28, 0.02])
+        slider = Slider(ax_slider, label, vmin, vmax, valinit=vinit, valstep=(vmax-vmin)/1000.0)
+        motor_sliders[key] = slider
+    
+    # Motor buttons (below motor sliders)
     ax_btn_apply = plt.axes([0.09, 0.42, 0.09, 0.03])
-    btn_apply = Button(ax_btn_apply, 'Apply')
+    btn_apply = Button(ax_btn_apply, 'Apply Motor')
     
     ax_btn_reset = plt.axes([0.19, 0.42, 0.10, 0.03])
     btn_reset = Button(ax_btn_reset, 'Reset')
@@ -1652,15 +1678,21 @@ if HAS_MATPLOTLIB:
     ax_btn_next = plt.axes([0.25, 0.08, 0.08, 0.025])
     btn_next = Button(ax_btn_next, 'Next >')
     
-    def update_slider_values(params):
-        \"\"\"Update slider positions from parameter dict\"\"\"
-        for key in sliders:
-            if key in params:
-                sliders[key].set_val(params[key])
+    def update_control_sliders():
+        \"\"\"Update control slider positions from global params\"\"\"
+        for key in control_sliders:
+            if key in GLOBAL_CONTROL_PARAMS:
+                control_sliders[key].set_val(GLOBAL_CONTROL_PARAMS[key])
     
-    def get_current_slider_values():
-        \"\"\"Get current slider values as dict\"\"\"
-        return {{key: sliders[key].val for key in sliders}}
+    def update_motor_sliders(params):
+        \"\"\"Update motor slider positions from parameter dict\"\"\"
+        for key in motor_sliders:
+            if key in params:
+                motor_sliders[key].set_val(params[key])
+    
+    def get_current_motor_values():
+        \"\"\"Get current motor slider values as dict\"\"\"
+        return {{key: motor_sliders[key].val for key in motor_sliders}}
     
     def update_radio_buttons():
         \"\"\"Recreate RadioButtons with current page joints\"\"\"
@@ -1684,41 +1716,52 @@ if HAS_MATPLOTLIB:
             joint_page += 1
             update_radio_buttons()
     
+    def on_apply_control(event):
+        \"\"\"Apply control parameters to all actuators\"\"\"
+        GLOBAL_CONTROL_PARAMS['kp'] = control_sliders['kp'].val
+        GLOBAL_CONTROL_PARAMS['kv'] = control_sliders['kv'].val
+        apply_control_params_all()
+        update_info_text()
+    
     def on_joint_select(label):
         global selected_joint, current_mode
         if label == '[GLOBAL]':
             current_mode = 'global'
             selected_joint = None
-            update_slider_values(GLOBAL_MOTOR_PARAMS)
+            update_motor_sliders(GLOBAL_MOTOR_PARAMS)
         else:
             current_mode = 'per_joint'
             selected_joint = label
-            params = get_joint_params(label)
-            update_slider_values(params)
+            params = get_joint_motor_params(label)
+            update_motor_sliders(params)
         update_info_text()
     
     def on_apply(event):
-        params = get_current_slider_values()
+        \"\"\"Apply motor parameters to selected joint or global\"\"\"
+        params = get_current_motor_values()
         if current_mode == 'global':
             GLOBAL_MOTOR_PARAMS.update(params)
-            apply_all_motor_params()
+            apply_motor_params_all()
         else:
             per_joint_params[selected_joint] = params.copy()
-            apply_joint_params(selected_joint)
+            apply_motor_params_joint(selected_joint)
         update_info_text()
     
     def on_reset(event):
+        \"\"\"Reset selected joint to global motor specs\"\"\"
         if current_mode == 'per_joint' and selected_joint:
             if selected_joint in per_joint_params:
                 del per_joint_params[selected_joint]
-            apply_joint_params(selected_joint)
-            update_slider_values(GLOBAL_MOTOR_PARAMS)
+            apply_motor_params_joint(selected_joint)
+            update_motor_sliders(GLOBAL_MOTOR_PARAMS)
             update_info_text()
     
     def on_save(event):
         save_motor_params()
         update_info_text()
     
+    # Connect event handlers
+    btn_apply_control.on_clicked(on_apply_control)
     radio_joints.on_clicked(on_joint_select)
     btn_apply.on_clicked(on_apply)
     btn_reset.on_clicked(on_reset)
@@ -1727,10 +1770,11 @@ if HAS_MATPLOTLIB:
     btn_next.on_clicked(on_next_page)
     
     def update_info_text():
-        mode_str = "GLOBAL" if current_mode == 'global' else f"Joint: {{selected_joint}}"
+        mode_str = "GLOBAL Motor" if current_mode == 'global' else f"Joint: {{selected_joint}}"
         override_count = len(per_joint_params)
         total_joints = len(joint_ids)
-        info_str = f"Motor Validation | Mode: {{mode_str}} | Overrides: {{override_count}}/{{total_joints}} | "
+        info_str = f"Motor Validation | Control: kp={{GLOBAL_CONTROL_PARAMS['kp']:.0f}} kv={{GLOBAL_CONTROL_PARAMS['kv']:.0f}} | "
+        info_str += f"{{mode_str}} | Overrides: {{override_count}}/{{total_joints}} | "
         info_str += f"Time: {{elapsed:.2f}}s / {{duration:.2f}}s"
         if plot_history['saturated_count'] > 0:
             info_str += f" | ⚠️ SATURATION: {{plot_history['saturated_count']}}"
@@ -1766,14 +1810,17 @@ if HAS_MATPLOTLIB:
     # Initialize elapsed before UI setup
     elapsed = 0.0
     
-    # Initialize UI
+    # Initialize UI - load global motor defaults into sliders
+    update_control_sliders()
     on_joint_select('[GLOBAL]')
     plt.show(block=False)
     plt.pause(0.001)
 
 print("\\n=== Motor Validation Mode Started ===\")
 print(f"Duration: {{duration:.2f}}s | Joints: {{len(joint_ids)}} | CSV: motor_validation_log.csv\")
-print("UI: Select joint from left panel, adjust parameters, click Apply\")
+print("UI: Adjust Control (top), then Motor specs per joint (middle)\")
+print("    Click 'Apply Control to All' to update controller globally\")
+print("    Select joint, adjust motor specs, click 'Apply Motor' for that joint\")
 
 # --- Main Simulation Loop ---
 log_file_name = "motor_validation_log.csv"
