@@ -21,30 +21,21 @@ Select Analysis Mode:
    - Contact force visualization
 
 ========================================
-Enter choice [0 to auto-optimize, 2 for manual tuning]: 0
-Running automatic parameter optimization...
-======================================================================
-[MODE 0] AUTOMATIC MOTOR PARAMETER OPTIMIZATION
-======================================================================
-Model: direct_hand_parm.xml
+Enter choice [0 to auto-optimize, 2 for manual tuning]: 2
+Starting Motor Validation...
+Loading model: direct_hand_parm.xml
+Loaded Recording 1768623534448. Mode: Motor Validation
 
-Step 1: Testing default parameters (kp=1500, kv=150, forcelim=200)...
-----------------------------------------------------------------------
-  Tracking Error: 1.83deg (max: 3.03deg)
-  Saturation: 14.6%
-  Stability: 0.88
+=== Configuration ===
+Control Params (global): kp=800.0, kv=80.0
+Motor Specs (default): gear=200.0, forcelim=1000.0
+Total joints: 20, Total actuators: 20
 
-======================================================================
-[SUCCESS] DEFAULT PARAMETERS WORK PERFECTLY!
-======================================================================
-No optimization needed.
-
-
->>  Would you like to open Mode 2 (Interactive Motor Tuning)? [Y/n]: y
-
-======================================================================
-[MODE 2] LAUNCHING INTERACTIVE MOTOR TUNING
-======================================================================
-You can now fine-tune parameters per-joint...
-
-younleakim@younleakim-400TEA-400SEA:~/Downloads/direct_hand_parm$ 
+First 3 joints:
+  LittleFinger-1st_roll: gear=200.0, forcelim=1000.0
+  LittleFinger-1st-pitch: gear=200.0, forcelim=1000.0
+  LittleFinger-2nd-pitch: gear=200.0, forcelim=1000.0
+Traceback (most recent call last):
+  File "/home/younleakim/Downloads/direct_hand_parm/replay_motor_validation.py", line 409, in <module>
+    btn_reset_joint.on_clicked(on_reset_joint)
+NameError: name 'on_reset_joint' is not defined. Did you mean: 'btn_reset_joint'?
