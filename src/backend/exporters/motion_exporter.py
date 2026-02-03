@@ -922,9 +922,9 @@ MAX_SATURATION_PCT = 20.0    # Allow up to 20% force saturation
 MIN_STABILITY_SCORE = 0.7    # Stability metric (0-1)
 
 # Parameter search ranges
-KP_RANGE = [150, 200, 250, 300, 350, 400]
-KV_RANGE = [30, 40, 50, 60, 80]
-FORCELIM_RANGE = [80, 120, 160, 200, 250, 300, 400]
+KP_RANGE = [300, 400, 500, 600, 800, 1000]
+KV_RANGE = [40, 50, 60, 80, 100]
+FORCELIM_RANGE = [100, 120, 160, 200, 250, 300, 400]
 
 def simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, kp, kv, forcelim, n_steps):
     """Run simulation with given parameters and return metrics"""
@@ -935,7 +935,7 @@ def simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, kp, kv,
         # Set parameters
         for i in range(model.nu):
             model.actuator_gainprm[i][0] = kp  # Position gain
-            model.actuator_biasprm[i][2] = -kv  # Velocity damping
+            model.actuator_biasprm[i][1] = -kv  # Velocity damping (CRITICAL: index 1, not 2!)
             model.actuator_forcerange[i] = [-forcelim, forcelim]
         
         # CRITICAL FIX: Initialize qpos to trajectory start
@@ -943,8 +943,8 @@ def simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, kp, kv,
         data.qvel[:] = 0
         mujoco.mj_forward(model, data)
         
-        # Warmup: Let robot settle at start position
-        for _ in range(50):
+        # Warmup: Let robot settle at start position (reduced from 50 to 20)
+        for _ in range(20):
             for jname, jid in joint_ids.items():
                 if jname in actuator_ids:
                     data.ctrl[actuator_ids[jname]] = qpos_traj[0, model.jnt_qposadr[jid]]
@@ -1079,10 +1079,10 @@ def optimize_parameters(model_file='{model_file}'):
         q_interp = np.interp(trajectory_times, kf_times, y_points)
         qpos_traj[:, qadr] = q_interp
     
-    print("Step 1: Testing default parameters (kp=200, kv=40, forcelim=80)...")
+    print("Step 1: Testing default parameters (kp=500, kv=50, forcelim=120)...")
     print("-" * 70)
     default_result = simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, 
-                                         200, 40, 80, n_steps)
+                                         500, 50, 120, n_steps)
     
     print(f"  Tracking Error: {{np.rad2deg(default_result['avg_error']):.2f}}° (max: {{np.rad2deg(default_result['max_error']):.2f}}°)")
     print(f"  Saturation: {{default_result['saturation_pct']:.1f}}%")
@@ -1769,8 +1769,8 @@ print(f"Loaded {{rec['name']}}. Mode: Motor Validation")
 # --- Motor Parameter Management ---
 # Control parameters: applied globally to all actuators (controller tuning)
 GLOBAL_CONTROL_PARAMS = {{
-    'kp': 200.0,  # Position gain (reduced for stability)
-    'kv': 40.0,   # Velocity damping (20% of kp for good damping ratio)
+    'kp': 500.0,  # Position gain (increased for better tracking)
+    'kv': 50.0,   # Velocity damping (10% of kp for good damping ratio)
 }}
 
 # Motor specifications: can be different per joint (hardware characteristics)
@@ -1954,8 +1954,8 @@ if HAS_MATPLOTLIB:
     
     # === GLOBAL CONTROL SETTINGS (top) ===
     control_specs = [
-        ('kp', 'Control Kp (Gain)', 0, 1000, 200),
-        ('kv', 'Control Kv (Damping)', 0, 100, 40),
+        ('kp', 'Control Kp (Gain)', 0, 2000, 500),
+        ('kv', 'Control Kv (Damping)', 0, 200, 50),
     ]
     
     control_sliders = {{}}
