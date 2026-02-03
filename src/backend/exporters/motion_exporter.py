@@ -1008,12 +1008,25 @@ def optimize_parameters(model_file='{model_file}'):
     # Load recording
     rec = {rec_json}
     
-    # Build joint mappings
+    # Build joint mappings - get joint names from first keyframe or model
     joint_ids = {{}}
     actuator_ids = {{}}
     
-    for info in rec.get('joints_info', []):
-        jname = info['name']
+    # Get joint names from recording's first keyframe
+    joint_names = []
+    if rec.get('keyframes') and len(rec['keyframes']) > 0:
+        first_kf = rec['keyframes'][0]
+        if 'joints' in first_kf:
+            joint_names = list(first_kf['joints'].keys())
+    
+    # If no joints found in recording, try to get from model
+    if not joint_names:
+        print("⚠️  Warning: No joints in recording, using all model joints")
+        joint_names = [mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, i) 
+                      for i in range(model.njnt)]
+    
+    # Map joint names to IDs
+    for jname in joint_names:
         jid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, jname)
         if jid >= 0:
             joint_ids[jname] = jid
