@@ -17,7 +17,7 @@ def generate_mjcf_xml(
     """
     Generates MuJoCo MJCF XML.
     Returns: (xml_content, generated_joints_info)
-    
+
     Args:
         mesh_dir: Directory where STL files are stored (for inertia calculation)
     """
@@ -149,12 +149,14 @@ def generate_mjcf_xml(
                     stl_filename = mesh_files_map[link_id]
                     stl_path = os.path.join(mesh_dir, stl_filename)
                     if os.path.exists(stl_path):
-                        inertia_data = calculate_inertia_from_stl(stl_path)
-                
+                        # Get scale from link visual properties
+                        scale = link.visual.meshScale if (link.visual and link.visual.meshScale) else None
+                        inertia_data = calculate_inertia_from_stl(stl_path, scale=scale)
+
                 if inertia_data:
-                    mass = inertia_data['mass']
-                    com = inertia_data['center_of_mass']
-                    inertia_diag = inertia_data['inertia_diagonal']
+                    mass = inertia_data["mass"]
+                    com = inertia_data["center_of_mass"]
+                    inertia_diag = inertia_data["inertia_diagonal"]
                     com_str = f"{com[0]:.6f} {com[1]:.6f} {com[2]:.6f}"
                     inertia_str = f"{inertia_diag[0]:.6f} {inertia_diag[1]:.6f} {inertia_diag[2]:.6f}"
                     xml.append(
