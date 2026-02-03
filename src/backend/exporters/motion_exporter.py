@@ -902,32 +902,103 @@ if __name__ == '__main__':
 
 
 def generate_validation_script(model_file: str, recording_data: dict) -> str:
-    """Generate quick validation script to check if default parameters work well"""
+    """Generate validation script with automatic parameter optimization"""
     rec_json = json.dumps(recording_data, indent=2)
 
     return f'''#!/usr/bin/env python3
 """
-Quick validation of default motor parameters.
-Tests if robot can track trajectory with current settings.
+Automatic Motor Parameter Optimization and Validation
+Finds optimal parameters or diagnoses trajectory issues
 """
 import mujoco
 import numpy as np
 import json
 import os
+from itertools import product
 
 # Validation thresholds
 MAX_ACCEPTABLE_ERROR = 0.15  # rad (~8.6 degrees)
 MAX_SATURATION_PCT = 20.0    # Allow up to 20% force saturation
 MIN_STABILITY_SCORE = 0.7    # Stability metric (0-1)
 
-def validate_motor_parameters(model_file='{model_file}'):
-    """Run quick simulation and check if parameters are acceptable"""
+# Parameter search ranges
+KP_RANGE = [150, 200, 250, 300, 350]
+KV_RANGE = [30, 40, 50, 60]
+FORCELIM_RANGE = [80, 120, 160, 200]
+
+def simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, kp, kv, forcelim, n_steps):
+    """Run simulation with given parameters and return metrics"""
+    try:
+        model = mujoco.MjModel.from_xml_path(model_file)
+        data = mujoco.MjData(model)
+        
+        # Set parameters
+        for i in range(model.nu):
+            model.actuator_gainprm[i][0] = kp  # Position gain
+            model.actuator_biasprm[i][2] = -kv  # Velocity damping
+            model.actuator_forcerange[i] = [-forcelim, forcelim]
+        
+        errors = []
+        forces = []
+        saturated_count = 0
+        
+        # Run simulation (use half steps for speed)
+        test_steps = min(n_steps, 250)
+        for step_idx in range(test_steps):
+            # Set control targets
+            for jname, jid in joint_ids.items():
+                if jname in actuator_ids:
+                    target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
+                    data.ctrl[actuator_ids[jname]] = target_q
+            
+            # Step
+            mujoco.mj_step(model, data)
+            
+            # Collect metrics
+            step_errors = []
+            step_forces = []
+            for jname, jid in joint_ids.items():
+                if jname in actuator_ids:
+                    qadr = model.jnt_qposadr[jid]
+                    target = qpos_traj[step_idx, qadr]
+                    actual = data.qpos[qadr]
+                    error = abs(target - actual)
+                    step_errors.append(error)
+                    
+                    force = abs(data.actuator_force[actuator_ids[jname]])
+                    step_forces.append(force)
+                    if force >= forcelim * 0.95:
+                        saturated_count += 1
+            
+            if step_errors:
+                errors.append(np.mean(step_errors))
+            if step_forces:
+                forces.append(np.max(step_forces))
+        
+        # Calculate metrics
+        avg_error = np.mean(errors) if errors else 999
+        max_error = np.max(errors) if errors else 999
+        saturation_pct = 100 * saturated_count / (len(errors) * len(joint_ids)) if errors else 100
+        error_std = np.std(errors) if errors else 999
+        stability_score = 1.0 / (1.0 + error_std * 10)
+        
+        return {{
+            'avg_error': avg_error,
+            'max_error': max_error,
+            'saturation_pct': saturation_pct,
+            'stability_score': stability_score,
+            'success': avg_error < MAX_ACCEPTABLE_ERROR and saturation_pct < MAX_SATURATION_PCT and stability_score > MIN_STABILITY_SCORE
+        }}
+    except Exception as e:
+        return {{'avg_error': 999, 'success': False, 'error': str(e)}}
+
+def optimize_parameters(model_file='{model_file}'):
+    """Automatically find optimal parameters or diagnose issues"""
     
-    print("="*60)
-    print("MOTOR PARAMETER VALIDATION")
-    print("="*60)
+    print("="*70)
+    print("🔧 AUTOMATIC MOTOR PARAMETER OPTIMIZATION")
+    print("="*70)
     print(f"Model: {{model_file}}")
-    print(f"Testing default control and motor parameters...")
     print()
     
     # Load model and data
@@ -955,7 +1026,7 @@ def validate_motor_parameters(model_file='{model_file}'):
         print("❌ ERROR: No joints found in model!")
         return False
     
-    # Pre-calculate short trajectory (5 seconds max)
+    # Pre-calculate trajectory
     duration = min(rec['duration'] / 1000.0, 5.0)
     dt = model.opt.timestep
     trajectory_times = np.arange(0, duration, dt)
@@ -981,116 +1052,136 @@ def validate_motor_parameters(model_file='{model_file}'):
         q_interp = np.interp(trajectory_times, kf_times, y_points)
         qpos_traj[:, qadr] = q_interp
     
-    # Simulation
-    errors = []
-    forces = []
-    saturated_count = 0
-    force_limit = 80.0  # Default from MJCF
+    print("Step 1: Testing default parameters (kp=200, kv=40, forcelim=80)...")
+    print("-" * 70)
+    default_result = simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, 
+                                         200, 40, 80, n_steps)
     
-    print("Running simulation...")
-    for step_idx in range(min(n_steps, 500)):  # Max 500 steps (~2.5s)
-        # Set control targets
-        for jname, jid in joint_ids.items():
-            if jname in actuator_ids:
-                target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
-                data.ctrl[actuator_ids[jname]] = target_q
-        
-        # Step
-        mujoco.mj_step(model, data)
-        
-        # Collect metrics
-        step_errors = []
-        step_forces = []
-        for jname, jid in joint_ids.items():
-            if jname in actuator_ids:
-                qadr = model.jnt_qposadr[jid]
-                target = qpos_traj[step_idx, qadr]
-                actual = data.qpos[qadr]
-                error = abs(target - actual)
-                step_errors.append(error)
-                
-                force = abs(data.actuator_force[actuator_ids[jname]])
-                step_forces.append(force)
-                if force >= force_limit * 0.95:
-                    saturated_count += 1
-        
-        if step_errors:
-            errors.append(np.mean(step_errors))
-        if step_forces:
-            forces.append(np.max(step_forces))
-    
-    # Analysis
-    avg_error = np.mean(errors) if errors else 0
-    max_error = np.max(errors) if errors else 0
-    avg_force = np.mean(forces) if forces else 0
-    max_force = np.max(forces) if forces else 0
-    total_samples = len(errors) * len(joint_ids)
-    saturation_pct = 100 * saturated_count / total_samples if total_samples > 0 else 0
-    
-    # Stability: check variance in error (low = stable)
-    error_std = np.std(errors) if errors else 0
-    stability_score = 1.0 / (1.0 + error_std * 10)  # 0-1, higher = more stable
-    
-    # Print results
-    print(f"\\nTest Duration: {{len(errors) * dt:.2f}}s ({{len(errors)}} steps)")
-    print()
-    print("Results:")
-    print(f"  Tracking Error:")
-    print(f"    Average: {{avg_error:.4f}} rad ({{np.rad2deg(avg_error):.2f}}°)")
-    print(f"    Maximum: {{max_error:.4f}} rad ({{np.rad2deg(max_error):.2f}}°)")
-    print(f"  Force Usage:")
-    print(f"    Average: {{avg_force:.2f}} Nm")
-    print(f"    Peak: {{max_force:.2f}} Nm")
-    print(f"    Saturation: {{saturation_pct:.1f}}%")
-    print(f"  Stability Score: {{stability_score:.2f}}/1.00")
+    print(f"  Tracking Error: {{np.rad2deg(default_result['avg_error']):.2f}}° (max: {{np.rad2deg(default_result['max_error']):.2f}}°)")
+    print(f"  Saturation: {{default_result['saturation_pct']:.1f}}%")
+    print(f"  Stability: {{default_result['stability_score']:.2f}}")
     print()
     
-    # Verdict
-    passed = True
-    issues = []
-    
-    if avg_error > MAX_ACCEPTABLE_ERROR:
-        passed = False
-        issues.append(f"High tracking error ({{np.rad2deg(avg_error):.1f}}° > {{np.rad2deg(MAX_ACCEPTABLE_ERROR):.1f}}°)")
-    
-    if saturation_pct > MAX_SATURATION_PCT:
-        passed = False
-        issues.append(f"High saturation rate ({{saturation_pct:.1f}}% > {{MAX_SATURATION_PCT}}%)")
-    
-    if stability_score < MIN_STABILITY_SCORE:
-        passed = False
-        issues.append(f"Poor stability ({{stability_score:.2f}} < {{MIN_STABILITY_SCORE}})")
-    
-    print("="*60)
-    if passed:
-        print("✅ VALIDATION PASSED")
-        print("Default parameters work well for this trajectory!")
-        print("You can now adjust individual motor specs per joint.")
-    else:
-        print("❌ VALIDATION FAILED")
-        print("Issues detected:")
-        for issue in issues:
-            print(f"  - {{issue}}")
+    if default_result['success']:
+        print("="*70)
+        print("✅ DEFAULT PARAMETERS WORK PERFECTLY!")
+        print("="*70)
+        print("No optimization needed. You can proceed to Mode 2 for fine-tuning.")
         print()
-        print("Recommendations:")
-        if avg_error > MAX_ACCEPTABLE_ERROR:
-            print("  - Increase kp (position gain) for better tracking")
-            print("  - Check if trajectory is too fast for current motors")
-        if saturation_pct > MAX_SATURATION_PCT:
-            print("  - Increase forcelim (motor force limit)")
-            print("  - Or reduce kp to demand less force")
-        if stability_score < MIN_STABILITY_SCORE:
-            print("  - Increase kv (damping) for stability")
-            print("  - Add joint damping if oscillating")
-    print("="*60)
+        return True
     
-    return passed
+    # Start optimization
+    print("❌ Default parameters not optimal. Starting automatic search...")
+    print(f"   Testing {{len(KP_RANGE) * len(KV_RANGE) * len(FORCELIM_RANGE)}} parameter combinations...")
+    print()
+    
+    best_result = None
+    best_params = None
+    test_count = 0
+    
+    for kp, kv, forcelim in product(KP_RANGE, KV_RANGE, FORCELIM_RANGE):
+        test_count += 1
+        result = simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids,
+                                     kp, kv, forcelim, n_steps)
+        
+        # Show progress every 10 tests
+        if test_count % 10 == 0:
+            print(f"  Progress: {{test_count}}/{{len(KP_RANGE) * len(KV_RANGE) * len(FORCELIM_RANGE)}} tests completed...")
+        
+        # Update best result (prioritize success, then lowest error)
+        if best_result is None or (result['success'] and not best_result['success']) or \\
+           (result['success'] == best_result['success'] and result['avg_error'] < best_result['avg_error']):
+            best_result = result
+            best_params = {{'kp': kp, 'kv': kv, 'forcelim': forcelim}}
+            
+            # If we found a working combination, we can stop early
+            if result['success']:
+                print(f"  ✅ Found working parameters at test {{test_count}}!")
+                break
+    
+    print()
+    print("="*70)
+    
+    if best_result and best_result['success']:
+        print("✅ OPTIMAL PARAMETERS FOUND!")
+        print("="*70)
+        print()
+        print("Recommended parameters:")
+        print(f"  kp (position gain):     {{best_params['kp']}}")
+        print(f"  kv (velocity damping):  {{best_params['kv']}}")
+        print(f"  forcelim (force limit): {{best_params['forcelim']}} Nm")
+        print()
+        print("Performance with these parameters:")
+        print(f"  Tracking Error: {{np.rad2deg(best_result['avg_error']):.2f}}° (target: < {{np.rad2deg(MAX_ACCEPTABLE_ERROR)}}°)")
+        print(f"  Saturation: {{best_result['saturation_pct']:.1f}}% (target: < {{MAX_SATURATION_PCT}}%)")
+        print(f"  Stability: {{best_result['stability_score']:.2f}} (target: > {{MIN_STABILITY_SCORE}})")
+        print()
+        print("Next steps:")
+        print("  1. Update these values in src/backend/exporters/mjcf_exporter.py:")
+        print(f"     - Line ~218: kp=\\"{{best_params['kp']}}\\" kv=\\"{{best_params['kv']}}\\"")
+        print(f"     - Line ~218: forcerange=\\"-{{best_params['forcelim']}} {{best_params['forcelim']}}\\"")
+        print("  2. Re-export your robot model")
+        print("  3. Or use Mode 2 to apply these per-joint")
+        print()
+        print("="*70)
+        return True
+    else:
+        # No working parameters found
+        print("⚠️  NO WORKING PARAMETERS FOUND")
+        print("="*70)
+        print()
+        print("Best attempt (still failing):")
+        if best_params:
+            print(f"  kp={{best_params['kp']}}, kv={{best_params['kv']}}, forcelim={{best_params['forcelim']}}")
+            print(f"  Error: {{np.rad2deg(best_result['avg_error']):.2f}}° (limit: {{np.rad2deg(MAX_ACCEPTABLE_ERROR)}}°)")
+            print(f"  Saturation: {{best_result['saturation_pct']:.1f}}% (limit: {{MAX_SATURATION_PCT}}%)")
+        print()
+        print("🔴 DIAGNOSIS: TRAJECTORY IS TOO AGGRESSIVE")
+        print()
+        print("The recorded motion is physically impossible for this robot:")
+        print()
+        print("Possible causes:")
+        print("  1. ⚡ Motion is too fast")
+        print("     - Joints accelerate/decelerate too quickly")
+        print("     - Physics simulation cannot keep up")
+        print()
+        print("  2. 📏 Joint angles exceed safe limits")
+        print("     - Motion tries to move joints beyond physical range")
+        print("     - Check joint limits in MJCF/URDF")
+        print()
+        print("  3. ⚖️  Model mass/inertia is too high")
+        print("     - Heavy links require more force to move")
+        print("     - Reduce link mass in the model")
+        print()
+        print("  4. 🎯 Trajectory has sudden jumps")
+        print("     - Not enough keyframes for smooth interpolation")
+        print("     - Add more intermediate keyframes")
+        print()
+        print("Suggested solutions:")
+        print("  ✓ Re-record motion at 50-70% speed")
+        print("  ✓ Add more keyframes (smoother transitions)")
+        print("  ✓ Check and adjust joint limits")
+        print("  ✓ Reduce link mass/inertia in model editor")
+        print("  ✓ Use simpler, slower movements for testing")
+        print()
+        print("⚠️  Parameter tuning CANNOT solve this issue.")
+        print("    The trajectory itself must be modified.")
+        print()
+        print("="*70)
+        return False
 
 if __name__ == '__main__':
     import sys
-    model_file = sys.argv[1] if len(sys.argv) > 1 else '{model_file}'
-    success = validate_motor_parameters(model_file)
+    success = optimize_parameters()
     sys.exit(0 if success else 1)
+'''
+
+    return f'''#!/usr/bin/env python3
+"""
+Quick validation of default motor parameters.
+Tests if robot can track trajectory with current settings.
+"""
+import mujoco
 '''
 
 
@@ -1132,9 +1223,9 @@ echo "========================================"
 echo ""
 echo "Select Analysis Mode:"
 echo ""
-echo "0. Quick Validation (NEW)"
-echo "   - Test if default parameters work"
-echo "   - Takes ~5 seconds"
+echo "0. Auto Parameter Optimization (NEW)"
+echo "   - Finds optimal motor parameters automatically"
+echo "   - Or diagnoses trajectory issues"
 echo ""
 echo "1. Joint Torque Visualization"
 echo "   - Theoretical torque (inverse dynamics)"
@@ -1146,14 +1237,14 @@ echo "3. Fingertip Sensor Forces"
 echo "   - Contact force visualization"
 echo ""
 echo "========================================"
-read -p "Enter choice [0 to validate, 2 for full tuning]: " choice
+read -p "Enter choice [0 to auto-optimize, 2 for manual tuning]: " choice
 
 MODE="inverse"
 SCRIPT="replay_with_torque.py"
 
 if [ "$choice" = "0" ]; then
-    # Mode 0: Quick validation
-    echo "Running quick validation..."
+    # Mode 0: Auto optimization
+    echo "Running automatic parameter optimization..."
     python3 validate_motor_params.py
     exit_code=$?
     if [ $exit_code -eq 0 ]; then

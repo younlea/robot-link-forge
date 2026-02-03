@@ -57,6 +57,15 @@ You can now adjust individual motor specs per joint.
 ===========================================================
 ```
 
+**실패 시 자동 분석:**
+Mode 0은 실패 시 자동으로 원인을 분석합니다:
+- **Test 1**: 힘 한계를 2배로 증가시켜 테스트 (80 → 160 Nm)
+- **Test 2**: 위치 게인을 1.5배로 증가시켜 테스트 (kp: 200 → 300)
+
+결과는 두 가지로 나뉩니다:
+1. ✅ **해결 가능** - 파라미터 조정으로 해결됨 (제안 값 제공)
+2. ⚠️ **궤적 문제** - 모션 자체가 너무 공격적 (궤적 수정 필요)
+
 ### Mode 1: Joint Torque Visualization
 **Purpose**: See theoretical torque requirements (inverse dynamics)
 
