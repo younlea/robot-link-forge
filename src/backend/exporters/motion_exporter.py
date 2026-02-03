@@ -2272,8 +2272,11 @@ if HAS_MATPLOTLIB:
     
     print("Showing UI window...")
     plt.show(block=False)
-    plt.pause(0.1)  # Increased from 0.001 to ensure window appears
+    plt.pause(0.5)  # Longer pause to ensure full render
+    fig.canvas.draw()
+    fig.canvas.flush_events()
     print("UI window created successfully!")
+    print(f"Figure has {{len(fig.axes)}} axes")
 else:
     print("\\nMatplotlib not available - running without UI")
 

@@ -743,5 +743,20 @@ def generate_mjcf_xml(
         xml.append("  </sensor>")
 
     xml.append("</mujoco>")
-    xml.append("</mujoco>")
-    return "\n".join(xml), generated_joints_info
+    
+    # Debug: Print worldbody structure
+    xml_str = "\n".join(xml)
+    print("\n" + "="*70)
+    print("MJCF EXPORT VALIDATION")
+    print("="*70)
+    if "fixed_world" in xml_str:
+        print("✓ fixed_world anchor found - robot should be stable")
+    else:
+        print("✗ WARNING: fixed_world NOT found - robot will fall!")
+    
+    # Count bodies
+    body_count = xml_str.count("<body")
+    print(f"Total bodies: {body_count}")
+    print("="*70 + "\n")
+    
+    return xml_str, generated_joints_info
