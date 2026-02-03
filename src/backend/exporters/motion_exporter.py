@@ -2138,7 +2138,7 @@ if HAS_MATPLOTLIB:
             apply_motor_params_joint(selected_joint)
         update_info_text()
     
-    def on_reset(event):
+    def on_reset_joint(event):
         \"\"\"Reset selected joint to global motor specs\"\"\"
         if current_mode == 'per_joint' and selected_joint:
             if selected_joint in per_joint_params:
