@@ -938,6 +938,18 @@ def simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, kp, kv,
             model.actuator_biasprm[i][2] = -kv  # Velocity damping
             model.actuator_forcerange[i] = [-forcelim, forcelim]
         
+        # CRITICAL FIX: Initialize qpos to trajectory start
+        data.qpos[:] = qpos_traj[0]
+        data.qvel[:] = 0
+        mujoco.mj_forward(model, data)
+        
+        # Warmup: Let robot settle at start position
+        for _ in range(50):
+            for jname, jid in joint_ids.items():
+                if jname in actuator_ids:
+                    data.ctrl[actuator_ids[jname]] = qpos_traj[0, model.jnt_qposadr[jid]]
+            mujoco.mj_step(model, data)
+        
         errors = []
         forces = []
         saturated_count = 0
@@ -1919,7 +1931,7 @@ if HAS_MATPLOTLIB:
     selected_joint = None
     current_mode = 'global'  # 'global' or 'per_joint'
     joint_page = 0
-    joints_per_page = 20
+    joints_per_page = 8  # Reduced from 20 to prevent text overlap
     
     # Real-time data storage
     plot_history = {{
@@ -1984,19 +1996,19 @@ if HAS_MATPLOTLIB:
     ax_btn_save = plt.axes([0.30, 0.38, 0.08, 0.03])
     btn_save = Button(ax_btn_save, 'Save All')
     
-    # RadioButtons area - below buttons, wider and taller
-    ax_radio_joints = plt.axes([0.09, 0.12, 0.29, 0.23])
+    # RadioButtons area - below buttons, wider and taller (increased from 0.23 to 0.28)
+    ax_radio_joints = plt.axes([0.09, 0.08, 0.29, 0.28])
     radio_joints = RadioButtons(ax_radio_joints, get_current_page_joints(), activecolor='blue')
     
-    # Pagination buttons (below radio buttons)
-    ax_btn_prev = plt.axes([0.09, 0.08, 0.08, 0.025])
+    # Pagination buttons (moved up to accommodate larger radio area)
+    ax_btn_prev = plt.axes([0.09, 0.03, 0.08, 0.025])
     btn_prev = Button(ax_btn_prev, '< Prev')
     
-    ax_page_text_ax = plt.axes([0.18, 0.08, 0.06, 0.025])
+    ax_page_text_ax = plt.axes([0.18, 0.03, 0.06, 0.025])
     ax_page_text_ax.axis('off')
     page_text = ax_page_text_ax.text(0.5, 0.5, f'{{joint_page+1}}/{{total_pages}}', ha='center', va='center', fontsize=9)
     
-    ax_btn_next = plt.axes([0.25, 0.08, 0.08, 0.025])
+    ax_btn_next = plt.axes([0.25, 0.03, 0.08, 0.025])
     btn_next = Button(ax_btn_next, 'Next >')
     
     def update_control_sliders():
@@ -2019,7 +2031,7 @@ if HAS_MATPLOTLIB:
         \"\"\"Recreate RadioButtons with current page joints\"\"\"
         global radio_joints, ax_radio_joints
         ax_radio_joints.clear()
-        ax_radio_joints.set_position([0.09, 0.12, 0.29, 0.23])
+        ax_radio_joints.set_position([0.09, 0.08, 0.29, 0.28])  # Match new size
         radio_joints = RadioButtons(ax_radio_joints, get_current_page_joints(), activecolor='blue')
         radio_joints.on_clicked(on_joint_select)
         page_text.set_text(f'{{joint_page+1}}/{{total_pages}}')
