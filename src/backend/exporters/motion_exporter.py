@@ -922,9 +922,9 @@ MAX_SATURATION_PCT = 30.0    # Allow up to 30% force saturation
 MIN_STABILITY_SCORE = 0.6    # Stability metric (0-1)
 
 # Parameter search ranges
-KP_RANGE = [800, 1000, 1500, 2000, 2500]
-KV_RANGE = [80, 100, 150, 200, 250]
-FORCELIM_RANGE = [150, 200, 250, 300, 400]
+KP_RANGE = [1500, 2000, 2500, 3000, 3500]
+KV_RANGE = [150, 200, 250, 300, 350]
+FORCELIM_RANGE = [200, 250, 300, 400, 500]
 
 def simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, kp, kv, forcelim, n_steps):
     """Run simulation with given parameters and return metrics"""
@@ -1079,10 +1079,10 @@ def optimize_parameters(model_file='{model_file}'):
         q_interp = np.interp(trajectory_times, kf_times, y_points)
         qpos_traj[:, qadr] = q_interp
     
-    print("Step 1: Testing default parameters (kp=1500, kv=150, forcelim=200)...")
+    print("Step 1: Testing default parameters (kp=2500, kv=250, forcelim=300)...")
     print("-" * 70)
     default_result = simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, 
-                                         1500, 150, 200, n_steps)
+                                         2500, 250, 300, n_steps)
     
     print(f"  Tracking Error: {{np.rad2deg(default_result['avg_error']):.2f}}deg (max: {{np.rad2deg(default_result['max_error']):.2f}}deg)")
     print(f"  Saturation: {{default_result['saturation_pct']:.1f}}%")
@@ -1314,11 +1314,15 @@ if [ "$choice" = "0" ]; then
     echo "Running automatic parameter optimization..."
     python3 validate_motor_params.py
     exit_code=$?
+    echo "Exit code: $exit_code"
     
     # Check for Mode 2 launch request (exit code 42 = launch Mode 2)
     if [ $exit_code -eq 42 ]; then
         echo ""
+        echo "===================="
         echo "Launching Mode 2..."
+        echo "===================="
+        sleep 1
         python3 replay_motor_validation.py {default_rec_idx}
         exit 0
     elif [ $exit_code -eq 0 ]; then
@@ -1326,6 +1330,7 @@ if [ "$choice" = "0" ]; then
         echo "Optimization complete."
         exit 0
     else
+        echo "Optimization failed with exit code: $exit_code"
         exit $exit_code
     fi
 elif [ "$choice" = "2" ]; then
@@ -1816,14 +1821,14 @@ print(f"Loaded {{rec['name']}}. Mode: Motor Validation")
 # --- Motor Parameter Management ---
 # Control parameters: applied globally to all actuators (controller tuning)
 GLOBAL_CONTROL_PARAMS = {{
-    'kp': 1500.0,  # Position gain (increased for aggressive trajectory tracking)
-    'kv': 150.0,   # Velocity damping (10% of kp for good damping ratio)
+    'kp': 2500.0,  # Position gain (high for aggressive trajectory tracking)
+    'kv': 250.0,   # Velocity damping (10% of kp for good damping ratio)
 }}
 
 # Motor specifications: can be different per joint (hardware characteristics)
 GLOBAL_MOTOR_PARAMS = {{
     'gear': 1.0,
-    'forcelim': 200.0,  # Increased to 200 for aggressive trajectories
+    'forcelim': 300.0,  # High force limit for aggressive trajectories
     'ctrlrange_max': 10.0,  # Maximum velocity (rad/s or m/s)
     'armature': 0.001,
     'frictionloss': 0.1,
@@ -2001,8 +2006,8 @@ if HAS_MATPLOTLIB:
     
     # === GLOBAL CONTROL SETTINGS (top) ===
     control_specs = [
-        ('kp', 'Control Kp (Gain)', 0, 3000, 1500),
-        ('kv', 'Control Kv (Damping)', 0, 300, 150),
+        ('kp', 'Control Kp (Gain)', 0, 5000, 2500),
+        ('kv', 'Control Kv (Damping)', 0, 500, 250),
     ]
     
     control_sliders = {{}}
@@ -2019,7 +2024,7 @@ if HAS_MATPLOTLIB:
     # === MOTOR SPECIFICATIONS (middle) ===
     motor_specs = [
         ('gear', 'Motor Gear Ratio', 0.1, 200, 1),
-        ('forcelim', 'Motor Force Limit (Nm)', 0, 500, 200),  # Updated to 200
+        ('forcelim', 'Motor Force Limit (Nm)', 0, 600, 300),  # Updated to 300
         ('ctrlrange_max', 'Max Velocity (rad/s)', 0, 50, 10),
         ('armature', 'Motor Armature', 0, 0.01, 0.001),
         ('frictionloss', 'Motor Friction', 0, 1, 0.1),
