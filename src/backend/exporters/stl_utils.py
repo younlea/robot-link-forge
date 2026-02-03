@@ -102,14 +102,14 @@ def calculate_inertia_from_stl(
             center_of_mass *= scale[0]  # Linear scaling for COM
 
         # Ensure reasonable values
-        if mass < 0.001:  # Less than 1 gram
-            mass = 0.01  # Default to 10 grams
-        if mass > 10.0:  # More than 10 kg
-            mass = 0.1  # Cap at 100 grams
+        if mass < 0.0001:  # Less than 0.1 gram
+            mass = 0.001  # Default to 1 gram for very small parts
+        # Note: Removed upper limit - let real STL mass be used
+        # Heavy robots need heavy links!
 
         # Ensure inertia is positive definite
         inertia_diag = np.diag(inertia)
-        if np.any(inertia_diag <= 0):
+        if np.any(inertia_diag <= 0) or np.any(np.isnan(inertia_diag)):
             # Use simple formula for cylinder
             h = mesh.bounds[1][2] - mesh.bounds[0][2]
             r = (
@@ -119,8 +119,20 @@ def calculate_inertia_from_stl(
                 )
                 / 2
             )
+            # Apply scale to dimensions
+            if scale is not None:
+                h *= scale[2]
+                r *= scale[0]
+            
             ixx = iyy = mass * (3 * r**2 + h**2) / 12
             izz = mass * r**2 / 2
+            
+            # Minimum inertia to avoid numerical issues
+            min_inertia = mass * 0.0001
+            ixx = max(ixx, min_inertia)
+            iyy = max(iyy, min_inertia)
+            izz = max(izz, min_inertia)
+            
             inertia = np.diag([ixx, iyy, izz])
 
         return {
