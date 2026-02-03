@@ -922,9 +922,9 @@ MAX_SATURATION_PCT = 20.0    # Allow up to 20% force saturation
 MIN_STABILITY_SCORE = 0.7    # Stability metric (0-1)
 
 # Parameter search ranges
-KP_RANGE = [150, 200, 250, 300, 350]
-KV_RANGE = [30, 40, 50, 60]
-FORCELIM_RANGE = [80, 120, 160, 200]
+KP_RANGE = [150, 200, 250, 300, 350, 400]
+KV_RANGE = [30, 40, 50, 60, 80]
+FORCELIM_RANGE = [80, 120, 160, 200, 250, 300, 400]
 
 def simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, kp, kv, forcelim, n_steps):
     """Run simulation with given parameters and return metrics"""
@@ -1087,7 +1087,9 @@ def optimize_parameters(model_file='{model_file}'):
     
     # Start optimization
     print("❌ Default parameters not optimal. Starting automatic search...")
-    print(f"   Testing {{len(KP_RANGE) * len(KV_RANGE) * len(FORCELIM_RANGE)}} parameter combinations...")
+    total_tests = len(KP_RANGE) * len(KV_RANGE) * len(FORCELIM_RANGE)
+    print(f"   Testing {{total_tests}} parameter combinations...")
+    print(f"   (kp: {{len(KP_RANGE)}} values, kv: {{len(KV_RANGE)}} values, forcelim: {{len(FORCELIM_RANGE)}} values)")
     print()
     
     best_result = None
@@ -1101,7 +1103,7 @@ def optimize_parameters(model_file='{model_file}'):
         
         # Show progress every 10 tests
         if test_count % 10 == 0:
-            print(f"  Progress: {{test_count}}/{{len(KP_RANGE) * len(KV_RANGE) * len(FORCELIM_RANGE)}} tests completed...")
+            print(f"  Progress: {{test_count}}/{{total_tests}} tests completed...")
         
         # Update best result (prioritize success, then lowest error)
         if best_result is None or (result['success'] and not best_result['success']) or \\
@@ -1111,7 +1113,7 @@ def optimize_parameters(model_file='{model_file}'):
             
             # If we found a working combination, we can stop early
             if result['success']:
-                print(f"  ✅ Found working parameters at test {{test_count}}!")
+                print(f"  ✅ Found working parameters at test {{test_count}}/{{total_tests}}!")
                 break
     
     print()
