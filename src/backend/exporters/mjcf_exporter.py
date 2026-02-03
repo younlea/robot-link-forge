@@ -96,8 +96,9 @@ def generate_mjcf_xml(
     
     # CRITICAL: Add a fixed base body to prevent robot from falling
     # Without this, MuJoCo treats root as freejoint (6-DOF floating)
-    xml.append('    <body name="fixed_world" pos="0 0 0.5">')
-    xml.append('      <!-- Robot will be attached here -->')
+    xml.append('    <!-- Fixed world anchor - prevents robot from falling -->')
+    xml.append('    <body name="fixed_world" pos="0 0 0.5" mocap="false">')
+    xml.append('      <!-- Robot base attached here with no joints = welded -->')
 
     actuators = []
     sensors = []
