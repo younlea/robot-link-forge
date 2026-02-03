@@ -2041,18 +2041,23 @@ if HAS_MATPLOTLIB:
         slider = Slider(ax_slider, label, vmin, vmax, valinit=vinit, valstep=(vmax-vmin)/1000.0)
         motor_sliders[key] = slider
     
-    # Motor buttons (below motor sliders)
-    ax_btn_apply = plt.axes([0.09, 0.38, 0.09, 0.03])
-    btn_apply = Button(ax_btn_apply, 'Apply Motor')
+    # Motor buttons (all in one row below motor sliders)
+    button_y = 0.38
+    button_height = 0.03
+    button_width = 0.09
+    button_spacing = 0.005
     
-    ax_btn_reset_joint = plt.axes([0.19, 0.38, 0.09, 0.03])
-    btn_reset_joint = Button(ax_btn_reset_joint, 'Reset Joint')
+    ax_btn_apply = plt.axes([0.09, button_y, button_width, button_height])
+    btn_apply = Button(ax_btn_apply, 'Apply')
     
-    ax_btn_restart = plt.axes([0.29, 0.38, 0.09, 0.03])
+    ax_btn_reset_joint = plt.axes([0.09 + button_width + button_spacing, button_y, button_width, button_height])
+    btn_reset_joint = Button(ax_btn_reset_joint, 'Reset')
+    
+    ax_btn_restart = plt.axes([0.09 + 2*(button_width + button_spacing), button_y, button_width, button_height])
     btn_restart = Button(ax_btn_restart, 'Restart')
     
-    ax_btn_save = plt.axes([0.09, 0.34, 0.08, 0.03])
-    btn_save = Button(ax_btn_save, 'Save All')
+    ax_btn_save = plt.axes([0.09 + 3*(button_width + button_spacing), button_y, button_width, button_height])
+    btn_save = Button(ax_btn_save, 'Save')
     
     # RadioButtons area - below buttons, wider and taller (increased from 0.23 to 0.28)
     ax_radio_joints = plt.axes([0.09, 0.08, 0.29, 0.28])
@@ -2148,15 +2153,22 @@ if HAS_MATPLOTLIB:
             update_info_text()
     
     def on_restart(event):
-        \"\"\"Restart replay from beginning\"\"\"
+        \"\"\"Restart replay from beginning - reset time and robot position\"\"\"
         global start_time
         start_time = time.time()
+        
+        # Reset robot to initial trajectory position
+        data.qpos[:] = qpos_traj[0]
+        data.qvel[:] = 0
+        mujoco.mj_forward(model, data)
+        
         # Clear history for fresh plots
         plot_history['time'].clear()
         plot_history['tracking_error'].clear()
         plot_history['max_torque'].clear()
         plot_history['saturated_count'] = 0
         update_info_text()
+        print(\"[RESTART] Replay restarted from t=0\")
     
     def on_save(event):
         save_motor_params()
