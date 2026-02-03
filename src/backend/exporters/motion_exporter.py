@@ -921,11 +921,12 @@ MAX_ACCEPTABLE_ERROR = 0.20  # rad (~11.5 degrees, very relaxed for aggressive t
 MAX_SATURATION_PCT = 50.0    # Allow up to 50% force saturation
 MIN_STABILITY_SCORE = 0.4    # Stability metric (0-1)
 
-# Parameter search ranges
-KP_RANGE = [500, 800, 1000]  # Moderate PD gains
-KV_RANGE = [50, 80, 100]  # 10% damping ratio
-GEAR_RANGE = [100, 200, 300, 500, 800]  # EXTREME torque amplification!
-FORCELIM_RANGE = [800, 1000, 1500, 2000]  # Very high motor force limits
+# Parameter search ranges - REVISED for trajectory following
+# Key insight: LOW kp + HIGH gear is better than HIGH kp + LOW gear!
+KP_RANGE = [50, 100, 200]  # LOW kp reduces oscillations
+KV_RANGE = [10, 20, 40]  # 20% damping ratio
+GEAR_RANGE = [200, 500, 800, 1200]  # HIGH gear for torque
+FORCELIM_RANGE = [1000, 1500, 2000]  # High force limits
 
 def simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, kp, kv, gear, forcelim, n_steps):
     """Run simulation with given parameters and return metrics"""
@@ -1081,10 +1082,10 @@ def optimize_parameters(model_file='{model_file}'):
         q_interp = np.interp(trajectory_times, kf_times, y_points)
         qpos_traj[:, qadr] = q_interp
     
-    print("Step 1: Testing default parameters (kp=800, kv=80, gear=200, forcelim=1000)...")
+    print("Step 1: Testing default parameters (kp=100, kv=20, gear=500, forcelim=1500)...")
     print("-" * 70)
     default_result = simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, 
-                                         800, 80, 200, 1000, n_steps)
+                                         100, 20, 500, 1500, n_steps)
     
     print(f"  Tracking Error: {{np.rad2deg(default_result['avg_error']):.2f}}deg (max: {{np.rad2deg(default_result['max_error']):.2f}}deg)")
     print(f"  Saturation: {{default_result['saturation_pct']:.1f}}%")
@@ -1824,14 +1825,14 @@ print(f"Loaded {{rec['name']}}. Mode: Motor Validation")
 # --- Motor Parameter Management ---
 # Control parameters: applied globally to all actuators (controller tuning)
 GLOBAL_CONTROL_PARAMS = {{
-    'kp': 800.0,  # Position gain (moderate for stability)
-    'kv': 80.0,   # Velocity damping (10% of kp for good damping ratio)
+    'kp': 100.0,  # LOW position gain - reduces oscillations
+    'kv': 20.0,   # 20% damping ratio for smooth tracking
 }}
 
 # Motor specifications: can be different per joint (hardware characteristics)
 GLOBAL_MOTOR_PARAMS = {{
-    'gear': 200.0,  # EXTREME gear ratio for very aggressive trajectories!
-    'forcelim': 1000.0,  # Very high motor force limit
+    'gear': 500.0,  # HIGH gear ratio - provides torque
+    'forcelim': 1500.0,  # High motor force limit
     'ctrlrange_max': 10.0,  # Maximum velocity (rad/s or m/s)
     'armature': 0.001,
     'frictionloss': 0.1,
@@ -2009,8 +2010,8 @@ if HAS_MATPLOTLIB:
     
     # === GLOBAL CONTROL SETTINGS (top) ===
     control_specs = [
-        ('kp', 'Control Kp (Gain)', 0, 2000, 800),
-        ('kv', 'Control Kv (Damping)', 0, 200, 80),
+        ('kp', 'Control Kp (Gain)', 10, 500, 100),  # Lower range, default 100
+        ('kv', 'Control Kv (Damping)', 2, 100, 20),  # 20% damping
     ]
     
     control_sliders = {{}}
@@ -2026,8 +2027,8 @@ if HAS_MATPLOTLIB:
     
     # === MOTOR SPECIFICATIONS (middle) ===
     motor_specs = [
-        ('gear', 'Motor Gear Ratio', 1, 1000, 200),  # Default 200, max 1000
-        ('forcelim', 'Motor Force Limit (Nm)', 0, 3000, 1000),  # Default 1000, max 3000
+        ('gear', 'Motor Gear Ratio', 10, 2000, 500),  # Default 500, max 2000
+        ('forcelim', 'Motor Force Limit (Nm)', 100, 3000, 1500),  # Default 1500
         ('ctrlrange_max', 'Max Velocity (rad/s)', 0, 50, 10),
         ('armature', 'Motor Armature', 0, 0.01, 0.001),
         ('frictionloss', 'Motor Friction', 0, 1, 0.1),
