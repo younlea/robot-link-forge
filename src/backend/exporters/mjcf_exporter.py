@@ -247,11 +247,11 @@ def generate_mjcf_xml(
                             actuator_counter[act_name] = 0
 
                         # Tuned for stable tracking with good damping ratio
-                        # kp=800, kv=80 (10% damping ratio), increased force limit
+                        # kp=1500, kv=150 (10% damping ratio), increased force limit for aggressive trajectories
                         # User can adjust per-joint for different motor specs
                         actuators.append(
                             f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
-                            f'kp="800" kv="80" gear="1" forcelimited="true" forcerange="-150 150" {ctrl_range}/>'
+                            f'kp="1500" kv="150" gear="1" forcelimited="true" forcerange="-200 200" {ctrl_range}/>'
                         )
 
                         # Capture Info for Replay Mapping
