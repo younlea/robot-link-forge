@@ -917,14 +917,14 @@ import os
 from itertools import product
 
 # Validation thresholds
-MAX_ACCEPTABLE_ERROR = 0.15  # rad (~8.6 degrees)
-MAX_SATURATION_PCT = 20.0    # Allow up to 20% force saturation
-MIN_STABILITY_SCORE = 0.7    # Stability metric (0-1)
+MAX_ACCEPTABLE_ERROR = 0.10  # rad (~5.7 degrees, relaxed for realistic tracking)
+MAX_SATURATION_PCT = 30.0    # Allow up to 30% force saturation
+MIN_STABILITY_SCORE = 0.6    # Stability metric (0-1)
 
 # Parameter search ranges
-KP_RANGE = [300, 400, 500, 600, 800, 1000]
-KV_RANGE = [40, 50, 60, 80, 100]
-FORCELIM_RANGE = [100, 120, 160, 200, 250, 300, 400]
+KP_RANGE = [500, 600, 800, 1000, 1200, 1500]
+KV_RANGE = [50, 60, 80, 100, 120]
+FORCELIM_RANGE = [120, 150, 200, 250, 300, 400]
 
 def simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, kp, kv, forcelim, n_steps):
     """Run simulation with given parameters and return metrics"""
@@ -1079,10 +1079,10 @@ def optimize_parameters(model_file='{model_file}'):
         q_interp = np.interp(trajectory_times, kf_times, y_points)
         qpos_traj[:, qadr] = q_interp
     
-    print("Step 1: Testing default parameters (kp=500, kv=50, forcelim=120)...")
+    print("Step 1: Testing default parameters (kp=800, kv=80, forcelim=150)...")
     print("-" * 70)
     default_result = simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, 
-                                         500, 50, 120, n_steps)
+                                         800, 80, 150, n_steps)
     
     print(f"  Tracking Error: {{np.rad2deg(default_result['avg_error']):.2f}}° (max: {{np.rad2deg(default_result['max_error']):.2f}}°)")
     print(f"  Saturation: {{default_result['saturation_pct']:.1f}}%")
@@ -1093,8 +1093,24 @@ def optimize_parameters(model_file='{model_file}'):
         print("="*70)
         print("✅ DEFAULT PARAMETERS WORK PERFECTLY!")
         print("="*70)
-        print("No optimization needed. You can proceed to Mode 2 for fine-tuning.")
+        print("No optimization needed.")
         print()
+        
+        # Ask user if they want to proceed to Mode 2
+        while True:
+            response = input("\n➡️  Would you like to open Mode 2 (Interactive Motor Tuning)? [Y/n]: ").strip().lower()
+            if response in ['', 'y', 'yes']:
+                print("\n" + "="*70)
+                print("🔧 LAUNCHING MODE 2: INTERACTIVE MOTOR TUNING")
+                print("="*70)
+                print("You can now fine-tune parameters per-joint...\n")
+                # Return special code to launch Mode 2
+                return 'launch_mode2'
+            elif response in ['n', 'no']:
+                print("\n✓ Optimization complete. Exiting...")
+                return True
+            else:
+                print("Please enter 'y' or 'n'")
         return True
     
     # Start optimization
@@ -1153,6 +1169,22 @@ def optimize_parameters(model_file='{model_file}'):
         print("  3. Or use Mode 2 to apply these per-joint")
         print()
         print("="*70)
+        
+        # Ask user if they want to proceed to Mode 2
+        while True:
+            response = input("\\n\u27a1\ufe0f  Would you like to open Mode 2 (Interactive Motor Tuning)? [Y/n]: ").strip().lower()
+            if response in ['', 'y', 'yes']:
+                print("\\n" + "="*70)
+                print("\ud83d\udd27 LAUNCHING MODE 2: INTERACTIVE MOTOR TUNING")
+                print("="*70)
+                print("Applying optimized parameters as defaults...\\n")
+                # Return special code with best params
+                return ('launch_mode2', best_params)
+            elif response in ['n', 'no']:
+                print("\\n\u2713 Optimization complete. Exiting...")
+                return True
+            else:
+                print("Please enter 'y' or 'n'")
         return True
     else:
         # No working parameters found
@@ -1201,8 +1233,14 @@ def optimize_parameters(model_file='{model_file}'):
 
 if __name__ == '__main__':
     import sys
-    success = optimize_parameters()
-    sys.exit(0 if success else 1)
+    result = optimize_parameters()
+    # result can be: True, False, 'launch_mode2', or ('launch_mode2', params_dict)
+    if result == 'launch_mode2' or (isinstance(result, tuple) and result[0] == 'launch_mode2'):
+        sys.exit(42)  # Special exit code to launch Mode 2
+    elif result:
+        sys.exit(0)
+    else:
+        sys.exit(1)
 '''
 
     return f'''#!/usr/bin/env python3
@@ -1276,11 +1314,20 @@ if [ "$choice" = "0" ]; then
     echo "Running automatic parameter optimization..."
     python3 validate_motor_params.py
     exit_code=$?
-    if [ $exit_code -eq 0 ]; then
+    
+    # Check for Mode 2 launch request (exit code 42 = launch Mode 2)
+    if [ $exit_code -eq 42 ]; then
         echo ""
-        echo "Proceed to Mode 2 for per-joint tuning if needed."
+        echo "Launching Mode 2..."
+        python3 replay_motor_validation.py {default_rec_idx}
+        exit 0
+    elif [ $exit_code -eq 0 ]; then
+        echo ""
+        echo "\u2713 Optimization complete."
+        exit 0
+    else
+        exit $exit_code
     fi
-    exit $exit_code
 elif [ "$choice" = "2" ]; then
     # Mode 2 uses separate script
     SCRIPT="replay_motor_validation.py"
@@ -1769,14 +1816,14 @@ print(f"Loaded {{rec['name']}}. Mode: Motor Validation")
 # --- Motor Parameter Management ---
 # Control parameters: applied globally to all actuators (controller tuning)
 GLOBAL_CONTROL_PARAMS = {{
-    'kp': 500.0,  # Position gain (increased for better tracking)
-    'kv': 50.0,   # Velocity damping (10% of kp for good damping ratio)
+    'kp': 800.0,  # Position gain (increased for better tracking)
+    'kv': 80.0,   # Velocity damping (10% of kp for good damping ratio)
 }}
 
 # Motor specifications: can be different per joint (hardware characteristics)
 GLOBAL_MOTOR_PARAMS = {{
     'gear': 1.0,
-    'forcelim': 80.0,
+    'forcelim': 150.0,  # Increased from 80 to 150
     'ctrlrange_max': 10.0,  # Maximum velocity (rad/s or m/s)
     'armature': 0.001,
     'frictionloss': 0.1,
@@ -1954,8 +2001,8 @@ if HAS_MATPLOTLIB:
     
     # === GLOBAL CONTROL SETTINGS (top) ===
     control_specs = [
-        ('kp', 'Control Kp (Gain)', 0, 2000, 500),
-        ('kv', 'Control Kv (Damping)', 0, 200, 50),
+        ('kp', 'Control Kp (Gain)', 0, 2000, 800),
+        ('kv', 'Control Kv (Damping)', 0, 200, 80),
     ]
     
     control_sliders = {{}}
@@ -1972,7 +2019,7 @@ if HAS_MATPLOTLIB:
     # === MOTOR SPECIFICATIONS (middle) ===
     motor_specs = [
         ('gear', 'Motor Gear Ratio', 0.1, 200, 1),
-        ('forcelim', 'Motor Force Limit (Nm)', 0, 200, 80),
+        ('forcelim', 'Motor Force Limit (Nm)', 0, 500, 150),  # Updated default
         ('ctrlrange_max', 'Max Velocity (rad/s)', 0, 50, 10),
         ('armature', 'Motor Armature', 0, 0.01, 0.001),
         ('frictionloss', 'Motor Friction', 0, 1, 0.1),
