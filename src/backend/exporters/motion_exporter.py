@@ -1442,16 +1442,18 @@ print(f"Loaded {{rec['name']}}. Mode: Motor Validation")
 # --- Motor Parameter Management ---
 # Control parameters: applied globally to all actuators (controller tuning)
 GLOBAL_CONTROL_PARAMS = {{
-    'kp': 300.0,  # Position gain
-    'kv': 20.0,   # Velocity damping
+    'kp': 200.0,  # Position gain (reduced for stability)
+    'kv': 40.0,   # Velocity damping (20% of kp for good damping ratio)
 }}
 
 # Motor specifications: can be different per joint (hardware characteristics)
 GLOBAL_MOTOR_PARAMS = {{
     'gear': 1.0,
-    'forcelim': 100.0,
+    'forcelim': 80.0,
+    'ctrlrange_max': 10.0,  # Maximum velocity (rad/s or m/s)
     'armature': 0.001,
-    'frictionloss': 0.1
+    'frictionloss': 0.1,
+    'damping': 0.5
 }}
 
 # Per-joint motor parameter storage (overrides global motor specs if set)
@@ -1502,6 +1504,7 @@ def apply_motor_params_all():
         model.actuator_forcerange[aid, :] = [-params['forcelim'], params['forcelim']]
         model.dof_armature[model.jnt_dofadr[jid]] = params['armature']
         model.dof_frictionloss[model.jnt_dofadr[jid]] = params['frictionloss']
+        model.dof_damping[model.jnt_dofadr[jid]] = params.get('damping', 0.5)
 
 def apply_motor_params_joint(jname):
     \"\"\"Apply motor parameters to a specific joint\"\"\"
@@ -1516,6 +1519,7 @@ def apply_motor_params_joint(jname):
     model.actuator_forcerange[aid, :] = [-params['forcelim'], params['forcelim']]
     model.dof_armature[model.jnt_dofadr[jid]] = params['armature']
     model.dof_frictionloss[model.jnt_dofadr[jid]] = params['frictionloss']
+    model.dof_damping[model.jnt_dofadr[jid]] = params.get('damping', 0.5)
 
 def save_motor_params():
     \"\"\"Save current control and motor parameters to file\"\"\"
@@ -1623,8 +1627,8 @@ if HAS_MATPLOTLIB:
     
     # === GLOBAL CONTROL SETTINGS (top) ===
     control_specs = [
-        ('kp', 'Control Kp (Gain)', 0, 1000, 300),
-        ('kv', 'Control Kv (Damping)', 0, 100, 20),
+        ('kp', 'Control Kp (Gain)', 0, 1000, 200),
+        ('kv', 'Control Kv (Damping)', 0, 100, 40),
     ]
     
     control_sliders = {{}}
@@ -1641,30 +1645,32 @@ if HAS_MATPLOTLIB:
     # === MOTOR SPECIFICATIONS (middle) ===
     motor_specs = [
         ('gear', 'Motor Gear Ratio', 0.1, 200, 1),
-        ('forcelim', 'Motor Force Limit (Nm)', 0, 200, 100),
+        ('forcelim', 'Motor Force Limit (Nm)', 0, 200, 80),
+        ('ctrlrange_max', 'Max Velocity (rad/s)', 0, 50, 10),
         ('armature', 'Motor Armature', 0, 0.01, 0.001),
-        ('frictionloss', 'Motor Friction', 0, 1, 0.1)
+        ('frictionloss', 'Motor Friction', 0, 1, 0.1),
+        ('damping', 'Joint Damping', 0, 5, 0.5)
     ]
     
     motor_sliders = {{}}
-    y_start = 0.65
+    y_start = 0.68
     for i, (key, label, vmin, vmax, vinit) in enumerate(motor_specs):
-        ax_slider = plt.axes([0.10, y_start - i*0.05, 0.28, 0.02])
+        ax_slider = plt.axes([0.10, y_start - i*0.045, 0.28, 0.018])
         slider = Slider(ax_slider, label, vmin, vmax, valinit=vinit, valstep=(vmax-vmin)/1000.0)
         motor_sliders[key] = slider
     
     # Motor buttons (below motor sliders)
-    ax_btn_apply = plt.axes([0.09, 0.42, 0.09, 0.03])
+    ax_btn_apply = plt.axes([0.09, 0.38, 0.09, 0.03])
     btn_apply = Button(ax_btn_apply, 'Apply Motor')
     
-    ax_btn_reset = plt.axes([0.19, 0.42, 0.10, 0.03])
+    ax_btn_reset = plt.axes([0.19, 0.38, 0.10, 0.03])
     btn_reset = Button(ax_btn_reset, 'Reset')
     
-    ax_btn_save = plt.axes([0.30, 0.42, 0.08, 0.03])
+    ax_btn_save = plt.axes([0.30, 0.38, 0.08, 0.03])
     btn_save = Button(ax_btn_save, 'Save All')
     
     # RadioButtons area - below buttons, wider and taller
-    ax_radio_joints = plt.axes([0.09, 0.12, 0.29, 0.27])
+    ax_radio_joints = plt.axes([0.09, 0.12, 0.29, 0.23])
     radio_joints = RadioButtons(ax_radio_joints, get_current_page_joints(), activecolor='blue')
     
     # Pagination buttons (below radio buttons)
@@ -1698,7 +1704,7 @@ if HAS_MATPLOTLIB:
         \"\"\"Recreate RadioButtons with current page joints\"\"\"
         global radio_joints, ax_radio_joints
         ax_radio_joints.clear()
-        ax_radio_joints.set_position([0.09, 0.12, 0.29, 0.27])
+        ax_radio_joints.set_position([0.09, 0.12, 0.29, 0.23])
         radio_joints = RadioButtons(ax_radio_joints, get_current_page_joints(), activecolor='blue')
         radio_joints.on_clicked(on_joint_select)
         page_text.set_text(f'{{joint_page+1}}/{{total_pages}}')

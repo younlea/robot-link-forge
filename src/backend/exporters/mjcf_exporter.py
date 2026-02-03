@@ -190,8 +190,10 @@ def generate_mjcf_xml(
                         if limit:
                             range_str = f'range="{limit.lower} {limit.upper}"'
 
+                        # Add damping and armature for stability
                         xml.append(
-                            f'{indent}  <joint name="{joint_xml_name}" type="hinge" axis="{axis_str}" {range_str} />'
+                            f'{indent}  <joint name="{joint_xml_name}" type="hinge" axis="{axis_str}" '
+                            f'{range_str} damping="0.5" armature="0.001" />'
                         )
 
                         ctrl_range = (
@@ -214,11 +216,12 @@ def generate_mjcf_xml(
                         else:
                             actuator_counter[act_name] = 0
 
-                        # Optimized defaults for good trajectory tracking
-                        # kp=300: strong position tracking, kv=20: good damping
+                        # Tuned for stable tracking with good damping ratio
+                        # kp=200, kv=40 (20% damping ratio), moderate force limit
+                        # User can adjust per-joint for different motor specs
                         actuators.append(
                             f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
-                            f'kp="300" kv="20" gear="1" forcelimited="true" forcerange="-100 100" {ctrl_range}/>'
+                            f'kp="200" kv="40" gear="1" forcelimited="true" forcerange="-80 80" {ctrl_range}/>'
                         )
 
                         # Capture Info for Replay Mapping
@@ -255,7 +258,8 @@ def generate_mjcf_xml(
                         joint_counter[joint_xml_name] = 0
 
                     xml.append(
-                        f'{indent}  <joint name="{joint_xml_name}" type="slide" axis="{axis_str}" {range_str} />'
+                        f'{indent}  <joint name="{joint_xml_name}" type="slide" axis="{axis_str}" '
+                        f'{range_str} damping="0.5" armature="0.001" />'
                     )
 
                     ctrl_range = (
@@ -278,10 +282,10 @@ def generate_mjcf_xml(
                     else:
                         actuator_counter[act_name] = 0
 
-                    # Optimized defaults for good trajectory tracking
+                    # Tuned for stable tracking
                     actuators.append(
                         f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
-                        f'kp="300" kv="20" gear="1" forcelimited="true" forcerange="-100 100" {ctrl_range}/>'
+                        f'kp="200" kv="40" gear="1" forcelimited="true" forcerange="-80 80" {ctrl_range}/>'
                     )
 
                     # Capture Info for Replay Mapping
