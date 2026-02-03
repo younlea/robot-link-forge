@@ -901,6 +901,199 @@ if __name__ == '__main__':
 """
 
 
+def generate_validation_script(model_file: str, recording_data: dict) -> str:
+    """Generate quick validation script to check if default parameters work well"""
+    rec_json = json.dumps(recording_data, indent=2)
+
+    return f'''#!/usr/bin/env python3
+"""
+Quick validation of default motor parameters.
+Tests if robot can track trajectory with current settings.
+"""
+import mujoco
+import numpy as np
+import json
+import os
+
+# Validation thresholds
+MAX_ACCEPTABLE_ERROR = 0.15  # rad (~8.6 degrees)
+MAX_SATURATION_PCT = 20.0    # Allow up to 20% force saturation
+MIN_STABILITY_SCORE = 0.7    # Stability metric (0-1)
+
+def validate_motor_parameters(model_file='{model_file}'):
+    """Run quick simulation and check if parameters are acceptable"""
+    
+    print("="*60)
+    print("MOTOR PARAMETER VALIDATION")
+    print("="*60)
+    print(f"Model: {{model_file}}")
+    print(f"Testing default control and motor parameters...")
+    print()
+    
+    # Load model and data
+    model = mujoco.MjModel.from_xml_path(model_file)
+    data = mujoco.MjData(model)
+    
+    # Load recording
+    rec = {rec_json}
+    
+    # Build joint mappings
+    joint_ids = {{}}
+    actuator_ids = {{}}
+    
+    for info in rec.get('joints_info', []):
+        jname = info['name']
+        jid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, jname)
+        if jid >= 0:
+            joint_ids[jname] = jid
+            act_name = f"{{jname}}_act"
+            aid = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_ACTUATOR, act_name)
+            if aid >= 0:
+                actuator_ids[jname] = aid
+    
+    if not joint_ids:
+        print("❌ ERROR: No joints found in model!")
+        return False
+    
+    # Pre-calculate short trajectory (5 seconds max)
+    duration = min(rec['duration'] / 1000.0, 5.0)
+    dt = model.opt.timestep
+    trajectory_times = np.arange(0, duration, dt)
+    n_steps = len(trajectory_times)
+    
+    kf_joints = rec['keyframes']
+    kf_times = np.array([kf['time'] / 1000.0 for kf in kf_joints])
+    
+    # Build trajectory
+    qpos_traj = np.zeros((n_steps, model.nq))
+    for jname, jid in joint_ids.items():
+        qadr = model.jnt_qposadr[jid]
+        y_points = []
+        first_val = 0.0
+        if kf_joints and jname in kf_joints[0]['joints']:
+            first_val = kf_joints[0]['joints'][jname]
+        y_points.append(first_val)
+        prev_val = first_val
+        for kf in kf_joints:
+            val = kf['joints'].get(jname, prev_val)
+            y_points.append(val)
+            prev_val = val
+        q_interp = np.interp(trajectory_times, kf_times, y_points)
+        qpos_traj[:, qadr] = q_interp
+    
+    # Simulation
+    errors = []
+    forces = []
+    saturated_count = 0
+    force_limit = 80.0  # Default from MJCF
+    
+    print("Running simulation...")
+    for step_idx in range(min(n_steps, 500)):  # Max 500 steps (~2.5s)
+        # Set control targets
+        for jname, jid in joint_ids.items():
+            if jname in actuator_ids:
+                target_q = qpos_traj[step_idx, model.jnt_qposadr[jid]]
+                data.ctrl[actuator_ids[jname]] = target_q
+        
+        # Step
+        mujoco.mj_step(model, data)
+        
+        # Collect metrics
+        step_errors = []
+        step_forces = []
+        for jname, jid in joint_ids.items():
+            if jname in actuator_ids:
+                qadr = model.jnt_qposadr[jid]
+                target = qpos_traj[step_idx, qadr]
+                actual = data.qpos[qadr]
+                error = abs(target - actual)
+                step_errors.append(error)
+                
+                force = abs(data.actuator_force[actuator_ids[jname]])
+                step_forces.append(force)
+                if force >= force_limit * 0.95:
+                    saturated_count += 1
+        
+        if step_errors:
+            errors.append(np.mean(step_errors))
+        if step_forces:
+            forces.append(np.max(step_forces))
+    
+    # Analysis
+    avg_error = np.mean(errors) if errors else 0
+    max_error = np.max(errors) if errors else 0
+    avg_force = np.mean(forces) if forces else 0
+    max_force = np.max(forces) if forces else 0
+    total_samples = len(errors) * len(joint_ids)
+    saturation_pct = 100 * saturated_count / total_samples if total_samples > 0 else 0
+    
+    # Stability: check variance in error (low = stable)
+    error_std = np.std(errors) if errors else 0
+    stability_score = 1.0 / (1.0 + error_std * 10)  # 0-1, higher = more stable
+    
+    # Print results
+    print(f"\\nTest Duration: {{len(errors) * dt:.2f}}s ({{len(errors)}} steps)")
+    print()
+    print("Results:")
+    print(f"  Tracking Error:")
+    print(f"    Average: {{avg_error:.4f}} rad ({{np.rad2deg(avg_error):.2f}}°)")
+    print(f"    Maximum: {{max_error:.4f}} rad ({{np.rad2deg(max_error):.2f}}°)")
+    print(f"  Force Usage:")
+    print(f"    Average: {{avg_force:.2f}} Nm")
+    print(f"    Peak: {{max_force:.2f}} Nm")
+    print(f"    Saturation: {{saturation_pct:.1f}}%")
+    print(f"  Stability Score: {{stability_score:.2f}}/1.00")
+    print()
+    
+    # Verdict
+    passed = True
+    issues = []
+    
+    if avg_error > MAX_ACCEPTABLE_ERROR:
+        passed = False
+        issues.append(f"High tracking error ({{np.rad2deg(avg_error):.1f}}° > {{np.rad2deg(MAX_ACCEPTABLE_ERROR):.1f}}°)")
+    
+    if saturation_pct > MAX_SATURATION_PCT:
+        passed = False
+        issues.append(f"High saturation rate ({{saturation_pct:.1f}}% > {{MAX_SATURATION_PCT}}%)")
+    
+    if stability_score < MIN_STABILITY_SCORE:
+        passed = False
+        issues.append(f"Poor stability ({{stability_score:.2f}} < {{MIN_STABILITY_SCORE}})")
+    
+    print("="*60)
+    if passed:
+        print("✅ VALIDATION PASSED")
+        print("Default parameters work well for this trajectory!")
+        print("You can now adjust individual motor specs per joint.")
+    else:
+        print("❌ VALIDATION FAILED")
+        print("Issues detected:")
+        for issue in issues:
+            print(f"  - {{issue}}")
+        print()
+        print("Recommendations:")
+        if avg_error > MAX_ACCEPTABLE_ERROR:
+            print("  - Increase kp (position gain) for better tracking")
+            print("  - Check if trajectory is too fast for current motors")
+        if saturation_pct > MAX_SATURATION_PCT:
+            print("  - Increase forcelim (motor force limit)")
+            print("  - Or reduce kp to demand less force")
+        if stability_score < MIN_STABILITY_SCORE:
+            print("  - Increase kv (damping) for stability")
+            print("  - Add joint damping if oscillating")
+    print("="*60)
+    
+    return passed
+
+if __name__ == '__main__':
+    import sys
+    model_file = sys.argv[1] if len(sys.argv) > 1 else '{model_file}'
+    success = validate_motor_parameters(model_file)
+    sys.exit(0 if success else 1)
+'''
+
+
 def generate_torque_launch_script(
     python_script_name: str, default_rec_idx: int = 0
 ) -> str:
@@ -939,6 +1132,10 @@ echo "========================================"
 echo ""
 echo "Select Analysis Mode:"
 echo ""
+echo "0. Quick Validation (NEW)"
+echo "   - Test if default parameters work"
+echo "   - Takes ~5 seconds"
+echo ""
 echo "1. Joint Torque Visualization"
 echo "   - Theoretical torque (inverse dynamics)"
 echo ""
@@ -949,12 +1146,22 @@ echo "3. Fingertip Sensor Forces"
 echo "   - Contact force visualization"
 echo ""
 echo "========================================"
-read -p "Enter choice [1]: " choice
+read -p "Enter choice [0 to validate, 2 for full tuning]: " choice
 
 MODE="inverse"
 SCRIPT="replay_with_torque.py"
 
-if [ "$choice" = "2" ]; then
+if [ "$choice" = "0" ]; then
+    # Mode 0: Quick validation
+    echo "Running quick validation..."
+    python3 validate_motor_params.py
+    exit_code=$?
+    if [ $exit_code -eq 0 ]; then
+        echo ""
+        echo "Proceed to Mode 2 for per-joint tuning if needed."
+    fi
+    exit $exit_code
+elif [ "$choice" = "2" ]; then
     # Mode 2 uses separate script
     SCRIPT="replay_motor_validation.py"
     echo "Starting Motor Validation..."
