@@ -2002,10 +2002,9 @@ initial_qpos = qpos_traj[0, :].copy()
 
 # --- Interactive Motor Parameter UI ---
 if HAS_MATPLOTLIB:
-    try:
-        plt.ion()
-        fig = plt.figure(figsize=(18, 10))
-        print("\\nCreating UI window...")
+    plt.ion()
+    fig = plt.figure(figsize=(18, 10))
+    print("\\nCreating UI window...")
     
     # Create layout: info (top), sliders (left), plots (right)
     gs = fig.add_gridspec(3, 2, height_ratios=[0.5, 2, 1.5], width_ratios=[1, 1.5], 
@@ -2275,11 +2274,6 @@ if HAS_MATPLOTLIB:
     plt.show(block=False)
     plt.pause(0.1)  # Increased from 0.001 to ensure window appears
     print("UI window created successfully!")
-    
-    except Exception as e:
-        print(f"\\nWARNING: Failed to create UI window: {{e}}")
-        print("Continuing without UI (you can still see simulation in MuJoCo viewer)")
-        HAS_MATPLOTLIB = False
 else:
     print("\\nMatplotlib not available - running without UI")
 
