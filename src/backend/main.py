@@ -1930,6 +1930,7 @@ async def export_mujoco_mjcf(
             unique_link_names,
             use_mesh_collision=mesh_collision,
             direct_hand=direct_hand,
+            mesh_dir=mesh_dir,
         )
         mjcf_filename = f"{sanitized_robot_name}.xml"
         with open(os.path.join(package_dir, mjcf_filename), "w") as f:

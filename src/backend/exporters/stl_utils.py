@@ -47,3 +47,65 @@ def ensure_binary_stl(input_path: str, output_path: str):
         print(f"Error processing STL with trimesh: {e}. Falling back to raw copy.")
         if input_path != output_path:
             shutil.copy2(input_path, output_path)
+
+
+def calculate_inertia_from_stl(stl_path: str, density: float = 1000.0):
+    """
+    Calculate mass and inertia from STL file.
+    
+    Args:
+        stl_path: Path to STL file
+        density: Material density in kg/m³ (default: 1000 for plastic/resin)
+    
+    Returns:
+        dict with 'mass', 'center_of_mass', 'inertia' (3x3 matrix)
+        Returns None if calculation fails
+    """
+    try:
+        import trimesh
+        import numpy as np
+    except ImportError:
+        return None
+    
+    try:
+        mesh = trimesh.load(stl_path, file_type='stl')
+        
+        if isinstance(mesh, trimesh.Scene):
+            if len(mesh.geometry) == 0:
+                return None
+            mesh = trimesh.util.concatenate([g for g in mesh.geometry.values()])
+        
+        # Calculate physical properties
+        mesh.density = density
+        
+        mass = mesh.mass
+        center_of_mass = mesh.center_mass
+        inertia = mesh.moment_inertia
+        
+        # Ensure reasonable values
+        if mass < 0.001:  # Less than 1 gram
+            mass = 0.01  # Default to 10 grams
+        if mass > 10.0:  # More than 10 kg
+            mass = 0.1  # Cap at 100 grams
+        
+        # Ensure inertia is positive definite
+        inertia_diag = np.diag(inertia)
+        if np.any(inertia_diag <= 0):
+            # Use simple formula for cylinder
+            h = mesh.bounds[1][2] - mesh.bounds[0][2]
+            r = max(mesh.bounds[1][0] - mesh.bounds[0][0], 
+                   mesh.bounds[1][1] - mesh.bounds[0][1]) / 2
+            ixx = iyy = mass * (3*r**2 + h**2) / 12
+            izz = mass * r**2 / 2
+            inertia = np.diag([ixx, iyy, izz])
+        
+        return {
+            'mass': float(mass),
+            'center_of_mass': center_of_mass.tolist(),
+            'inertia_matrix': inertia.tolist(),
+            'inertia_diagonal': np.diag(inertia).tolist()
+        }
+        
+    except Exception as e:
+        print(f"Error calculating inertia from STL: {e}")
+        return None

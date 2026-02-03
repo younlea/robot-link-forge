@@ -2,6 +2,7 @@ import os
 from typing import Dict, Optional, Tuple, List
 from robot_models import RobotData
 from utils import to_snake_case
+from .stl_utils import calculate_inertia_from_stl
 
 
 def generate_mjcf_xml(
@@ -11,10 +12,14 @@ def generate_mjcf_xml(
     unique_link_names: Dict[str, str],
     use_mesh_collision: bool = False,
     direct_hand: bool = False,
+    mesh_dir: Optional[str] = None,
 ) -> Tuple[str, List[Dict]]:
     """
     Generates MuJoCo MJCF XML.
     Returns: (xml_content, generated_joints_info)
+    
+    Args:
+        mesh_dir: Directory where STL files are stored (for inertia calculation)
     """
     # Reuse URDF generation logic used for MuJoCo to extract joint split info
     # We call generate_urdf_xml with for_mujoco=True to get the splits
@@ -138,10 +143,29 @@ def generate_mjcf_xml(
         if parent_joint_id:
             joint = robot.joints.get(parent_joint_id)
             if joint and joint.type != "fixed":
-                # Add minimal but valid inertial properties
-                xml.append(
-                    f'{indent}  <inertial pos="0 0 0" mass="0.1" diaginertia="0.001 0.001 0.001" />'
-                )
+                # Try to calculate inertia from STL
+                inertia_data = None
+                if mesh_dir and link_id in mesh_files_map:
+                    stl_filename = mesh_files_map[link_id]
+                    stl_path = os.path.join(mesh_dir, stl_filename)
+                    if os.path.exists(stl_path):
+                        inertia_data = calculate_inertia_from_stl(stl_path)
+                
+                if inertia_data:
+                    mass = inertia_data['mass']
+                    com = inertia_data['center_of_mass']
+                    inertia_diag = inertia_data['inertia_diagonal']
+                    com_str = f"{com[0]:.6f} {com[1]:.6f} {com[2]:.6f}"
+                    inertia_str = f"{inertia_diag[0]:.6f} {inertia_diag[1]:.6f} {inertia_diag[2]:.6f}"
+                    xml.append(
+                        f'{indent}  <inertial pos="{com_str}" mass="{mass:.6f}" diaginertia="{inertia_str}" />'
+                    )
+                else:
+                    # Use better default values (reasonable for robot links)
+                    # mass: 0.05 kg (50g), inertia scaled accordingly
+                    xml.append(
+                        f'{indent}  <inertial pos="0 0 0" mass="0.05" diaginertia="0.0001 0.0001 0.0001" />'
+                    )
 
         if parent_joint_id:
             joint = robot.joints.get(parent_joint_id)
