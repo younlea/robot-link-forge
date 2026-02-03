@@ -2045,10 +2045,13 @@ if HAS_MATPLOTLIB:
     ax_btn_apply = plt.axes([0.09, 0.38, 0.09, 0.03])
     btn_apply = Button(ax_btn_apply, 'Apply Motor')
     
-    ax_btn_reset = plt.axes([0.19, 0.38, 0.10, 0.03])
-    btn_reset = Button(ax_btn_reset, 'Reset')
+    ax_btn_reset_joint = plt.axes([0.19, 0.38, 0.09, 0.03])
+    btn_reset_joint = Button(ax_btn_reset_joint, 'Reset Joint')
     
-    ax_btn_save = plt.axes([0.30, 0.38, 0.08, 0.03])
+    ax_btn_restart = plt.axes([0.29, 0.38, 0.09, 0.03])
+    btn_restart = Button(ax_btn_restart, 'Restart')
+    
+    ax_btn_save = plt.axes([0.09, 0.34, 0.08, 0.03])
     btn_save = Button(ax_btn_save, 'Save All')
     
     # RadioButtons area - below buttons, wider and taller (increased from 0.23 to 0.28)
@@ -2144,6 +2147,17 @@ if HAS_MATPLOTLIB:
             update_motor_sliders(GLOBAL_MOTOR_PARAMS)
             update_info_text()
     
+    def on_restart(event):
+        \"\"\"Restart replay from beginning\"\"\"
+        global start_time
+        start_time = time.time()
+        # Clear history for fresh plots
+        plot_history['time'].clear()
+        plot_history['tracking_error'].clear()
+        plot_history['max_torque'].clear()
+        plot_history['saturated_count'] = 0
+        update_info_text()
+    
     def on_save(event):
         save_motor_params()
         update_info_text()
@@ -2152,7 +2166,8 @@ if HAS_MATPLOTLIB:
     btn_apply_control.on_clicked(on_apply_control)
     radio_joints.on_clicked(on_joint_select)
     btn_apply.on_clicked(on_apply)
-    btn_reset.on_clicked(on_reset)
+    btn_reset_joint.on_clicked(on_reset_joint)
+    btn_restart.on_clicked(on_restart)
     btn_save.on_clicked(on_save)
     btn_prev.on_clicked(on_prev_page)
     btn_next.on_clicked(on_next_page)
