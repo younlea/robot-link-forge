@@ -247,12 +247,12 @@ def generate_mjcf_xml(
                             actuator_counter[act_name] = 0
 
                         # Motor parameters for aggressive trajectories:
-                        # - gear=50: Torque amplification (main solution for insufficient torque)
+                        # - gear=100: High torque amplification (increased from 50)
                         # - kp=800, kv=80: Moderate PD gains for stability
-                        # - forcerange=[-500, 500]: High motor force limit
+                        # - forcerange=[-800, 800]: Very high motor force limit
                         actuators.append(
                             f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
-                            f'kp="800" kv="80" gear="50" forcelimited="true" forcerange="-500 500" {ctrl_range}/>'  
+                            f'kp="800" kv="80" gear="100" forcelimited="true" forcerange="-800 800" {ctrl_range}/>'  
                         )
 
                         # Capture Info for Replay Mapping
