@@ -1441,10 +1441,10 @@ print(f"Loaded {{rec['name']}}. Mode: Motor Validation")
 
 # --- Motor Parameter Management ---
 GLOBAL_MOTOR_PARAMS = {{
-    'kp': 500.0,      # Increased from 100
-    'kv': 50.0,       # Increased from 10
-    'forcelim': 100.0,
-    'gear': 100.0,
+    'kp': 100.0,      # Position gain - start conservative
+    'kv': 10.0,       # Velocity damping
+    'forcelim': 50.0, # Force limit (Nm)
+    'gear': 1.0,      # Gear ratio (1 = direct drive)
     'armature': 0.001,
     'frictionloss': 0.1
 }}
@@ -1610,27 +1610,12 @@ if HAS_MATPLOTLIB:
         end = min(start + joints_per_page, len(joint_list_full))
         return joint_list_full[start:end]
     
-    # RadioButtons area - expanded to show more items
-    ax_radio_joints = plt.axes([0.09, 0.10, 0.14, 0.22])
-    radio_joints = RadioButtons(ax_radio_joints, get_current_page_joints(), activecolor='blue')
-    
-    # Pagination buttons (below radio buttons)
-    ax_btn_prev = plt.axes([0.09, 0.06, 0.06, 0.025])
-    btn_prev = Button(ax_btn_prev, '< Prev')
-    
-    ax_page_text_ax = plt.axes([0.155, 0.06, 0.04, 0.025])
-    ax_page_text_ax.axis('off')
-    page_text = ax_page_text_ax.text(0.5, 0.5, f'{{joint_page+1}}/{{total_pages}}', ha='center', va='center', fontsize=9)
-    
-    ax_btn_next = plt.axes([0.20, 0.06, 0.06, 0.025])
-    btn_next = Button(ax_btn_next, 'Next >')
-    
-    # Parameter sliders (left side, above joint selector)
+    # Parameter sliders (left side, top area)
     slider_specs = [
-        ('kp', 'Kp (Gain)', 0, 1000, 500),
-        ('kv', 'Kv (Damping)', 0, 100, 50),
-        ('forcelim', 'Force Limit (Nm)', 0, 200, 100),
-        ('gear', 'Gear Ratio', 1, 500, 100),
+        ('kp', 'Kp (Gain)', 0, 1000, 100),
+        ('kv', 'Kv (Damping)', 0, 100, 10),
+        ('forcelim', 'Force Limit (Nm)', 0, 200, 50),
+        ('gear', 'Gear Ratio', 0.1, 200, 1),
         ('armature', 'Armature', 0, 0.01, 0.001),
         ('frictionloss', 'Friction', 0, 1, 0.1)
     ]
@@ -1638,19 +1623,34 @@ if HAS_MATPLOTLIB:
     sliders = {{}}
     
     for i, (key, label, vmin, vmax, vinit) in enumerate(slider_specs):
-        ax_slider = plt.axes([0.10, 0.71 - i*0.055, 0.28, 0.02])
+        ax_slider = plt.axes([0.10, 0.77 - i*0.055, 0.28, 0.02])
         slider = Slider(ax_slider, label, vmin, vmax, valinit=vinit, valstep=(vmax-vmin)/1000.0)
         sliders[key] = slider
     
-    # Buttons (above joint selector)
-    ax_btn_apply = plt.axes([0.09, 0.33, 0.09, 0.03])
+    # Buttons (middle area, aligned horizontally)
+    ax_btn_apply = plt.axes([0.09, 0.42, 0.09, 0.03])
     btn_apply = Button(ax_btn_apply, 'Apply')
     
-    ax_btn_reset = plt.axes([0.19, 0.33, 0.10, 0.03])
+    ax_btn_reset = plt.axes([0.19, 0.42, 0.10, 0.03])
     btn_reset = Button(ax_btn_reset, 'Reset')
     
-    ax_btn_save = plt.axes([0.30, 0.33, 0.08, 0.03])
+    ax_btn_save = plt.axes([0.30, 0.42, 0.08, 0.03])
     btn_save = Button(ax_btn_save, 'Save All')
+    
+    # RadioButtons area - below buttons, wider and taller
+    ax_radio_joints = plt.axes([0.09, 0.12, 0.29, 0.27])
+    radio_joints = RadioButtons(ax_radio_joints, get_current_page_joints(), activecolor='blue')
+    
+    # Pagination buttons (below radio buttons)
+    ax_btn_prev = plt.axes([0.09, 0.08, 0.08, 0.025])
+    btn_prev = Button(ax_btn_prev, '< Prev')
+    
+    ax_page_text_ax = plt.axes([0.18, 0.08, 0.06, 0.025])
+    ax_page_text_ax.axis('off')
+    page_text = ax_page_text_ax.text(0.5, 0.5, f'{{joint_page+1}}/{{total_pages}}', ha='center', va='center', fontsize=9)
+    
+    ax_btn_next = plt.axes([0.25, 0.08, 0.08, 0.025])
+    btn_next = Button(ax_btn_next, 'Next >')
     
     def update_slider_values(params):
         \"\"\"Update slider positions from parameter dict\"\"\"
@@ -1666,7 +1666,7 @@ if HAS_MATPLOTLIB:
         \"\"\"Recreate RadioButtons with current page joints\"\"\"
         global radio_joints, ax_radio_joints
         ax_radio_joints.clear()
-        ax_radio_joints.set_position([0.09, 0.10, 0.14, 0.22])
+        ax_radio_joints.set_position([0.09, 0.12, 0.29, 0.27])
         radio_joints = RadioButtons(ax_radio_joints, get_current_page_joints(), activecolor='blue')
         radio_joints.on_clicked(on_joint_select)
         page_text.set_text(f'{{joint_page+1}}/{{total_pages}}')

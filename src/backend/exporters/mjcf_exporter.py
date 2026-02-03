@@ -214,10 +214,11 @@ def generate_mjcf_xml(
                         else:
                             actuator_counter[act_name] = 0
 
-                        # Add forcelimited and forcerange so runtime can modify limits
+                        # Lower default values for stability, runtime can increase if needed
+                        # gear=1 (no gear ratio), moderate kp/kv, limited force
                         actuators.append(
                             f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
-                            f'kp="500" kv="30" forcelimited="true" forcerange="-100 100" {ctrl_range}/>'
+                            f'kp="100" kv="10" gear="1" forcelimited="true" forcerange="-50 50" {ctrl_range}/>'
                         )
 
                         # Capture Info for Replay Mapping
@@ -277,10 +278,10 @@ def generate_mjcf_xml(
                     else:
                         actuator_counter[act_name] = 0
 
-                    # Add forcelimited and forcerange for runtime modification
+                    # Lower default values for stability
                     actuators.append(
                         f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
-                        f'kp="500" kv="30" forcelimited="true" forcerange="-100 100" {ctrl_range}/>'
+                        f'kp="100" kv="10" gear="1" forcelimited="true" forcerange="-50 50" {ctrl_range}/>'
                     )
 
                     # Capture Info for Replay Mapping
