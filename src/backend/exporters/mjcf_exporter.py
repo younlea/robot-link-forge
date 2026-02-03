@@ -246,14 +246,15 @@ def generate_mjcf_xml(
                         else:
                             actuator_counter[act_name] = 0
 
-                        # Motor parameters for trajectory following:
-                        # - LOW kp (100): Reduces oscillations and overshoot
-                        # - LOW kv (20): 20% damping for smooth tracking
-                        # - HIGH gear (500): Provides torque without high kp
-                        # - HIGH forcerange (1500): Sufficient force authority
+# Motor parameters - BALANCED approach:
+                        # - gear=50: Realistic gear ratio (allows fast movement)
+                        # - kp=200: Moderate position gain
+                        # - kv=20: 10% damping ratio for stability
+                        # - forcerange=300: Realistic motor torque (50×6Nm = 300Nm)
+                        # Physics: High gear → slow speed! Use moderate gear for trajectory tracking
                         actuators.append(
                             f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
-                            f'kp="100" kv="20" gear="500" forcelimited="true" forcerange="-1500 1500" {ctrl_range}/>'  
+                            f'kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" {ctrl_range}/>'  
                         )
 
                         # Capture Info for Replay Mapping

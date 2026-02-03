@@ -921,12 +921,14 @@ MAX_ACCEPTABLE_ERROR = 0.20  # rad (~11.5 degrees, very relaxed for aggressive t
 MAX_SATURATION_PCT = 50.0    # Allow up to 50% force saturation
 MIN_STABILITY_SCORE = 0.4    # Stability metric (0-1)
 
-# Parameter search ranges - REVISED for trajectory following
-# Key insight: LOW kp + HIGH gear is better than HIGH kp + LOW gear!
-KP_RANGE = [50, 100, 200]  # LOW kp reduces oscillations
-KV_RANGE = [10, 20, 40]  # 20% damping ratio
-GEAR_RANGE = [200, 500, 800, 1200]  # HIGH gear for torque
-FORCELIM_RANGE = [1000, 1500, 2000]  # High force limits
+# Parameter search ranges - PHYSICS CORRECTED!
+# Key insight: High gear → SLOW speed! Must use moderate gear for trajectory tracking
+# Torque = gear × (kp × error + kv × velocity)
+# Speed ∝ 1/gear (inverse relationship!)
+KP_RANGE = [100, 200, 400]  # Moderate position gains
+KV_RANGE = [10, 20, 40]  # 10% damping ratio
+GEAR_RANGE = [20, 50, 100, 150]  # REALISTIC gear ratios for fast movement
+FORCELIM_RANGE = [200, 400, 600]  # Torque = gear × ~6Nm motor
 
 def simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, kp, kv, gear, forcelim, n_steps):
     """Run simulation with given parameters and return metrics"""
@@ -1082,10 +1084,10 @@ def optimize_parameters(model_file='{model_file}'):
         q_interp = np.interp(trajectory_times, kf_times, y_points)
         qpos_traj[:, qadr] = q_interp
     
-    print("Step 1: Testing default parameters (kp=100, kv=20, gear=500, forcelim=1500)...")
+    print("Step 1: Testing default parameters (kp=200, kv=20, gear=50, forcelim=300)...")
     print("-" * 70)
     default_result = simulate_with_params(model_file, qpos_traj, joint_ids, actuator_ids, 
-                                         100, 20, 500, 1500, n_steps)
+                                         200, 20, 50, 300, n_steps)
     
     print(f"  Tracking Error: {{np.rad2deg(default_result['avg_error']):.2f}}deg (max: {{np.rad2deg(default_result['max_error']):.2f}}deg)")
     print(f"  Saturation: {{default_result['saturation_pct']:.1f}}%")
@@ -1825,14 +1827,14 @@ print(f"Loaded {{rec['name']}}. Mode: Motor Validation")
 # --- Motor Parameter Management ---
 # Control parameters: applied globally to all actuators (controller tuning)
 GLOBAL_CONTROL_PARAMS = {{
-    'kp': 100.0,  # LOW position gain - reduces oscillations
-    'kv': 20.0,   # 20% damping ratio for smooth tracking
+    'kp': 200.0,  # Moderate position gain
+    'kv': 20.0,   # 10% damping ratio (kv = 0.1 × kp)
 }}
 
 # Motor specifications: can be different per joint (hardware characteristics)
 GLOBAL_MOTOR_PARAMS = {{
-    'gear': 500.0,  # HIGH gear ratio - provides torque
-    'forcelim': 1500.0,  # High motor force limit
+    'gear': 50.0,  # REALISTIC gear ratio - allows fast movement (speed ∝ 1/gear)
+    'forcelim': 300.0,  # Motor force limit (gear × ~6Nm motor = 300Nm)
     'ctrlrange_max': 10.0,  # Maximum velocity (rad/s or m/s)
     'armature': 0.001,
     'frictionloss': 0.1,
@@ -2010,8 +2012,8 @@ if HAS_MATPLOTLIB:
     
     # === GLOBAL CONTROL SETTINGS (top) ===
     control_specs = [
-        ('kp', 'Control Kp (Gain)', 10, 500, 100),  # Lower range, default 100
-        ('kv', 'Control Kv (Damping)', 2, 100, 20),  # 20% damping
+        ('kp', 'Control Kp (Gain)', 10, 1000, 200),  # Default 200
+        ('kv', 'Control Kv (Damping)', 2, 100, 20),  # 10% damping
     ]
     
     control_sliders = {{}}
@@ -2026,9 +2028,10 @@ if HAS_MATPLOTLIB:
     btn_apply_control = Button(ax_btn_apply_control, 'Apply Control to All')
     
     # === MOTOR SPECIFICATIONS (middle) ===
+    # Physics: gear ↑ → torque ↑, speed ↓ (inverse relationship!)
     motor_specs = [
-        ('gear', 'Motor Gear Ratio', 10, 2000, 500),  # Default 500, max 2000
-        ('forcelim', 'Motor Force Limit (Nm)', 100, 3000, 1500),  # Default 1500
+        ('gear', 'Motor Gear Ratio', 1, 200, 50),  # Default 50, max 200 (higher = SLOWER)
+        ('forcelim', 'Motor Force Limit (Nm)', 50, 1000, 300),  # gear × 6Nm motor
         ('ctrlrange_max', 'Max Velocity (rad/s)', 0, 50, 10),
         ('armature', 'Motor Armature', 0, 0.01, 0.001),
         ('frictionloss', 'Motor Friction', 0, 1, 0.1),

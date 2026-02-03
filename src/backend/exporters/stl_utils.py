@@ -123,16 +123,16 @@ def calculate_inertia_from_stl(
             if scale is not None:
                 h *= scale[2]
                 r *= scale[0]
-            
+
             ixx = iyy = mass * (3 * r**2 + h**2) / 12
             izz = mass * r**2 / 2
-            
+
             # Minimum inertia to avoid numerical issues
             min_inertia = mass * 0.0001
             ixx = max(ixx, min_inertia)
             iyy = max(iyy, min_inertia)
             izz = max(izz, min_inertia)
-            
+
             inertia = np.diag([ixx, iyy, izz])
 
         return {
