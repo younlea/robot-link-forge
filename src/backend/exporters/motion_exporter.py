@@ -967,6 +967,21 @@ qacc_traj = np.zeros((n_steps, model.nv))
 recorded_joints = list(keyframes[0]["joints"].keys()) if keyframes else []
 print(f"Found {{len(recorded_joints)}} joints in recording")
 
+# DEBUG: Check keyframe timing
+print("\\n🔍 KEYFRAME TIMING:")
+print(f"  Number of keyframes: {{len(keyframes)}}")
+if len(keyframes) > 0:
+    print(f"  First keyframe time: {{keyframes[0]['timestamp']/1000.0:.3f}}s")
+    print(f"  Last keyframe time: {{keyframes[-1]['timestamp']/1000.0:.3f}}s")
+    print(f"  Recording duration: {{duration:.3f}}s")
+    print(f"  Keyframe times: ", end="")
+    for i, kf in enumerate(keyframes[:5]):
+        print(f"{{kf['timestamp']/1000.0:.2f}}s ", end="")
+    if len(keyframes) > 5:
+        print("...")
+    else:
+        print()
+
 for jname in recorded_joints:
     if jname not in joint_ids:
         print(f"Warning: Joint {{jname}} in recording not found in model")
@@ -1215,6 +1230,7 @@ try:
             
             # Workaround: Disable actuators and apply forces directly to qfrc_applied
             data.ctrl[:] = 0.0  # Disable position control
+            data.qfrc_applied[:] = 0.0  # CRITICAL: Clear previous forces!
             
             # Apply computed forces directly to joints
             for jname, jid in joint_ids.items():
@@ -1269,15 +1285,16 @@ try:
                         jid = joint_ids[jname]
                         aid = actuator_ids[jname]
                         qadr = model.jnt_qposadr[jid]
+                        dof_adr = model.jnt_dofadr[jid]
                         
                         target = qpos_traj[step, qadr]
                         actual = data.qpos[qadr]
-                        ctrl = data.ctrl[aid]
+                        applied_force = data.qfrc_applied[dof_adr]  # Actually applied force
                         
                         log_entry[f'{{jname}}_target'] = target
                         log_entry[f'{{jname}}_actual'] = actual
-                        log_entry[f'{{jname}}_ctrl'] = ctrl
-                        log_entry[f'{{jname}}_error_rad'] = target - actual
+                        log_entry[f'{{jname}}_force'] = applied_force
+                        log_entry[f'{{jname}}_error'] = target - actual
                 
                 phase2_log.append(log_entry)
             
@@ -1302,13 +1319,13 @@ try:
         with open('phase2_control_applied.csv', 'w', newline='') as f:
             writer = csv.writer(f)
             
-            # Header: time, step, then for each joint: target, actual, ctrl, error
+            # Header: time, step, then for each joint: target, actual, force, error
             header = ['time_s', 'step']
             for jname in joint_names_ordered:
                 header.extend([
                     f'{{jname}}_target_rad',
                     f'{{jname}}_actual_rad',
-                    f'{{jname}}_ctrl_Nm',
+                    f'{{jname}}_force_Nm',
                     f'{{jname}}_error_rad'
                 ])
             writer.writerow(header)
@@ -1319,8 +1336,8 @@ try:
                 for jname in joint_names_ordered:
                     row.append(entry.get(f'{{jname}}_target', 0))
                     row.append(entry.get(f'{{jname}}_actual', 0))
-                    row.append(entry.get(f'{{jname}}_ctrl', 0))
-                    row.append(entry.get(f'{{jname}}_error_rad', 0))
+                    row.append(entry.get(f'{{jname}}_force', 0))
+                    row.append(entry.get(f'{{jname}}_error', 0))
                 writer.writerow(row)
         
         print(f"  Saved {{len(phase2_log)}} samples (every 10 steps) to phase2_control_applied.csv")
