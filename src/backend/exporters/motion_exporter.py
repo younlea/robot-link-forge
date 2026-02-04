@@ -976,8 +976,12 @@ for jname in recorded_joints:
     qadr = model.jnt_qposadr[jnt_idx]
     dof_adr = model.jnt_dofadr[jnt_idx]
     
-    times = [kf["timestamp"]/1000.0 for kf in keyframes]  # Convert ms to seconds
-    positions = [kf["joints"].get(jname, 0.0) for kf in keyframes]
+    # Build time array starting from 0
+    times = [0.0] + [kf["timestamp"]/1000.0 for kf in keyframes]
+    
+    # Get initial position (first keyframe value)
+    first_pos = keyframes[0]["joints"].get(jname, 0.0)
+    positions = [first_pos] + [kf["joints"].get(jname, first_pos) for kf in keyframes]
     
     t_interp = np.linspace(0, duration, n_steps)
     q_interp = np.interp(t_interp, times, positions)
@@ -985,6 +989,20 @@ for jname in recorded_joints:
     qpos_traj[:, qadr] = q_interp
     qvel_traj[:, dof_adr] = np.gradient(q_interp, dt)
     qacc_traj[:, dof_adr] = np.gradient(qvel_traj[:, dof_adr], dt)
+
+# DEBUG: Check trajectory variation
+print("\\n🔍 TRAJECTORY DIAGNOSTIC:")
+print("Checking if trajectory actually changes over time...")
+for jname in ['IndexFinger-1st-pitch', 'MiddleFinger-1st-pitch', 'Thumb-1st-pitch']:
+    if jname in joint_ids:
+        jid = joint_ids[jname]
+        qadr = model.jnt_qposadr[jid]
+        print(f"  {{jname}}:")
+        print(f"    Step 0:    {{qpos_traj[0, qadr]:.4f}} rad")
+        print(f"    Step 500:  {{qpos_traj[500, qadr]:.4f}} rad")
+        print(f"    Step 2500: {{qpos_traj[2500, qadr]:.4f}} rad")
+        print(f"    Step 5000: {{qpos_traj[5000, qadr]:.4f}} rad")
+        print(f"    Range: {{np.max(qpos_traj[:, qadr]) - np.min(qpos_traj[:, qadr]):.4f}} rad")
 
 print("\\n" + "="*70)
 print("PHASE 1: INVERSE DYNAMICS ANALYSIS")
@@ -1023,6 +1041,17 @@ for step in range(n_steps):
     data.qacc[:] = qacc_traj[step]
     
     mujoco.mj_inverse(model, data)
+    
+    # DEBUG: Print qfrc_inverse at step 2500
+    if step == 2500:
+        print(f"\\n🔍 DEBUG Step 2500 - qfrc_inverse values:")
+        print(f"  qfrc_inverse shape: {{data.qfrc_inverse.shape}}")
+        print(f"  qfrc_inverse max: {{np.max(np.abs(data.qfrc_inverse)):.2f}} Nm")
+        for jname, jid in joint_ids.items():
+            dof_adr = model.jnt_dofadr[jid]
+            qfrc = data.qfrc_inverse[dof_adr]
+            if abs(qfrc) > 0.1:
+                print(f"    {{jname:30s}} DOF[{{dof_adr}}]: {{qfrc:+8.2f}} Nm")
     
     # CRITICAL: qfrc_inverse is in DOF space, not actuator space!
     # We need to map DOF forces to actuator controls
