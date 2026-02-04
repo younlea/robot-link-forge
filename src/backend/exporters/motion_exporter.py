@@ -1284,26 +1284,27 @@ try:
                 error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
                 errors.append(error ** 2)
                 
-                # Get actuator control value (use actuator_ids, not joint_ids!)
-                ctrl_val = 0.0
+                # Get applied force value (not ctrl which is 0)
+                force_val = 0.0
                 if jname in actuator_ids:
-                    aid = actuator_ids[jname]
-                    ctrl_val = data.ctrl[aid]
+                    dof_adr = model.jnt_dofadr[jnt_idx]
+                    force_val = applied_forces[dof_adr]
                 
-                error_details.append((jname, abs(error), abs(ctrl_val)))
+                error_details.append((jname, abs(error), abs(force_val)))
                 
-                # Check if saturated
+                # Check if force limit exceeded
                 if jname in actuator_ids:
                     aid = actuator_ids[jname]
                     limit = adjusted_limits[aid]
-                    if abs(data.ctrl[aid]) >= limit * 0.99:
+                    if abs(force_val) >= limit * 0.99:
                         saturated_joints.append(jname)
             
             rms_error = np.sqrt(np.mean(errors))
-            max_ctrl = np.max(np.abs(data.ctrl[:model.nu]))
+            # Use qfrc_applied instead of data.ctrl (which is set to 0)
+            max_force = np.max(np.abs(applied_forces))
             
             tracking_errors.append(rms_error)
-            control_torques.append(max_ctrl)
+            control_torques.append(max_force)
             times.append(elapsed)
             
             # Save Phase 2 data every 10 steps (reduce file size)
@@ -1335,7 +1336,7 @@ try:
                 error_details.sort(key=lambda x: x[1], reverse=True)
                 worst_joints = error_details[:3]
                 
-                print(f"  T={{elapsed:.2f}}s: RMS error={{rms_error:.4f}} rad, Max torque={{max_ctrl:.2f}} Nm")
+                print(f"  T={{elapsed:.2f}}s: RMS error={{rms_error:.4f}} rad, Max force={{max_force:.2f}} Nm")
                 print(f"    Worst errors: ", end="")
                 for jname, err, ctrl in worst_joints:
                     print(f"{{jname}}={{np.rad2deg(err):.1f}}° ({{ctrl:.1f}}Nm)  ", end="")
