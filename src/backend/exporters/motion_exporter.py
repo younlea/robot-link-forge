@@ -933,7 +933,7 @@ data = mujoco.MjData(model)
 
 # Load recording
 recording_data = {rec_json}
-duration = recording_data["duration"]
+duration = recording_data["duration"] / 1000.0  # Convert ms to seconds
 keyframes = recording_data["keyframes"]
 
 # Build joint mapping
@@ -944,7 +944,7 @@ for i in range(model.njnt):
         joint_ids[jnt_name] = i
 
 print(f"Model has {{model.njnt}} joints, {{model.nu}} actuators")
-print(f"Recording duration: {{duration:.2f}}s")
+print(f"Recording duration: {{duration:.2f}}s ({{recording_data['duration']:.0f}}ms)")
 
 # Interpolate trajectory
 dt = model.opt.timestep
