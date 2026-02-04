@@ -76,7 +76,10 @@ UI: Adjust Control (top), then Motor specs per joint (middle)
     Click 'Apply Control to All' to update controller globally
     Select joint, adjust motor specs, click 'Apply Motor' for that joint
 
-Initialized robot to first keyframe position
+Initializing robot to first keyframe position...
+WARNING: Nan, Inf or huge value in QACC at DOF 14. The simulation is unstable. Time = 0.0080.
+
+Robot initialized and stabilized
 DISPLAY: :0
 MUJOCO_GL: NOT SET (using default)
 MuJoCo version: 3.4.0
@@ -85,6 +88,41 @@ Starting motor validation simulation...
 
 [T=0.00s] Step 0/6835
   Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=6.217, error=-6.217, torque=-300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=19.096, error=-19.096, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=0.000, actual=-4.436, error=4.436, torque=-300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=-5.032, error=5.032, ctrl=0.000, torque=300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=1.890, error=-1.890, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=4.964, error=-4.964, ctrl=0.000, torque=300.0Nm
+
+=== First Step Debug (after mj_step) ===
+  LittleFinger-1st_roll:
+    target=0.0000, actual=-5.0321, error=5.0321
+    force=300.0000, kp=200.0
+    expected_force = kp * error = 1006.4111
+  LittleFinger-1st-pitch:
+    target=0.0000, actual=1.8904, error=-1.8904
+    force=-300.0000, kp=200.0
+    expected_force = kp * error = -378.0739
+  LittleFinger-2nd-pitch:
+    target=0.0000, actual=4.9640, error=-4.9640
+    force=300.0000, kp=200.0
+    expected_force = kp * error = -992.7901
+
+
+[T=0.11s] Step 113/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=5.502, error=-5.502, torque=-300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=3.866, error=-3.866, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=0.000, actual=59.418, error=-59.418, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=-2.596, error=2.596, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-1.585, error=1.585, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=3.361, error=-3.361, ctrl=0.000, torque=-300.0Nm
+
+[T=0.31s] Step 309/6835
+  Moving joints (should track trajectory):
     MiddleFinger-1st-pitch: target=0.000, actual=0.000, error=-0.000, torque=0.0Nm (range=1.571)
     MiddleFinger-2nd-pitch: target=0.000, actual=0.000, error=-0.000, torque=0.0Nm (range=0.221)
     IndexFinger-1st-pitch: target=0.000, actual=0.049, error=-0.049, torque=0.0Nm (range=1.571)
@@ -92,177 +130,200 @@ Starting motor validation simulation...
     MiddleFinger-3rd-pitch: target=0.000, actual=-0.232, error=0.232, ctrl=0.000, torque=-7.0Nm
     IndexFinger-2nd-pitch: target=0.000, actual=-0.322, error=0.322, ctrl=0.000, torque=-10.5Nm
 
-=== First Step Debug (after mj_step) ===
-  LittleFinger-1st_roll:
-    target=0.0000, actual=-0.0000, error=0.0000
-    force=0.0000, kp=200.0
-    expected_force = kp * error = 0.0000
-  LittleFinger-1st-pitch:
-    target=0.0000, actual=0.0000, error=-0.0000
-    force=0.0000, kp=200.0
-    expected_force = kp * error = -0.0000
-  LittleFinger-2nd-pitch:
-    target=0.0000, actual=0.0000, error=-0.0000
-    force=0.0000, kp=200.0
-    expected_force = kp * error = -0.0000
-
-
-[T=0.22s] Step 223/6835
-  Moving joints (should track trajectory):
-    MiddleFinger-1st-pitch: target=0.000, actual=-1.347, error=1.347, torque=-135.9Nm (range=1.571)
-    MiddleFinger-2nd-pitch: target=0.000, actual=-1.400, error=1.400, torque=-68.5Nm (range=0.221)
-    IndexFinger-1st-pitch: target=0.000, actual=-5.471, error=5.471, torque=-300.0Nm (range=1.571)
-  ⚠️ Static joints with large error (should stay at 0):
-    MiddleFinger-3rd-pitch: target=0.000, actual=9.621, error=-9.621, ctrl=0.000, torque=300.0Nm
-    IndexFinger-2nd-pitch: target=0.000, actual=10.055, error=-10.055, ctrl=0.000, torque=300.0Nm
-    IndexFinger-3rd-pitch: target=0.000, actual=-4.089, error=4.089, ctrl=0.000, torque=-123.5Nm
-
-[T=0.45s] Step 448/6835
-  Moving joints (should track trajectory):
-    MiddleFinger-1st-pitch: target=0.000, actual=-0.157, error=0.157, torque=300.0Nm (range=1.571)
-    MiddleFinger-2nd-pitch: target=0.000, actual=5.693, error=-5.693, torque=300.0Nm (range=0.221)
-    IndexFinger-1st-pitch: target=0.000, actual=-3.697, error=3.697, torque=300.0Nm (range=1.571)
-  ⚠️ Static joints with large error (should stay at 0):
-    LittleFinger-1st_roll: target=0.000, actual=-4.002, error=4.002, ctrl=0.000, torque=-300.0Nm
-    LittleFinger-1st-pitch: target=0.000, actual=3.000, error=-3.000, ctrl=0.000, torque=300.0Nm
-    LittleFinger-2nd-pitch: target=0.000, actual=8.124, error=-8.124, ctrl=0.000, torque=300.0Nm
-
-[T=0.67s] Step 665/6835
-  Moving joints (should track trajectory):
-    MiddleFinger-1st-pitch: target=0.000, actual=2.782, error=-2.782, torque=-300.0Nm (range=1.571)
-    MiddleFinger-2nd-pitch: target=0.000, actual=12.600, error=-12.600, torque=-300.0Nm (range=0.221)
-    IndexFinger-1st-pitch: target=-0.088, actual=6.338, error=-6.426, torque=-300.0Nm (range=1.571)
-  ⚠️ Static joints with large error (should stay at 0):
-    LittleFinger-1st_roll: target=0.000, actual=-7.786, error=7.786, ctrl=0.000, torque=300.0Nm
-    LittleFinger-1st-pitch: target=0.000, actual=5.737, error=-5.737, ctrl=0.000, torque=-300.0Nm
-    LittleFinger-2nd-pitch: target=0.000, actual=-1.510, error=1.510, ctrl=0.000, torque=-300.0Nm
-
-[T=0.88s] Step 877/6835
-  Moving joints (should track trajectory):
-    MiddleFinger-1st-pitch: target=0.000, actual=6.217, error=-6.217, torque=-300.0Nm (range=1.571)
-    MiddleFinger-2nd-pitch: target=0.000, actual=19.096, error=-19.096, torque=-300.0Nm (range=0.221)
-    IndexFinger-1st-pitch: target=-0.308, actual=-4.436, error=4.128, torque=-300.0Nm (range=1.571)
-  ⚠️ Static joints with large error (should stay at 0):
-    LittleFinger-1st_roll: target=0.000, actual=-5.032, error=5.032, ctrl=0.000, torque=300.0Nm
-    LittleFinger-1st-pitch: target=0.000, actual=1.890, error=-1.890, ctrl=0.000, torque=-300.0Nm
-    LittleFinger-2nd-pitch: target=0.000, actual=4.964, error=-4.964, ctrl=0.000, torque=300.0Nm
-
-[T=1.10s] Step 1095/6835
+[T=0.50s] Step 499/6835
   Moving joints (should track trajectory):
     MiddleFinger-1st-pitch: target=0.000, actual=5.502, error=-5.502, torque=-300.0Nm (range=1.571)
     MiddleFinger-2nd-pitch: target=0.000, actual=3.866, error=-3.866, torque=-300.0Nm (range=0.221)
-    IndexFinger-1st-pitch: target=-0.535, actual=59.418, error=-59.952, torque=300.0Nm (range=1.571)
+    IndexFinger-1st-pitch: target=0.000, actual=59.418, error=-59.418, torque=300.0Nm (range=1.571)
   ⚠️ Static joints with large error (should stay at 0):
     LittleFinger-1st_roll: target=0.000, actual=-2.596, error=2.596, ctrl=0.000, torque=-300.0Nm
     LittleFinger-1st-pitch: target=0.000, actual=-1.585, error=1.585, ctrl=0.000, torque=300.0Nm
     LittleFinger-2nd-pitch: target=0.000, actual=3.361, error=-3.361, ctrl=0.000, torque=-300.0Nm
 
-[T=1.31s] Step 1314/6835
+[T=0.60s] Step 600/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.157, error=0.157, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=5.693, error=-5.693, torque=300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.021, actual=-3.697, error=3.677, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=-4.002, error=4.002, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=3.000, error=-3.000, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=8.124, error=-8.124, ctrl=0.000, torque=300.0Nm
+
+[T=0.71s] Step 706/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=6.217, error=-6.217, torque=-300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=19.096, error=-19.096, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.131, actual=-4.436, error=4.305, torque=-300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=-5.032, error=5.032, ctrl=0.000, torque=300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=1.890, error=-1.890, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=4.964, error=-4.964, ctrl=0.000, torque=300.0Nm
+
+[T=0.81s] Step 807/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-1.347, error=1.347, torque=-135.9Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-1.400, error=1.400, torque=-68.5Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.236, actual=-5.471, error=5.235, torque=-300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    MiddleFinger-3rd-pitch: target=0.000, actual=9.621, error=-9.621, ctrl=0.000, torque=300.0Nm
+    IndexFinger-2nd-pitch: target=0.000, actual=10.055, error=-10.055, ctrl=0.000, torque=300.0Nm
+    IndexFinger-3rd-pitch: target=0.000, actual=-4.089, error=4.089, ctrl=0.000, torque=-123.5Nm
+
+[T=0.91s] Step 910/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.157, error=0.157, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=5.693, error=-5.693, torque=300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.343, actual=-3.697, error=3.355, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=-4.002, error=4.002, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=3.000, error=-3.000, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=8.124, error=-8.124, ctrl=0.000, torque=300.0Nm
+
+[T=1.01s] Step 1012/6835
   Moving joints (should track trajectory):
     MiddleFinger-1st-pitch: target=0.000, actual=4.892, error=-4.892, torque=300.0Nm (range=1.571)
     MiddleFinger-2nd-pitch: target=0.000, actual=-9.478, error=9.478, torque=300.0Nm (range=0.221)
-    IndexFinger-1st-pitch: target=-0.762, actual=-74.984, error=74.222, torque=-300.0Nm (range=1.571)
+    IndexFinger-1st-pitch: target=-0.449, actual=-74.984, error=74.536, torque=-300.0Nm (range=1.571)
   ⚠️ Static joints with large error (should stay at 0):
     LittleFinger-1st_roll: target=0.000, actual=-0.500, error=0.500, ctrl=0.000, torque=-300.0Nm
     LittleFinger-1st-pitch: target=0.000, actual=1.708, error=-1.708, ctrl=0.000, torque=300.0Nm
     LittleFinger-2nd-pitch: target=0.000, actual=2.273, error=-2.273, ctrl=0.000, torque=300.0Nm
 
-[T=1.53s] Step 1531/6835
+[T=1.11s] Step 1113/6835
   Moving joints (should track trajectory):
     MiddleFinger-1st-pitch: target=0.000, actual=4.492, error=-4.492, torque=300.0Nm (range=1.571)
     MiddleFinger-2nd-pitch: target=0.000, actual=-13.080, error=13.080, torque=300.0Nm (range=0.221)
-    IndexFinger-1st-pitch: target=-0.987, actual=1962.080, error=-1963.067, torque=300.0Nm (range=1.571)
+    IndexFinger-1st-pitch: target=-0.553, actual=1962.080, error=-1962.633, torque=300.0Nm (range=1.571)
   ⚠️ Static joints with large error (should stay at 0):
     LittleFinger-1st_roll: target=0.000, actual=1.191, error=-1.191, ctrl=0.000, torque=-300.0Nm
     LittleFinger-1st-pitch: target=0.000, actual=-1.290, error=1.290, ctrl=0.000, torque=-300.0Nm
     LittleFinger-2nd-pitch: target=0.000, actual=1.670, error=-1.670, ctrl=0.000, torque=300.0Nm
-WARNING: Nan, Inf or huge value in QACC at DOF 14. The simulation is unstable. Time = 0.0080.
 
-
-[T=1.77s] Step 1773/6835
-  Moving joints (should track trajectory):
-    MiddleFinger-1st-pitch: target=0.000, actual=0.000, error=-0.000, torque=0.0Nm (range=1.571)
-    MiddleFinger-2nd-pitch: target=0.000, actual=0.000, error=-0.000, torque=0.0Nm (range=0.221)
-    IndexFinger-1st-pitch: target=-1.239, actual=0.049, error=-1.288, torque=0.0Nm (range=1.571)
-  ⚠️ Static joints with large error (should stay at 0):
-    MiddleFinger-3rd-pitch: target=0.000, actual=-0.232, error=0.232, ctrl=0.000, torque=-7.0Nm
-    IndexFinger-2nd-pitch: target=0.000, actual=-0.322, error=0.322, ctrl=0.000, torque=-10.5Nm
-
-[T=1.98s] Step 1975/6835
-  Moving joints (should track trajectory):
-    MiddleFinger-1st-pitch: target=0.000, actual=-1.347, error=1.347, torque=-135.9Nm (range=1.571)
-    MiddleFinger-2nd-pitch: target=0.000, actual=-1.400, error=1.400, torque=-68.5Nm (range=0.221)
-    IndexFinger-1st-pitch: target=-1.448, actual=-5.471, error=4.022, torque=-300.0Nm (range=1.571)
-  ⚠️ Static joints with large error (should stay at 0):
-    MiddleFinger-3rd-pitch: target=0.000, actual=9.621, error=-9.621, ctrl=0.000, torque=300.0Nm
-    IndexFinger-2nd-pitch: target=0.000, actual=10.055, error=-10.055, ctrl=0.000, torque=300.0Nm
-    IndexFinger-3rd-pitch: target=0.000, actual=-4.089, error=4.089, ctrl=0.000, torque=-123.5Nm
-
-[T=2.18s] Step 2176/6835
-  Moving joints (should track trajectory):
-    MiddleFinger-1st-pitch: target=0.000, actual=-0.157, error=0.157, torque=300.0Nm (range=1.571)
-    MiddleFinger-2nd-pitch: target=0.000, actual=5.693, error=-5.693, torque=300.0Nm (range=0.221)
-    IndexFinger-1st-pitch: target=-1.485, actual=-3.697, error=2.212, torque=300.0Nm (range=1.571)
-  ⚠️ Static joints with large error (should stay at 0):
-    LittleFinger-1st_roll: target=0.000, actual=-4.002, error=4.002, ctrl=0.000, torque=-300.0Nm
-    LittleFinger-1st-pitch: target=0.000, actual=3.000, error=-3.000, ctrl=0.000, torque=300.0Nm
-    LittleFinger-2nd-pitch: target=0.000, actual=8.124, error=-8.124, ctrl=0.000, torque=300.0Nm
-
-[T=2.38s] Step 2380/6835
-  Moving joints (should track trajectory):
-    MiddleFinger-1st-pitch: target=0.000, actual=2.782, error=-2.782, torque=-300.0Nm (range=1.571)
-    MiddleFinger-2nd-pitch: target=0.000, actual=12.600, error=-12.600, torque=-300.0Nm (range=0.221)
-    IndexFinger-1st-pitch: target=-1.274, actual=6.338, error=-7.612, torque=-300.0Nm (range=1.571)
-  ⚠️ Static joints with large error (should stay at 0):
-    LittleFinger-1st_roll: target=0.000, actual=-7.786, error=7.786, ctrl=0.000, torque=300.0Nm
-    LittleFinger-1st-pitch: target=0.000, actual=5.737, error=-5.737, ctrl=0.000, torque=-300.0Nm
-    LittleFinger-2nd-pitch: target=0.000, actual=-1.510, error=1.510, ctrl=0.000, torque=-300.0Nm
-
-[T=2.59s] Step 2589/6835
+[T=1.21s] Step 1214/6835
   Moving joints (should track trajectory):
     MiddleFinger-1st-pitch: target=0.000, actual=6.217, error=-6.217, torque=-300.0Nm (range=1.571)
     MiddleFinger-2nd-pitch: target=0.000, actual=19.096, error=-19.096, torque=-300.0Nm (range=0.221)
-    IndexFinger-1st-pitch: target=-1.059, actual=-4.436, error=3.377, torque=-300.0Nm (range=1.571)
+    IndexFinger-1st-pitch: target=-0.658, actual=-4.436, error=3.778, torque=-300.0Nm (range=1.571)
   ⚠️ Static joints with large error (should stay at 0):
     LittleFinger-1st_roll: target=0.000, actual=-5.032, error=5.032, ctrl=0.000, torque=300.0Nm
     LittleFinger-1st-pitch: target=0.000, actual=1.890, error=-1.890, ctrl=0.000, torque=-300.0Nm
     LittleFinger-2nd-pitch: target=0.000, actual=4.964, error=-4.964, ctrl=0.000, torque=300.0Nm
 
-[T=2.80s] Step 2801/6835
+[T=1.32s] Step 1318/6835
   Moving joints (should track trajectory):
     MiddleFinger-1st-pitch: target=0.000, actual=5.502, error=-5.502, torque=-300.0Nm (range=1.571)
     MiddleFinger-2nd-pitch: target=0.000, actual=3.866, error=-3.866, torque=-300.0Nm (range=0.221)
-    IndexFinger-1st-pitch: target=-0.840, actual=59.418, error=-60.257, torque=300.0Nm (range=1.571)
+    IndexFinger-1st-pitch: target=-0.766, actual=59.418, error=-60.184, torque=300.0Nm (range=1.571)
   ⚠️ Static joints with large error (should stay at 0):
     LittleFinger-1st_roll: target=0.000, actual=-2.596, error=2.596, ctrl=0.000, torque=-300.0Nm
     LittleFinger-1st-pitch: target=0.000, actual=-1.585, error=1.585, ctrl=0.000, torque=300.0Nm
     LittleFinger-2nd-pitch: target=0.000, actual=3.361, error=-3.361, ctrl=0.000, torque=-300.0Nm
 
-[T=3.01s] Step 3010/6835
+[T=1.51s] Step 1514/6835
   Moving joints (should track trajectory):
-    MiddleFinger-1st-pitch: target=0.000, actual=4.892, error=-4.892, torque=300.0Nm (range=1.571)
-    MiddleFinger-2nd-pitch: target=0.000, actual=-9.478, error=9.478, torque=300.0Nm (range=0.221)
-    IndexFinger-1st-pitch: target=-0.624, actual=-74.984, error=74.360, torque=-300.0Nm (range=1.571)
+    MiddleFinger-1st-pitch: target=0.000, actual=2.782, error=-2.782, torque=-300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=12.600, error=-12.600, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.970, actual=6.338, error=-7.308, torque=-300.0Nm (range=1.571)
   ⚠️ Static joints with large error (should stay at 0):
-    LittleFinger-1st_roll: target=0.000, actual=-0.500, error=0.500, ctrl=0.000, torque=-300.0Nm
-    LittleFinger-1st-pitch: target=0.000, actual=1.708, error=-1.708, ctrl=0.000, torque=300.0Nm
-    LittleFinger-2nd-pitch: target=0.000, actual=2.273, error=-2.273, ctrl=0.000, torque=300.0Nm
+    LittleFinger-1st_roll: target=0.000, actual=-7.786, error=7.786, ctrl=0.000, torque=300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=5.737, error=-5.737, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-1.510, error=1.510, ctrl=0.000, torque=-300.0Nm
 
-[T=3.23s] Step 3229/6835
+[T=1.62s] Step 1615/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.157, error=0.157, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=5.693, error=-5.693, torque=300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-1.075, actual=-3.697, error=2.623, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=-4.002, error=4.002, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=3.000, error=-3.000, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=8.124, error=-8.124, ctrl=0.000, torque=300.0Nm
+
+[T=1.73s] Step 1731/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=2.782, error=-2.782, torque=-300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=12.600, error=-12.600, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-1.195, actual=6.338, error=-7.533, torque=-300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=-7.786, error=7.786, ctrl=0.000, torque=300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=5.737, error=-5.737, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-1.510, error=1.510, ctrl=0.000, torque=-300.0Nm
+
+[T=1.91s] Step 1913/6835
   Moving joints (should track trajectory):
     MiddleFinger-1st-pitch: target=0.000, actual=0.000, error=-0.000, torque=0.0Nm (range=1.571)
     MiddleFinger-2nd-pitch: target=0.000, actual=0.000, error=-0.000, torque=0.0Nm (range=0.221)
-    IndexFinger-1st-pitch: target=-0.398, actual=0.049, error=-0.447, torque=0.0Nm (range=1.571)
+    IndexFinger-1st-pitch: target=-1.384, actual=0.049, error=-1.433, torque=0.0Nm (range=1.571)
   ⚠️ Static joints with large error (should stay at 0):
     MiddleFinger-3rd-pitch: target=0.000, actual=-0.232, error=0.232, ctrl=0.000, torque=-7.0Nm
     IndexFinger-2nd-pitch: target=0.000, actual=-0.322, error=0.322, ctrl=0.000, torque=-10.5Nm
 
-[T=3.45s] Step 3446/6835
+[T=2.02s] Step 2015/6835
   Moving joints (should track trajectory):
-    MiddleFinger-1st-pitch: target=0.000, actual=-1.347, error=1.347, torque=-135.9Nm (range=1.571)
-    MiddleFinger-2nd-pitch: target=0.000, actual=-1.400, error=1.400, torque=-68.5Nm (range=0.221)
-    IndexFinger-1st-pitch: target=-0.174, actual=-5.471, error=5.297, torque=-300.0Nm (range=1.571)
+    MiddleFinger-1st-pitch: target=0.000, actual=6.217, error=-6.217, torque=-300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=19.096, error=-19.096, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-1.490, actual=-4.436, error=2.946, torque=-300.0Nm (range=1.571)
   ⚠️ Static joints with large error (should stay at 0):
-    MiddleFinger-3rd-pitch: target=0.000, actual=9.621, error=-9.621, ctrl=0.000, torque=300.0Nm
-    IndexFinger-2nd-pitch: target=0.000, actual=10.055, error=-10.055, ctrl=0.000, torque=300.0Nm
-    IndexFinger-3rd-pitch: target=0.000, actual=-4.089, error=4.089, ctrl=0.000, torque=-123.5Nm
+    LittleFinger-1st_roll: target=0.000, actual=-5.032, error=5.032, ctrl=0.000, torque=300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=1.890, error=-1.890, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=4.964, error=-4.964, ctrl=0.000, torque=300.0Nm
+
+[T=2.12s] Step 2120/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=0.000, error=-0.000, torque=0.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=0.000, error=-0.000, torque=0.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-1.543, actual=0.049, error=-1.592, torque=0.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    MiddleFinger-3rd-pitch: target=0.000, actual=-0.232, error=0.232, ctrl=0.000, torque=-7.0Nm
+    IndexFinger-2nd-pitch: target=0.000, actual=-0.322, error=0.322, ctrl=0.000, torque=-10.5Nm
+
+[T=2.22s] Step 2224/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=4.492, error=-4.492, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-13.080, error=13.080, torque=300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-1.436, actual=1962.080, error=-1963.516, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=1.191, error=-1.191, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-1.290, error=1.290, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=1.670, error=-1.670, ctrl=0.000, torque=300.0Nm
+
+[T=2.33s] Step 2326/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=0.000, error=-0.000, torque=0.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=0.000, error=-0.000, torque=0.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-1.330, actual=0.049, error=-1.379, torque=0.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    MiddleFinger-3rd-pitch: target=0.000, actual=-0.232, error=0.232, ctrl=0.000, torque=-7.0Nm
+    IndexFinger-2nd-pitch: target=0.000, actual=-0.322, error=0.322, ctrl=0.000, torque=-10.5Nm
+
+[T=2.43s] Step 2427/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=0.000, error=-0.000, torque=0.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=0.000, error=-0.000, torque=0.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-1.226, actual=0.049, error=-1.275, torque=0.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    MiddleFinger-3rd-pitch: target=0.000, actual=-0.232, error=0.232, ctrl=0.000, torque=-7.0Nm
+    IndexFinger-2nd-pitch: target=0.000, actual=-0.322, error=0.322, ctrl=0.000, torque=-10.5Nm
+
+[T=2.53s] Step 2532/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.157, error=0.157, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=5.693, error=-5.693, torque=300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-1.117, actual=-3.697, error=2.580, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=-4.002, error=4.002, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=3.000, error=-3.000, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=8.124, error=-8.124, ctrl=0.000, torque=300.0Nm
+
+[T=2.73s] Step 2729/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.157, error=0.157, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=5.693, error=-5.693, torque=300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.914, actual=-3.697, error=2.783, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=-4.002, error=4.002, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=3.000, error=-3.000, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=8.124, error=-8.124, ctrl=0.000, torque=300.0Nm
+Motor validation simulation completed successfully
+Motor validation complete. Log saved to motor_validation_log.csv
