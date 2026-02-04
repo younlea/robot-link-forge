@@ -1596,6 +1596,10 @@ try:
                 # Plot qfrc_inverse (Actuator Force required)
                 vals_to_plot = [data.qfrc_inverse[model.jnt_dofadr[joint_ids[n]]] for n in data_source_names]
                 
+                # Log for Mode 1 (inverse dynamics)
+                row = [elapsed] + vals_to_plot
+                writer.writerow(row)
+                
             elif args.mode == 'sensors':
                 # Plot Sensor Data
                 vals_to_plot = [data.sensordata[sensor_ids[n]] for n in data_source_names]
@@ -2295,13 +2299,8 @@ data.qpos[:] = initial_qpos
 data.qvel[:] = 0.0
 data.qacc[:] = 0.0
 data.ctrl[:] = 0.0
-
-# Stabilize the initial configuration
-print(f"\\nInitializing robot to first keyframe position...")
-for _ in range(100):  # Multiple steps to settle physics
-    mujoco.mj_forward(model, data)
-    mujoco.mj_step(model, data)
-print(f"Robot initialized and stabilized\")
+mujoco.mj_forward(model, data)
+print(f"\\nRobot initialized to first keyframe\")
 
 # --- Main Simulation Loop ---
 log_file_name = "motor_validation_log.csv"
@@ -2343,15 +2342,12 @@ try:
             if elapsed > duration:
                 start_time = now
                 elapsed = 0
-                # CRITICAL: Reset qpos to initial position
+                # Reset to initial position
                 data.qpos[:] = initial_qpos
                 data.qvel[:] = 0.0
                 data.qacc[:] = 0.0
                 data.ctrl[:] = 0.0
-                # Stabilize after reset
-                for _ in range(50):  # Fewer steps needed for reset
-                    mujoco.mj_forward(model, data)
-                    mujoco.mj_step(model, data)
+                mujoco.mj_forward(model, data)
                 if HAS_MATPLOTLIB:
                     plot_history['time'].clear()
                     plot_history['tracking_error'].clear()
