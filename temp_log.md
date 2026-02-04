@@ -147,16 +147,39 @@ Letting physics settle at initial pose...
 Initial RMS error after stabilization: 0.0000 rad (0.00°)
 
 Starting forward simulation...
+
+🔍 TORQUE HISTORY DIAGNOSTIC:
+  torque_history shape: (6836, 20)
+  Expected: (6836, 20)
+
+  Sample torques at key steps:
+    Step 0: max=2.91 Nm, nonzero=3/20
+      MiddleFinger-3rd-pitch        :    +1.75 Nm
+      IndexFinger-2nd-pitch         :    +2.91 Nm
+    Step 500: max=2.91 Nm, nonzero=3/20
+      MiddleFinger-3rd-pitch        :    +1.75 Nm
+      IndexFinger-2nd-pitch         :    +2.91 Nm
+    Step 2500: max=2.92 Nm, nonzero=4/20
+      MiddleFinger-3rd-pitch        :    +1.75 Nm
+      IndexFinger-1st-pitch         :    +0.55 Nm
+      IndexFinger-2nd-pitch         :    +2.92 Nm
+      Thumb-1st-pitch               :    +0.27 Nm
+    Step 5000: max=16.21 Nm, nonzero=9/20
+      MiddleFinger_1st_roll         :    -0.32 Nm
+      MiddleFinger-1st-pitch        :   -16.21 Nm
+      MiddleFinger-2nd-pitch        :    -7.73 Nm
+      MiddleFinger-3rd-pitch        :    -1.14 Nm
+      IndexFinger-2nd-pitch         :    +2.91 Nm
+      thumb_1st_yaw                 :    -0.61 Nm
+      Thumb-1st-pitch               :   -14.23 Nm
+      Thumb-2nd-pitch               :    -7.09 Nm
+      Thumb-3rd-pitch               :    -3.47 Nm
   T=0.00s: RMS error=0.0916 rad, Max torque=2.91 Nm
     Worst errors: IndexFinger-2nd-pitch=18.1° (2.9Nm)  MiddleFinger-3rd-pitch=13.3° (1.7Nm)  Thumb-1st-pitch=6.0° (0.0Nm)  
 WARNING: Nan, Inf or huge value in QACC at DOF 13. The simulation is unstable. Time = 0.0070.
 
-  T=1.50s: RMS error=7.0823 rad, Max torque=2.92 Nm
-    Worst errors: MiddleFinger-1st-pitch=891.5° (0.0Nm)  thumb_1st_yaw=650.4° (0.0Nm)  MiddleFinger-2nd-pitch=618.9° (0.0Nm)  
-  T=4.00s: RMS error=6.6753 rad, Max torque=2.91 Nm
-    Worst errors: IndexFinger-2nd-pitch=745.5° (2.9Nm)  Thumb-3rd-pitch=573.2° (0.0Nm)  RingFinger-3rd-pitch=570.4° (0.0Nm)  
-  T=6.50s: RMS error=0.1175 rad, Max torque=0.00 Nm
-    Worst errors: IndexFinger-2nd-pitch=18.4° (0.0Nm)  MiddleFinger-1st-pitch=16.9° (0.0Nm)  MiddleFinger-3rd-pitch=13.3° (0.0Nm)  
+  T=4.00s: RMS error=19.0681 rad, Max torque=2.91 Nm
+    Worst errors: MiddleFinger_1st_roll=4599.1° (0.0Nm)  MiddleFinger-2nd-pitch=1348.6° (0.1Nm)  IndexFinger-2nd-pitch=514.8° (2.9Nm)  
 
 Simulation complete!
 
@@ -165,11 +188,11 @@ VALIDATION RESULTS
 ======================================================================
 
 Tracking Performance:
-  Average RMS Error: 79.129540 rad (4533.789 deg)
-  Maximum RMS Error: 2415.232425 rad (138382.624 deg)
+  Average RMS Error: 72.930532 rad (4178.612 deg)
+  Maximum RMS Error: 2365.599173 rad (135538.849 deg)
 
 Torque Usage:
-  Average Torque: 3.00 Nm
+  Average Torque: 3.01 Nm
   Peak Torque: 38.40 Nm
   Computed Limit: 76.79 Nm
   Usage: 50.0%
@@ -179,3 +202,5 @@ Torque Usage:
   → Problem is in physics model or timestep
   → Check: mass, inertia, timestep, solver settings
 ======================================================================
+
+Plot saved to: mode4_validation.png
