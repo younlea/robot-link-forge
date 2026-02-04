@@ -74,9 +74,11 @@ def generate_mjcf_xml(
 
     xml = [f'<mujoco model="{robot_name}">']
     xml.append('  <compiler angle="radian" meshdir="meshes"/>')
-    # Improved Global Physics
+    # Improved Global Physics for stability
+    # timestep=0.001 (1ms) for better stability with PD control
+    # solver=Newton for accuracy, iterations=100 for convergence
     xml.append(
-        '  <option timestep="0.002" iterations="50" solver="Newton" tolerance="1e-10" gravity="0 0 -9.81"/>'
+        '  <option timestep="0.001" iterations="100" solver="Newton" tolerance="1e-10" gravity="0 0 -9.81"/>'
     )
 
     # 2. Write Assets
@@ -93,12 +95,12 @@ def generate_mjcf_xml(
     xml.append("  <worldbody>")
     xml.append('    <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/>')
     xml.append('    <geom type="plane" size="5 5 0.1" rgba=".9 .9 .9 1"/>')
-    
+
     # CRITICAL: Add a fixed base body to prevent robot from falling
     # Without this, MuJoCo treats root as freejoint (6-DOF floating)
-    xml.append('    <!-- Fixed world anchor - prevents robot from falling -->')
+    xml.append("    <!-- Fixed world anchor - prevents robot from falling -->")
     xml.append('    <body name="fixed_world" pos="0 0 0.5" mocap="false">')
-    xml.append('      <!-- Robot base attached here with no joints = welded -->')
+    xml.append("      <!-- Robot base attached here with no joints = welded -->")
 
     actuators = []
     sensors = []
@@ -725,9 +727,11 @@ def generate_mjcf_xml(
 
         xml.append(f"{indent}</body>")
 
-    build_body(robot.baseLinkId, indent_level=3)  # Indent 3 because inside fixed_world body
-    
-    xml.append('    </body>  <!-- End fixed_world -->')
+    build_body(
+        robot.baseLinkId, indent_level=3
+    )  # Indent 3 because inside fixed_world body
+
+    xml.append("    </body>  <!-- End fixed_world -->")
     xml.append("  </worldbody>")
 
     if actuators:
@@ -743,20 +747,66 @@ def generate_mjcf_xml(
         xml.append("  </sensor>")
 
     xml.append("</mujoco>")
-    
+
     # Debug: Print worldbody structure
     xml_str = "\n".join(xml)
-    print("\n" + "="*70)
+    print("\n" + "=" * 70)
     print("MJCF EXPORT VALIDATION")
-    print("="*70)
+    print("=" * 70)
+
+    # Check for fixed_world
     if "fixed_world" in xml_str:
-        print("✓ fixed_world anchor found - robot should be stable")
+        print("✓ fixed_world anchor found")
+
+        # Check if robot base is directly under fixed_world (no joint = welded)
+        lines = xml_str.split("\n")
+        in_fixed_world = False
+        found_base_body = False
+        found_joint_in_fixed = False
+
+        for i, line in enumerate(lines):
+            if 'name="fixed_world"' in line:
+                in_fixed_world = True
+            if (
+                in_fixed_world
+                and "</body>" in line
+                and "fixed_world" in lines[max(0, i - 1)]
+            ):
+                in_fixed_world = False
+            if in_fixed_world and "<body" in line and "fixed_world" not in line:
+                found_base_body = True
+            if in_fixed_world and "<joint" in line:
+                found_joint_in_fixed = True
+
+        if found_base_body and not found_joint_in_fixed:
+            print("✓ Robot base welded to fixed_world (no joint) - STABLE")
+        elif found_joint_in_fixed:
+            print("✗ WARNING: Joint found inside fixed_world - robot NOT fixed!")
+        else:
+            print("⚠ Could not verify robot attachment")
     else:
         print("✗ WARNING: fixed_world NOT found - robot will fall!")
-    
+
     # Count bodies
     body_count = xml_str.count("<body")
-    print(f"Total bodies: {body_count}")
-    print("="*70 + "\n")
-    
+    joint_count = xml_str.count("<joint")
+    print(f"Total bodies: {body_count}, Total joints: {joint_count}")
+
+    # Print first few lines of worldbody for debugging
+    print("\nFirst 5 lines after <worldbody>:")
+    in_wb = False
+    wb_lines = []
+    for line in xml_str.split("\n"):
+        if "<worldbody>" in line:
+            in_wb = True
+            continue
+        if in_wb:
+            wb_lines.append(line)
+            if len(wb_lines) >= 5:
+                break
+    for line in wb_lines:
+        print(f"  {line}")
+
+    print("=" * 70 + "\n")
+
     return xml_str, generated_joints_info

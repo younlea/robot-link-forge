@@ -2484,9 +2484,11 @@ try:
                     update_plots()
                     
                     try:
-                        fig.canvas.draw_idle()
+                        fig.canvas.draw()
                         fig.canvas.flush_events()
-                    except: pass
+                        plt.pause(0.001)  # Force UI update
+                    except Exception as e:
+                        print(f"Warning: Plot update failed: {e}")
                 
                 last_print = now
 
