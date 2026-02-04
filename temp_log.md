@@ -42,26 +42,26 @@ Found 20 joints in recording
   Last keyframe time: 6.835s
   Recording duration: 6.835s
   Keyframe times: 0.58s 2.09s 3.61s 5.05s 6.83s 
-  Warning: Thumb-1st-pitch using linear interpolation (install scipy for better results)
-  Warning: RingFinger-1st-pitch using linear interpolation (install scipy for better results)
-  Warning: RingFinger-3rd-pitch using linear interpolation (install scipy for better results)
-  Warning: IndexFinger-3rd-pitch using linear interpolation (install scipy for better results)
-  Warning: MiddleFinger-1st-pitch using linear interpolation (install scipy for better results)
-  Warning: IndexFinger-2nd-pitch using linear interpolation (install scipy for better results)
-  Warning: LittleFinger-1st-pitch using linear interpolation (install scipy for better results)
-  Warning: MiddleFinger-2nd-pitch using linear interpolation (install scipy for better results)
   Warning: LittleFinger-3rd-pitch using linear interpolation (install scipy for better results)
-  Warning: MiddleFinger-3rd-pitch using linear interpolation (install scipy for better results)
   Warning: Thumb-2nd-pitch using linear interpolation (install scipy for better results)
-  Warning: MiddleFinger_1st_roll using linear interpolation (install scipy for better results)
-  Warning: IndexFinger_1st_roll using linear interpolation (install scipy for better results)
-  Warning: Thumb-3rd-pitch using linear interpolation (install scipy for better results)
   Warning: LittleFinger-2nd-pitch using linear interpolation (install scipy for better results)
+  Warning: Thumb-1st-pitch using linear interpolation (install scipy for better results)
+  Warning: MiddleFinger-2nd-pitch using linear interpolation (install scipy for better results)
+  Warning: RingFinger-3rd-pitch using linear interpolation (install scipy for better results)
   Warning: IndexFinger-1st-pitch using linear interpolation (install scipy for better results)
-  Warning: thumb_1st_yaw using linear interpolation (install scipy for better results)
-  Warning: LittleFinger-1st_roll using linear interpolation (install scipy for better results)
+  Warning: RingFinger-1st-pitch using linear interpolation (install scipy for better results)
   Warning: RingFinger-1st_roll using linear interpolation (install scipy for better results)
+  Warning: IndexFinger-3rd-pitch using linear interpolation (install scipy for better results)
+  Warning: LittleFinger-1st_roll using linear interpolation (install scipy for better results)
+  Warning: thumb_1st_yaw using linear interpolation (install scipy for better results)
   Warning: RingFinger-2nd-pitch using linear interpolation (install scipy for better results)
+  Warning: LittleFinger-1st-pitch using linear interpolation (install scipy for better results)
+  Warning: Thumb-3rd-pitch using linear interpolation (install scipy for better results)
+  Warning: IndexFinger-2nd-pitch using linear interpolation (install scipy for better results)
+  Warning: MiddleFinger-1st-pitch using linear interpolation (install scipy for better results)
+  Warning: IndexFinger_1st_roll using linear interpolation (install scipy for better results)
+  Warning: MiddleFinger-3rd-pitch using linear interpolation (install scipy for better results)
+  Warning: MiddleFinger_1st_roll using linear interpolation (install scipy for better results)
 
 🔍 TRAJECTORY DIAGNOSTIC:
 Checking if trajectory actually changes over time...
@@ -245,36 +245,62 @@ Starting forward simulation...
       Thumb-1st-pitch               :   -14.23 Nm
       Thumb-2nd-pitch               :    -7.09 Nm
       Thumb-3rd-pitch               :    -3.47 Nm
+
+🔍 DEBUG at step 0:
+  Max qfrc_applied before mj_step: 2.91 Nm
+  Max applied_forces: 2.91 Nm
+  Nonzero DOFs in qfrc_applied: 3/20
+    LittleFinger-1st_roll         : applied=   +0.01 Nm, from history=   +0.01 Nm
+    LittleFinger-1st-pitch        : applied=   -0.01 Nm, from history=   -0.01 Nm
+    LittleFinger-2nd-pitch        : applied=   -0.00 Nm, from history=   -0.00 Nm
+    LittleFinger-3rd-pitch        : applied=   -0.00 Nm, from history=   -0.00 Nm
+    RingFinger-1st_roll           : applied=   +0.00 Nm, from history=   +0.00 Nm
+  Max qfrc_applied AFTER mj_step: 2.91 Nm
+  → MuJoCo cleared forces: False
+
   T=0.00s: RMS error=0.0890 rad, Max force=2.91 Nm
     Worst errors: IndexFinger-2nd-pitch=18.3° (2.9Nm)  MiddleFinger-3rd-pitch=13.3° (1.7Nm)  IndexFinger-1st-pitch=2.8° (0.0Nm)  
-WARNING: Nan, Inf or huge value in QACC at DOF 9. The simulation is unstable. Time = 0.0070.
+WARNING: Nan, Inf or huge value in QACC at DOF 8. The simulation is unstable. Time = 0.0070.
 
-  T=0.50s: RMS error=6.8910 rad, Max force=2.91 Nm
+
+🔍 DEBUG at step 500:
+  Max qfrc_applied before mj_step: 2.91 Nm
+  Max applied_forces: 2.91 Nm
+  Nonzero DOFs in qfrc_applied: 3/20
+    LittleFinger-1st_roll         : applied=   +0.01 Nm, from history=   +0.01 Nm
+    LittleFinger-1st-pitch        : applied=   -0.01 Nm, from history=   -0.01 Nm
+    LittleFinger-2nd-pitch        : applied=   -0.00 Nm, from history=   -0.00 Nm
+    LittleFinger-3rd-pitch        : applied=   -0.00 Nm, from history=   -0.00 Nm
+    RingFinger-1st_roll           : applied=   +0.00 Nm, from history=   +0.00 Nm
+  Max qfrc_applied AFTER mj_step: 2.91 Nm
+  → MuJoCo cleared forces: False
+
+  T=0.50s: RMS error=6.8911 rad, Max force=2.91 Nm
     Worst errors: MiddleFinger-1st-pitch=922.6° (0.0Nm)  MiddleFinger-2nd-pitch=618.8° (0.0Nm)  IndexFinger_1st_roll=560.9° (0.0Nm)  
-  T=1.00s: RMS error=123.5766 rad, Max force=2.92 Nm
-    Worst errors: RingFinger-1st_roll=31080.2° (0.0Nm)  MiddleFinger-2nd-pitch=4049.2° (0.0Nm)  RingFinger-1st-pitch=3129.3° (0.0Nm)  
+  T=1.00s: RMS error=122.1376 rad, Max force=2.92 Nm
+    Worst errors: RingFinger-1st_roll=30706.7° (0.0Nm)  MiddleFinger-2nd-pitch=4049.5° (0.0Nm)  RingFinger-1st-pitch=3122.1° (0.0Nm)  
   T=1.50s: RMS error=6.4167 rad, Max force=2.92 Nm
     Worst errors: IndexFinger-2nd-pitch=746.1° (2.9Nm)  RingFinger-3rd-pitch=570.7° (0.0Nm)  LittleFinger-3rd-pitch=570.7° (0.0Nm)  
-  T=2.00s: RMS error=15.6103 rad, Max force=12.76 Nm
-    Worst errors: MiddleFinger-2nd-pitch=2423.6° (0.0Nm)  RingFinger-1st_roll=2002.2° (0.0Nm)  RingFinger-1st-pitch=1358.4° (0.0Nm)  
-  T=2.50s: RMS error=15.5534 rad, Max force=2.92 Nm
-    Worst errors: MiddleFinger-2nd-pitch=2423.6° (0.0Nm)  RingFinger-1st_roll=2002.2° (0.0Nm)  RingFinger-1st-pitch=1358.4° (0.0Nm)  
+  T=2.00s: RMS error=15.6069 rad, Max force=12.76 Nm
+    Worst errors: MiddleFinger-2nd-pitch=2423.6° (0.0Nm)  RingFinger-1st_roll=2002.5° (0.0Nm)  RingFinger-1st-pitch=1357.5° (0.0Nm)  
+  T=2.50s: RMS error=15.5497 rad, Max force=2.92 Nm
+    Worst errors: MiddleFinger-2nd-pitch=2423.6° (0.0Nm)  RingFinger-1st_roll=2002.5° (0.0Nm)  RingFinger-1st-pitch=1357.5° (0.0Nm)  
   T=3.00s: RMS error=3.6582 rad, Max force=2.92 Nm
     Worst errors: IndexFinger-2nd-pitch=576.2° (2.9Nm)  MiddleFinger-3rd-pitch=551.5° (1.7Nm)  IndexFinger-3rd-pitch=364.8° (0.0Nm)  
-  T=3.50s: RMS error=12.0977 rad, Max force=2.91 Nm
+  T=3.50s: RMS error=12.0978 rad, Max force=2.91 Nm
     Worst errors: MiddleFinger_1st_roll=2591.2° (0.0Nm)  MiddleFinger-2nd-pitch=1291.5° (0.0Nm)  IndexFinger-2nd-pitch=523.3° (2.9Nm)  
-  T=4.00s: RMS error=3.6939 rad, Max force=2.91 Nm
+  T=4.00s: RMS error=0.1408 rad, Max force=2.91 Nm
+    Worst errors: MiddleFinger-1st-pitch=24.2° (0.5Nm)  IndexFinger-2nd-pitch=18.4° (2.9Nm)  MiddleFinger-3rd-pitch=13.3° (1.7Nm)  
+  T=4.50s: RMS error=3.6877 rad, Max force=2.91 Nm
     Worst errors: IndexFinger-2nd-pitch=576.2° (2.9Nm)  MiddleFinger-3rd-pitch=551.5° (1.7Nm)  IndexFinger-3rd-pitch=364.8° (0.0Nm)  
-  T=4.50s: RMS error=6.8209 rad, Max force=2.91 Nm
-    Worst errors: MiddleFinger-1st-pitch=866.4° (0.5Nm)  MiddleFinger-2nd-pitch=626.6° (0.1Nm)  IndexFinger_1st_roll=560.9° (0.0Nm)  
   T=5.00s: RMS error=6.8887 rad, Max force=16.21 Nm
     Worst errors: IndexFinger-2nd-pitch=746.1° (2.9Nm)  Thumb-3rd-pitch=573.0° (3.5Nm)  RingFinger-3rd-pitch=570.7° (0.0Nm)  
-  T=5.50s: RMS error=19.0201 rad, Max force=2.91 Nm
-    Worst errors: MiddleFinger_1st_roll=3129.6° (0.0Nm)  MiddleFinger-2nd-pitch=2411.6° (0.1Nm)  RingFinger-1st_roll=2008.6° (0.0Nm)  
-  T=6.00s: RMS error=12.2857 rad, Max force=2.91 Nm
-    Worst errors: MiddleFinger_1st_roll=2643.7° (0.0Nm)  MiddleFinger-2nd-pitch=1297.5° (0.1Nm)  IndexFinger-2nd-pitch=523.8° (2.9Nm)  
-  T=6.50s: RMS error=12.2571 rad, Max force=2.91 Nm
-    Worst errors: MiddleFinger_1st_roll=2642.4° (0.0Nm)  MiddleFinger-2nd-pitch=1294.0° (0.1Nm)  IndexFinger-2nd-pitch=523.8° (2.9Nm)  
+  T=5.50s: RMS error=19.0265 rad, Max force=2.91 Nm
+    Worst errors: MiddleFinger_1st_roll=3131.9° (0.0Nm)  MiddleFinger-2nd-pitch=2411.5° (0.1Nm)  RingFinger-1st_roll=2008.6° (0.0Nm)  
+  T=6.00s: RMS error=0.2098 rad, Max force=2.91 Nm
+    Worst errors: MiddleFinger-1st-pitch=42.2° (0.5Nm)  Thumb-1st-pitch=21.0° (0.2Nm)  IndexFinger-2nd-pitch=18.4° (2.9Nm)  
+  T=6.50s: RMS error=3.6961 rad, Max force=2.91 Nm
+    Worst errors: IndexFinger-2nd-pitch=576.2° (2.9Nm)  MiddleFinger-3rd-pitch=551.5° (1.7Nm)  IndexFinger-3rd-pitch=364.8° (0.0Nm)  
 
 Simulation complete!
 
@@ -286,8 +312,8 @@ VALIDATION RESULTS
 ======================================================================
 
 Tracking Performance:
-  Average RMS Error: 57.331805 rad (3284.870 deg)
-  Maximum RMS Error: 2783.600743 rad (159488.574 deg)
+  Average RMS Error: 53.022588 rad (3037.971 deg)
+  Maximum RMS Error: 2355.770714 rad (134975.719 deg)
 
 Torque Usage:
   Average Torque: 3.39 Nm
@@ -300,5 +326,3 @@ Torque Usage:
   → Problem is in physics model or timestep
   → Check: mass, inertia, timestep, solver settings
 ======================================================================
-
-Plot saved to: mode4_validation.png
