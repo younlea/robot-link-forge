@@ -919,7 +919,17 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 import json
-from scipy.interpolate import CubicSpline
+
+try:
+    from scipy.interpolate import CubicSpline
+    HAS_SCIPY = True
+except ImportError:
+    HAS_SCIPY = False
+    print("⚠️  WARNING: scipy not installed!")
+    print("   For smooth trajectories, install scipy:")
+    print("   pip install scipy")
+    print("   Using fallback linear interpolation (may cause torque spikes)")
+    print()
 
 try:
     import matplotlib.pyplot as plt
@@ -1001,12 +1011,21 @@ for jname in recorded_joints:
     
     t_interp = np.linspace(0, duration, n_steps)
     
-    # Use cubic spline for smooth interpolation (reduces acceleration spikes)
-    from scipy.interpolate import CubicSpline
-    cs = CubicSpline(times, positions, bc_type='clamped')  # clamped = zero velocity at endpoints
-    q_interp = cs(t_interp)
-    qvel_interp = cs(t_interp, 1)  # First derivative (velocity)
-    qacc_interp = cs(t_interp, 2)  # Second derivative (acceleration)
+    if HAS_SCIPY:
+        # Use cubic spline for smooth interpolation (reduces acceleration spikes)
+        cs = CubicSpline(times, positions, bc_type='clamped')  # clamped = zero velocity at endpoints
+        q_interp = cs(t_interp)
+        qvel_interp = cs(t_interp, 1)  # First derivative (velocity)
+        qacc_interp = cs(t_interp, 2)  # Second derivative (acceleration)
+    else:
+        # Fallback: Linear interpolation with moving average smoothing
+        print(f"  Warning: {{jname}} using linear interpolation (install scipy for better results)")
+        q_interp = np.interp(t_interp, times, positions)
+        # Simple moving average filter to reduce noise
+        window = 21
+        q_smooth = np.convolve(q_interp, np.ones(window)/window, mode='same')
+        qvel_interp = np.gradient(q_smooth, dt)
+        qacc_interp = np.gradient(qvel_interp, dt)
     
     qpos_traj[:, qadr] = q_interp
     qvel_traj[:, dof_adr] = qvel_interp
