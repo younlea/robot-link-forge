@@ -759,31 +759,46 @@ def generate_mjcf_xml(
         print("✓ fixed_world anchor found")
 
         # Check if robot base is directly under fixed_world (no joint = welded)
+        # Strategy: Look for first <body> after fixed_world, check if there's a <joint> 
+        # BEFORE the next <body> (which would be a child)
         lines = xml_str.split("\n")
-        in_fixed_world = False
+        found_fixed_world = False
         found_base_body = False
-        found_joint_in_fixed = False
+        found_joint_before_child_body = False
+        body_depth = 0
 
         for i, line in enumerate(lines):
-            if 'name="fixed_world"' in line:
-                in_fixed_world = True
-            if (
-                in_fixed_world
-                and "</body>" in line
-                and "fixed_world" in lines[max(0, i - 1)]
-            ):
-                in_fixed_world = False
-            if in_fixed_world and "<body" in line and "fixed_world" not in line:
-                found_base_body = True
-            if in_fixed_world and "<joint" in line:
-                found_joint_in_fixed = True
+            if 'name="fixed_world"' in line and "<body" in line:
+                found_fixed_world = True
+                body_depth = 1
+                continue
+            
+            if found_fixed_world and not found_base_body:
+                # Looking for first body inside fixed_world (robot base)
+                if "<body" in line:
+                    found_base_body = True
+                    body_depth += 1
+                    continue
+            
+            if found_base_body and body_depth == 2:
+                # We're between robot base opening and its first child body
+                # If we find a <joint> here, it means base has a joint to fixed_world (BAD!)
+                if "<joint" in line and not "<!--" in line:
+                    found_joint_before_child_body = True
+                    break
+                if "<body" in line:
+                    # Found child body, stop checking
+                    break
+                if "</body>" in line:
+                    # Base body closed without children, stop
+                    break
 
-        if found_base_body and not found_joint_in_fixed:
+        if found_base_body and not found_joint_before_child_body:
             print("✓ Robot base welded to fixed_world (no joint) - STABLE")
-        elif found_joint_in_fixed:
-            print("✗ WARNING: Joint found inside fixed_world - robot NOT fixed!")
+        elif found_joint_before_child_body:
+            print("✗ WARNING: Joint found between fixed_world and robot base - robot NOT fixed!")
         else:
-            print("⚠ Could not verify robot attachment")
+            print("⚠ Could not verify robot attachment (check XML structure)")
     else:
         print("✗ WARNING: fixed_world NOT found - robot will fall!")
 

@@ -83,43 +83,24 @@ def calculate_inertia_from_stl(
 
         # Calculate physical properties
         # CRITICAL: STL files are typically in mm, but MuJoCo needs SI units (kg, m)
-        # 
-        # Step 1: Calculate mass correctly assuming STL is in mm
-        volume_mm3 = mesh.volume
-        volume_m3 = volume_mm3 / 1e9  # 1 m³ = 1e9 mm³
-        mass_kg = volume_m3 * density  # density is in kg/m³
         
-        # Step 2: Get center of mass (in mm from STL)
-        center_of_mass_mm = mesh.center_mass
+        # Set density in kg/mm³ (convert from kg/m³)
+        mesh.density = density / 1e9
         
-        # Step 3: Calculate inertia in SI units (kg·m²)
-        # trimesh.moment_inertia needs density set correctly
-        mesh.density = density / 1e9  # Convert to kg/mm³ for mm-scale STL
-        inertia_SI = mesh.moment_inertia / 1e6  # Convert mm² to m²: (kg·mm²) / 1e6 = kg·m²
+        # Get properties from trimesh (all in mm units with correct density)
+        mass_in_mm_units = mesh.mass  # This is in kg (correct because density is in kg/mm³)
+        center_of_mass_mm = mesh.center_mass  # in mm
+        inertia_mm = mesh.moment_inertia  # in kg·mm²
         
-        # Now we have SI units: mass in kg, COM in mm, inertia in kg·m²
-        mass = mass_kg
-        center_of_mass = center_of_mass_mm / 1000  # Convert mm to m
-        inertia = inertia_SI
-
-        # NOTE: MuJoCo scale in <mesh scale="..."/> only affects VISUAL geometry
-        # Mass and inertia should be REAL physical values in SI units
-        # So we do NOT apply scale to mass/inertia!
-        # 
-        # However, if the scale parameter here represents the actual physical scaling
-        # (e.g., STL was designed at 10x size), then we DO need to scale mass.
-        # 
-        # Best practice: Assume STL is correct physical size in mm,
-        # and scale in MuJoCo is just for visualization
-        # → Do NOT scale mass/inertia
-        #
-        # But our current code expects to apply scale... let's keep it for backward compatibility
-        # but document that this is wrong for most cases
+        # Convert to SI units (meters)
+        mass = mass_in_mm_units  # Already in kg
+        center_of_mass = center_of_mass_mm / 1000  # mm to m
+        inertia = inertia_mm / 1e6  # kg·mm² to kg·m²
+        
+        # Do NOT apply scale - MuJoCo scale is for visualization only
+        # Mass and inertia are physical properties, not visual
         if scale is not None:
-            # WARNING: This scales the physical properties, which is usually WRONG
-            # Scale in MuJoCo <mesh> tag is for visualization only
-            # TODO: Remove this scaling or make it optional
-            pass  # Do NOT scale mass - use real physical values
+            pass  # Intentionally do nothing - keep physical values correct
 
         # Ensure reasonable values
         if mass < 0.0001:  # Less than 0.1 gram
