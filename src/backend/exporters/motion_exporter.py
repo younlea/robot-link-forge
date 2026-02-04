@@ -953,7 +953,11 @@ qpos_traj = np.zeros((n_steps, model.nq))
 qvel_traj = np.zeros((n_steps, model.nv))
 qacc_traj = np.zeros((n_steps, model.nv))
 
-for jname in recording_data["recorded_joints"]:
+# Get joint names from first keyframe
+recorded_joints = list(keyframes[0]["joints"].keys()) if keyframes else []
+print(f"Found {{len(recorded_joints)}} joints in recording")
+
+for jname in recorded_joints:
     if jname not in joint_ids:
         print(f"Warning: Joint {{jname}} in recording not found in model")
         continue
