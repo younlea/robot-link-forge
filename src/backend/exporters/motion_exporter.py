@@ -1225,6 +1225,9 @@ try:
             data.ctrl[:] = 0.0  # Disable position control
             data.qfrc_applied[:] = 0.0  # CRITICAL: Clear previous forces!
             
+            # Store applied forces for logging
+            applied_forces = np.zeros(model.nv)
+            
             # Apply computed forces directly to joints
             for jname, jid in joint_ids.items():
                 if jname in actuator_ids:
@@ -1234,6 +1237,7 @@ try:
                     # Apply force directly to the DOF
                     force = torque_history[sim_step][aid]
                     data.qfrc_applied[dof_adr] = force
+                    applied_forces[dof_adr] = force  # Save for logging
             
             mujoco.mj_step(model, data)
             viewer.sync()
@@ -1285,11 +1289,13 @@ try:
                         
                         target = qpos_traj[sim_step, qadr]
                         actual = data.qpos[qadr]
-                        applied_force = data.qfrc_applied[dof_adr]  # Actually applied force
+                        # Use the force we intended to apply (from torque_history)
+                        # NOT data.qfrc_applied which may be modified by mj_step
+                        intended_force = torque_history[sim_step][aid]
                         
                         log_entry[f'{{jname}}_target'] = target
                         log_entry[f'{{jname}}_actual'] = actual
-                        log_entry[f'{{jname}}_force'] = applied_force
+                        log_entry[f'{{jname}}_force'] = intended_force
                         log_entry[f'{{jname}}_error'] = target - actual
                 
                 phase2_log.append(log_entry)
