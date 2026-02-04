@@ -31,6 +31,13 @@ Model has 20 joints, 20 actuators
 Recording duration: 6.83s (6835ms)
 Found 20 joints in recording
 
+🔍 KEYFRAME TIMING:
+  Number of keyframes: 5
+  First keyframe time: 0.580s
+  Last keyframe time: 6.835s
+  Recording duration: 6.835s
+  Keyframe times: 0.58s 2.09s 3.61s 5.05s 6.83s 
+
 🔍 TRAJECTORY DIAGNOSTIC:
 Checking if trajectory actually changes over time...
   IndexFinger-1st-pitch:
@@ -211,25 +218,29 @@ Starting forward simulation...
     Worst errors: IndexFinger-2nd-pitch=18.3° (0.0Nm)  MiddleFinger-3rd-pitch=13.3° (0.0Nm)  IndexFinger-1st-pitch=2.8° (0.0Nm)  
 WARNING: Nan, Inf or huge value in QACC at DOF 9. The simulation is unstable. Time = 0.0070.
 
-  T=2.00s: RMS error=0.4036 rad, Max torque=0.00 Nm
-    Worst errors: IndexFinger-1st-pitch=87.3° (0.0Nm)  Thumb-1st-pitch=50.6° (0.0Nm)  IndexFinger-2nd-pitch=18.4° (0.0Nm)  
-  T=3.50s: RMS error=6.8945 rad, Max torque=0.00 Nm
-    Worst errors: MiddleFinger-1st-pitch=922.6° (0.0Nm)  MiddleFinger-2nd-pitch=618.8° (0.0Nm)  IndexFinger_1st_roll=560.9° (0.0Nm)  
-  T=6.00s: RMS error=79.9531 rad, Max torque=0.00 Nm
-    Worst errors: RingFinger-2nd-pitch=14723.3° (0.0Nm)  MiddleFinger_1st_roll=11354.0° (0.0Nm)  MiddleFinger-1st-pitch=5179.8° (0.0Nm)  
+  T=1.00s: RMS error=6.9059 rad, Max torque=0.00 Nm
+    Worst errors: MiddleFinger-1st-pitch=922.6° (0.0Nm)  MiddleFinger-2nd-pitch=618.8° (0.0Nm)  IndexFinger_1st_roll=560.8° (0.0Nm)  
+  T=2.50s: RMS error=15.5534 rad, Max torque=0.00 Nm
+    Worst errors: MiddleFinger-2nd-pitch=2423.6° (0.0Nm)  RingFinger-1st_roll=2002.2° (0.0Nm)  RingFinger-1st-pitch=1358.4° (0.0Nm)  
+  T=3.00s: RMS error=123.5845 rad, Max torque=0.00 Nm
+    Worst errors: RingFinger-1st_roll=31080.2° (0.0Nm)  MiddleFinger-2nd-pitch=4049.2° (0.0Nm)  RingFinger-1st-pitch=3129.3° (0.0Nm)  
+  T=4.00s: RMS error=6.8632 rad, Max torque=0.00 Nm
+    Worst errors: MiddleFinger-1st-pitch=897.6° (0.0Nm)  MiddleFinger-2nd-pitch=622.2° (0.0Nm)  IndexFinger_1st_roll=560.9° (0.0Nm)  
+  T=6.00s: RMS error=79.5865 rad, Max torque=0.00 Nm
+    Worst errors: RingFinger-2nd-pitch=14723.3° (0.0Nm)  MiddleFinger_1st_roll=11203.4° (0.0Nm)  MiddleFinger-1st-pitch=5160.1° (0.0Nm)  
 
 Simulation complete!
 
 💾 Saving Phase 2 control history to CSV...
-  Saved 152 samples (every 10 steps) to phase2_control_applied.csv
+  Saved 151 samples (every 10 steps) to phase2_control_applied.csv
 
 ======================================================================
 VALIDATION RESULTS
 ======================================================================
 
 Tracking Performance:
-  Average RMS Error: 46.491740 rad (2663.780 deg)
-  Maximum RMS Error: 1504.295978 rad (86189.811 deg)
+  Average RMS Error: 54.548783 rad (3125.415 deg)
+  Maximum RMS Error: 2145.618505 rad (122934.885 deg)
 
 Torque Usage:
   Average Torque: 0.00 Nm
