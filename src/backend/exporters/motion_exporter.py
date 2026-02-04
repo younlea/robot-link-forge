@@ -1170,6 +1170,9 @@ tracking_errors = []
 control_torques = []
 times = []
 
+# Phase 2 data logging (save every step for CSV)
+phase2_log = []  # Will store: [time, step, target_pos, actual_pos, ctrl] per joint
+
 print("\\nStarting forward simulation...")
 
 # DEBUG: Check torque_history contents
@@ -1244,6 +1247,26 @@ try:
             control_torques.append(max_ctrl)
             times.append(elapsed)
             
+            # Save Phase 2 data every 10 steps (reduce file size)
+            if step % 10 == 0:
+                log_entry = {{'time': elapsed, 'step': step}}
+                for jname in joint_ids.keys():
+                    if jname in actuator_ids:
+                        jid = joint_ids[jname]
+                        aid = actuator_ids[jname]
+                        qadr = model.jnt_qposadr[jid]
+                        
+                        target = qpos_traj[step, qadr]
+                        actual = data.qpos[qadr]
+                        ctrl = data.ctrl[aid]
+                        
+                        log_entry[f'{{jname}}_target'] = target
+                        log_entry[f'{{jname}}_actual'] = actual
+                        log_entry[f'{{jname}}_ctrl'] = ctrl
+                        log_entry[f'{{jname}}_error_rad'] = target - actual
+                
+                phase2_log.append(log_entry)
+            
             # Print progress with diagnostics
             if step % 500 == 0:
                 # Find worst 3 joints
@@ -1265,38 +1288,28 @@ try:
         with open('phase2_control_applied.csv', 'w', newline='') as f:
             writer = csv.writer(f)
             
-            # Header
+            # Header: time, step, then for each joint: target, actual, ctrl, error
             header = ['time_s', 'step']
             for jname in joint_names_ordered:
-                header.append(f"{{jname}}_target")
-                header.append(f"{{jname}}_actual") 
-                header.append(f"{{jname}}_error_deg")
+                header.extend([
+                    f'{{jname}}_target_rad',
+                    f'{{jname}}_actual_rad',
+                    f'{{jname}}_ctrl_Nm',
+                    f'{{jname}}_error_rad'
+                ])
             writer.writerow(header)
             
-            # Save every 10th step to reduce file size
-            for idx, t in enumerate(times):
-                step_idx = int(t / dt)
-                if step_idx >= n_steps:
-                    step_idx = n_steps - 1
-                    
-                row = [t, step_idx]
+            # Write logged data
+            for entry in phase2_log:
+                row = [entry['time'], entry['step']]
                 for jname in joint_names_ordered:
-                    if jname in joint_ids and jname in actuator_ids:
-                        jid = joint_ids[jname]
-                        aid = actuator_ids[jname]
-                        qadr = model.jnt_qposadr[jid]
-                        
-                        target = qpos_traj[step_idx, qadr]
-                        actual = data.qpos[qadr]  # Last known position
-                        error_deg = np.rad2deg(target - actual)
-                        
-                        row.extend([target, actual, error_deg])
-                    else:
-                        row.extend([0, 0, 0])
-                
+                    row.append(entry.get(f'{{jname}}_target', 0))
+                    row.append(entry.get(f'{{jname}}_actual', 0))
+                    row.append(entry.get(f'{{jname}}_ctrl', 0))
+                    row.append(entry.get(f'{{jname}}_error_rad', 0))
                 writer.writerow(row)
         
-        print(f"  Saved {{len(times)}} samples to phase2_control_applied.csv")
+        print(f"  Saved {{len(phase2_log)}} samples (every 10 steps) to phase2_control_applied.csv")
 
 except Exception as e:
     print(f"ERROR: {{e}}")
