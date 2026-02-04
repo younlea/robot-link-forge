@@ -966,7 +966,7 @@ for jname in recorded_joints:
     qadr = model.jnt_qposadr[jnt_idx]
     dof_adr = model.jnt_dofadr[jnt_idx]
     
-    times = [kf["time"] for kf in keyframes]
+    times = [kf["timestamp"]/1000.0 for kf in keyframes]  # Convert ms to seconds
     positions = [kf["joints"].get(jname, 0.0) for kf in keyframes]
     
     t_interp = np.linspace(0, duration, n_steps)
