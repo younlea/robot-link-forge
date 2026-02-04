@@ -943,6 +943,16 @@ for i in range(model.njnt):
     if jnt_name:
         joint_ids[jnt_name] = i
 
+# Build actuator mapping (CRITICAL for Mode 4)
+actuator_ids = {{}}
+for i in range(model.nu):
+    act_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
+    if act_name:
+        # Actuator names usually end with "_act", strip to get joint name
+        joint_name = act_name.replace("_act", "")
+        if joint_name in joint_ids:
+            actuator_ids[joint_name] = i
+
 print(f"Model has {{model.njnt}} joints, {{model.nu}} actuators")
 print(f"Recording duration: {{duration:.2f}}s ({{recording_data['duration']:.0f}}ms)")
 
@@ -981,6 +991,23 @@ print("PHASE 1: INVERSE DYNAMICS ANALYSIS")
 print("="*70)
 print("Calculating required torques for trajectory...")
 
+# CRITICAL DIAGNOSTIC: Check data structure
+print("\\n🔍 DATA STRUCTURE DIAGNOSTIC:")
+print(f"  model.nu (actuators): {{model.nu}}")
+print(f"  model.nv (DOFs): {{model.nv}}")
+print(f"  model.nq (positions): {{model.nq}}")
+print("\\n  Joint → DOF mapping:")
+for jname, jid in joint_ids.items():
+    dof_adr = model.jnt_dofadr[jid]
+    print(f"    {{jname:30s}} → DOF {{dof_adr}}")
+print("\\n  Actuator → Joint mapping:")
+for i in range(model.nu):
+    act_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
+    trnid = model.actuator_trnid[i, 0]  # Transmission ID (joint)
+    if trnid >= 0:
+        joint_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, trnid)
+        print(f"    Actuator[{{i}}] {{act_name:25s}} → Joint {{joint_name}}")
+
 # Phase 1: Run inverse dynamics to compute required torques
 max_torques = np.zeros(model.nu)
 torque_history = []
@@ -989,6 +1016,7 @@ data.qpos[:] = qpos_traj[0]
 data.qvel[:] = 0.0
 mujoco.mj_forward(model, data)
 
+print("\\n" + "="*70)
 for step in range(n_steps):
     data.qpos[:] = qpos_traj[step]
     data.qvel[:] = qvel_traj[step]
@@ -996,11 +1024,25 @@ for step in range(n_steps):
     
     mujoco.mj_inverse(model, data)
     
-    # Record ACTUAL torques (not absolute) for feedforward control
-    torques_actual = data.qfrc_inverse[:model.nu].copy()
+    # CRITICAL: qfrc_inverse is in DOF space, not actuator space!
+    # We need to map DOF forces to actuator controls
+    # Method: For each actuator, find its joint and read qfrc_inverse at that DOF
+    
+    torques_actual = np.zeros(model.nu)
+    for jname, jid in joint_ids.items():
+        dof_adr = model.jnt_dofadr[jid]
+        joint_force = data.qfrc_inverse[dof_adr]
+        
+        # Find corresponding actuator
+        if jname in actuator_ids:
+            aid = actuator_ids[jname]
+            # For motor actuators: ctrl = force / gear
+            # But we're testing direct force, so just copy
+            torques_actual[aid] = joint_force
+    
     torque_history.append(torques_actual)
     
-    # Track max for statistics (do NOT append to torque_history again!)
+    # Track max for statistics
     torques_abs = np.abs(torques_actual)
     max_torques = np.maximum(max_torques, torques_abs)
     
