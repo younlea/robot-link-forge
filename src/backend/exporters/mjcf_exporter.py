@@ -759,7 +759,7 @@ def generate_mjcf_xml(
         print("✓ fixed_world anchor found")
 
         # Check if robot base is directly under fixed_world (no joint = welded)
-        # Strategy: Look for first <body> after fixed_world, check if there's a <joint> 
+        # Strategy: Look for first <body> after fixed_world, check if there's a <joint>
         # BEFORE the next <body> (which would be a child)
         lines = xml_str.split("\n")
         found_fixed_world = False
@@ -772,14 +772,14 @@ def generate_mjcf_xml(
                 found_fixed_world = True
                 body_depth = 1
                 continue
-            
+
             if found_fixed_world and not found_base_body:
                 # Looking for first body inside fixed_world (robot base)
                 if "<body" in line:
                     found_base_body = True
                     body_depth += 1
                     continue
-            
+
             if found_base_body and body_depth == 2:
                 # We're between robot base opening and its first child body
                 # If we find a <joint> here, it means base has a joint to fixed_world (BAD!)
@@ -796,7 +796,9 @@ def generate_mjcf_xml(
         if found_base_body and not found_joint_before_child_body:
             print("✓ Robot base welded to fixed_world (no joint) - STABLE")
         elif found_joint_before_child_body:
-            print("✗ WARNING: Joint found between fixed_world and robot base - robot NOT fixed!")
+            print(
+                "✗ WARNING: Joint found between fixed_world and robot base - robot NOT fixed!"
+            )
         else:
             print("⚠ Could not verify robot attachment (check XML structure)")
     else:
