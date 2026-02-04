@@ -1607,144 +1607,96 @@ try:
                 # Log
                 row = [elapsed] + vals_to_plot
                 writer.writerow(row)
+            
+            # Draw Plot (for ALL modes with matplotlib)
+            if HAS_MATPLOTLIB and (now - last_print > 0.1):
+                ax.clear()
                 
-                # User requested: "Finger name, 1st, 2nd, 3rd" labels
-                def get_pretty_label(name):
-                    # Parse standard robot names
-                    # e.g. "index_finger_joint_1" -> "Index 1st"
-                    low = name.lower()
-                    finger = "Unknown"
-                    if "thumb" in low: finger = "Thumb"
-                    elif "index" in low: finger = "Index"
-                    elif "middle" in low: finger = "Middle"
-                    elif "ring" in low: finger = "Ring"
-                    elif "little" in low or "pinky" in low: finger = "Little"
-                    
-                    # Find index
-                    idx_str = ""
-                    if "1" in name or "proximal" in name: idx_str = "1st"
-                    elif "2" in name or "medial" in name: idx_str = "2nd"
-                    elif "3" in name or "distal" in name: idx_str = "3rd"
-                    elif "tip" in name: idx_str = "Tip"
-                    
-                    if finger == "Unknown": return name
-                    return f"{{finger}}\\n{{idx_str}}"
-
-                # Draw Plot (Throttle)
-                if HAS_MATPLOTLIB and (now - last_print > 0.1):
-                    ax.clear()
-                    ax.set_zlim(*z_lim_default)
-                    
-                    # Determine mapping
+                if args.mode == 'sensors':
+                    ax.set_zlim(0, 5)
+                    ax.set_title(f"Sensor Forces (N) T={{elapsed:.2f}}s")
+                    # 3x7 Logic
                     dz_list = []
+                    c_list = []
                     
-                    if args.mode == 'sensors':
-                        ax.set_title(f"Sensor Forces (N) T={{elapsed:.2f}}s")
-                        ax.set_zlim(0, 5) # Sensors are positive
-                        # 3x7 Logic
-                        # Initialize c_list
-                        c_list = []
-                        
-                        for f in range(5):
-                            for r in range(7):
-                                for c in range(3):
-                                    sname = sensor_grid_map[f][r][c]
-                                    val = 0.0
-                                    if sname and sname in sensor_ids:
-                                        idx_map = data_source_names.index(sname)
-                                        val = vals_to_plot[idx_map]
-                                    dz_list.append(val)
-                                    c_list.append(plt.cm.viridis(val / 5.0))
-                        
-                        # Finger tick logic
-                        x_flat_arr = []
-                        y_flat_arr = []
-                        for f in range(5):
-                            for r in range(7):
-                                for c in range(3):
-                                    x_flat_arr.append(f*4 + c)
-                                    y_flat_arr.append(r)
-                                    
-                        ax.bar3d(x_flat_arr, y_flat_arr, np.zeros_like(x_flat_arr), 0.8, 0.8, dz_list, color=c_list, shade=True)
-                        
-                        # Sensor Graph Labels
-                        tick_locs = []
-                        for i in range(5):
-                            tick_locs.append(i*4 + 1)
-                        ax.set_xticks(tick_locs)
-                        ax.set_xticklabels(FINGER_NAMES, fontsize=9)
-
-
-                    elif args.mode in ['inverse', 'forward']:
-                        # Bar Plot for Torques (2D Grid: Finger vs Joint Rank)
-                        ax.set_title(f"Joint Torques (Nm) T={{elapsed:.2f}}s")
-                        ax.set_zlim(-50, 50) # Z-Axis increased to 50
-                        
-                        # Setup Grid
-                        # X: Fingers (0..4) 'Thumb', 'Index' ...
-                        # Y: Joints (0..2) '1st', '2nd', '3rd'
-                        
-                        x_bar = []
-                        y_bar = []
-                        dz_bar = []
-                        c_bar = []
-                        
-                        for c in range(5):
-                            for r in range(3):
-                                jname = joint_grid_map[r][c]
+                    for f in range(5):
+                        for r in range(7):
+                            for c in range(3):
+                                sname = sensor_grid_map[f][r][c]
                                 val = 0.0
-                                if jname and jname in joint_ids:
-                                     # Find value
-                                     if jname in data_source_names:
-                                         idx_map = data_source_names.index(jname)
-                                         val = vals_to_plot[idx_map]
+                                if sname and sname in sensor_ids:
+                                    idx_map = data_source_names.index(sname)
+                                    val = vals_to_plot[idx_map]
+                                dz_list.append(val)
+                                c_list.append(plt.cm.viridis(val / 5.0))
+                    
+                    # Finger tick logic
+                    x_flat_arr = []
+                    y_flat_arr = []
+                    for f in range(5):
+                        for r in range(7):
+                            for c in range(3):
+                                x_flat_arr.append(f*4 + c)
+                                y_flat_arr.append(r)
                                 
-                                x_bar.append(c)
-                                y_bar.append(r)
-                                dz_bar.append(val)
-                                
-                                # Color Logic (Coolwarm)
-                                # Map -50..50 to 0..1
-                                norm_val = np.clip(val, -50, 50)
-                                # Shift to 0..1: (val + 50) / 100
-                                c_bar.append(plt.cm.coolwarm((norm_val + 50) / 100.0))
+                    ax.bar3d(x_flat_arr, y_flat_arr, np.zeros_like(x_flat_arr), 0.8, 0.8, dz_list, color=c_list, shade=True)
+                    
+                    # Sensor Graph Labels
+                    tick_locs = []
+                    for i in range(5):
+                        tick_locs.append(i*4 + 1)
+                    ax.set_xticks(tick_locs)
+                    ax.set_xticklabels(FINGER_NAMES, fontsize=9)
 
-                        # Plot
-                        # Use narrow bars
-                        ax.bar3d(x_bar, y_bar, np.zeros_like(x_bar), 0.5, 0.5, dz_bar, color=c_bar, shade=True)
-                        
-                        # Labels
-                        ax.set_xticks(np.arange(5) + 0.25)
-                        ax.set_xticklabels(FINGER_NAMES, rotation=0, fontsize=9)
-                        ax.set_yticks(np.arange(3) + 0.25)
-                        ax.set_yticklabels(['1st', '2nd', '3rd'], rotation=0, fontsize=9)
-                        
-                    else:
-                        ax.set_title(f"Torques (Nm) T={{elapsed:.2f}}s Modes: Inverse/Forward")
-                        # 3x5 Logic
-                        for c in range(5):
-                            for r in range(3):
-                                jname = joint_grid_map[r][c]
-                                val = 0.0
-                                if jname and jname in joint_ids:
+                elif args.mode in ['inverse', 'forward']:
+                    # Bar Plot for Torques (2D Grid: Finger vs Joint Rank)
+                    ax.set_title(f"Joint Torques (Nm) T={{elapsed:.2f}}s")
+                    ax.set_zlim(-50, 50)
+                    
+                    # Setup Grid
+                    # X: Fingers (0..4) 'Thumb', 'Index' ...
+                    # Y: Joints (0..2) '1st', '2nd', '3rd'
+                    
+                    x_bar = []
+                    y_bar = []
+                    dz_bar = []
+                    c_bar = []
+                    
+                    for c in range(5):
+                        for r in range(3):
+                            jname = joint_grid_map[r][c]
+                            val = 0.0
+                            if jname and jname in joint_ids:
+                                 # Find value
+                                 if jname in data_source_names:
                                      idx_map = data_source_names.index(jname)
                                      val = vals_to_plot[idx_map]
-                                dz_list.append(val)
-                                norm_val = np.clip(val, -20, 20)
-                                c_list.append(plt.cm.coolwarm((norm_val+20)/40.0))
-                        
-                        # Joints Mesh grid logic
-                        _x = np.arange(5)
-                        _y = np.arange(3)
-                        _xx, _yy = np.meshgrid(_x, _y)
-                        
-                        ax.bar3d(_xx.flatten(), _yy.flatten(), np.zeros_like(_xx.flatten()), 0.5, 0.5, dz_list, color=c_list, shade=True)
-                        
-                    try:
-                        fig.canvas.draw_idle()
-                        fig.canvas.flush_events()
-                    except: pass
-                    last_print = now
+                            
+                            x_bar.append(c)
+                            y_bar.append(r)
+                            dz_bar.append(val)
+                            
+                            # Color Logic (Coolwarm)
+                            # Map -50..50 to 0..1
+                            norm_val = np.clip(val, -50, 50)
+                            # Shift to 0..1: (val + 50) / 100
+                            c_bar.append(plt.cm.coolwarm((norm_val + 50) / 100.0))
+
+                    # Plot
+                    # Use narrow bars
+                    ax.bar3d(x_bar, y_bar, np.zeros_like(x_bar), 0.5, 0.5, dz_bar, color=c_bar, shade=True)
+                    
+                    # Labels
+                    ax.set_xticks(np.arange(5) + 0.25)
+                    ax.set_xticklabels(FINGER_NAMES, rotation=0, fontsize=9)
+                    ax.set_yticks(np.arange(3) + 0.25)
+                    ax.set_yticklabels(['1st', '2nd', '3rd'], rotation=0, fontsize=9)
+                    
+                try:
+                    fig.canvas.draw_idle()
+                    fig.canvas.flush_events()
+                except: pass
+                last_print = now
 
     print("Simulation completed successfully")
 except Exception as e:
