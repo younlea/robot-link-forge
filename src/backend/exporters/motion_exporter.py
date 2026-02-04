@@ -1116,6 +1116,24 @@ times = []
 
 print("\\nStarting forward simulation...")
 
+# DEBUG: Check torque_history contents
+print("\\n🔍 TORQUE HISTORY DIAGNOSTIC:")
+print(f"  torque_history shape: {{torque_history.shape}}")
+print(f"  Expected: ({{n_steps}}, {{model.nu}})")
+print("\\n  Sample torques at key steps:")
+for sample_step in [0, 500, 2500, 5000]:
+    if sample_step < len(torque_history):
+        max_t = np.max(np.abs(torque_history[sample_step]))
+        nonzero = np.count_nonzero(np.abs(torque_history[sample_step]) > 0.01)
+        print(f"    Step {{sample_step}}: max={{max_t:.2f}} Nm, nonzero={{nonzero}}/{{model.nu}}")
+        # Show which joints have significant torque
+        for jname, jid in joint_ids.items():
+            if jname in actuator_ids:
+                aid = actuator_ids[jname]
+                t = torque_history[sample_step][aid]
+                if abs(t) > 0.1:  # Only show significant torques
+                    print(f"      {{jname:30s}}: {{t:+8.2f}} Nm")
+
 try:
     with mujoco.viewer.launch_passive(model, data) as viewer:
         start_time = time.time()
@@ -1144,17 +1162,24 @@ try:
             saturated_joints = []
             
             for jname, jnt_idx in joint_ids.items():
-                if jnt_idx >= model.nu:
-                    continue
                 qadr = model.jnt_qposadr[jnt_idx]
                 error = qpos_traj[step, qadr] - data.qpos[qadr]
                 errors.append(error ** 2)
-                error_details.append((jname, abs(error), abs(data.ctrl[jnt_idx])))
+                
+                # Get actuator control value (use actuator_ids, not joint_ids!)
+                ctrl_val = 0.0
+                if jname in actuator_ids:
+                    aid = actuator_ids[jname]
+                    ctrl_val = data.ctrl[aid]
+                
+                error_details.append((jname, abs(error), abs(ctrl_val)))
                 
                 # Check if saturated
-                limit = adjusted_limits[jnt_idx]
-                if abs(data.ctrl[jnt_idx]) >= limit * 0.99:
-                    saturated_joints.append(jname)
+                if jname in actuator_ids:
+                    aid = actuator_ids[jname]
+                    limit = adjusted_limits[aid]
+                    if abs(data.ctrl[aid]) >= limit * 0.99:
+                        saturated_joints.append(jname)
             
             rms_error = np.sqrt(np.mean(errors))
             max_ctrl = np.max(np.abs(data.ctrl[:model.nu]))
