@@ -1,374 +1,281 @@
-<mujoco model="direct_hand_parm">
-  <compiler angle="radian" meshdir="meshes"/>
-  <option timestep="0.002" iterations="50" solver="Newton" tolerance="1e-10" gravity="0 0 -9.81"/>
-  <asset>
-    <mesh name="direct_hand_parm_0" file="direct_hand_parm.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="new_link_5_1" file="new_link_5.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="new_link_8_2" file="new_link_8.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="little_finger-3rd-end_3" file="little_finger-3rd-end.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="new_link_6_4" file="new_link_6.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="new_link_9_5" file="new_link_9.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="ring_finger-3rd-end_6" file="ring_finger-3rd-end.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="new_link_7_7" file="new_link_7.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="new_link_10_8" file="new_link_10.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="middle_finger-3rd-end_9" file="middle_finger-3rd-end.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="index_finger-1st-pitch_10" file="index_finger-1st-pitch.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="index_finger-2st-pitch_11" file="index_finger-2st-pitch.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="index_finger-3rd-end_12" file="index_finger-3rd-end.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="thumb-link_13" file="thumb-link.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="new_link_11_14" file="new_link_11.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="thumb-3rd-end_15" file="thumb-3rd-end.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="little_finger-1st_roll_join_16" file="little_finger-1st_roll_join.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="ring_finger-1st_roll_join_17" file="ring_finger-1st_roll_join.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="middle_finger_1st_roll_join_18" file="middle_finger_1st_roll_join.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="index_finger_1st_roll_join_19" file="index_finger_1st_roll_join.stl" scale="0.01 0.01 0.01"/>
-    <mesh name="thumb_1st_yaw_join_20" file="thumb_1st_yaw_join.stl" scale="0.01 0.01 0.01"/>
-    <material name="gray" rgba="0.5 0.5 0.5 1"/>
-    <material name="collision" rgba="1 0 0 0.5"/>
-  </asset>
-  <worldbody>
-    <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/>
-    <geom type="plane" size="5 5 0.1" rgba=".9 .9 .9 1"/>
-    <!-- Fixed world anchor - prevents robot from falling -->
-    <body name="fixed_world" pos="0 0 0.5" mocap="false">
-      <!-- Robot base attached here with no joints = welded -->
-      <body name="direct_hand_parm" pos="0 0 0" euler="0 0 0">
-        <geom type="mesh" mesh="direct_hand_parm_0" group="1" contype="0" conaffinity="0" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="1.5707963267948966 -3.141592653589793 1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-        <body name="new_link" pos="0.16 0.369 0.843" euler="-0.17453292519943295 0.0 0.0">
-          <inertial pos="0 0 0" mass="0.05" diaginertia="0.0001 0.0001 0.0001" />
-          <joint name="LittleFinger-1st_roll" type="hinge" axis="1 0 0" range="-0.17453292519943295 0.17453292519943295" damping="0.5" armature="0.001" />
-          <geom type="mesh" mesh="little_finger-1st_roll_join_16" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" group="1" contype="0" conaffinity="0" />
-          <body name="new_link_5" pos="0.0 0.0 0.0" euler="0.0 0.0 0.0">
-            <inertial pos="0.195205 0.020469 -0.001666" mass="8.565548" diaginertia="0.071855 0.220305 0.218803" />
-            <joint name="LittleFinger-1st-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 0.0" damping="0.5" armature="0.001" />
-            <geom type="mesh" mesh="new_link_5_1" group="1" contype="0" conaffinity="0" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-            <body name="new_link_8" pos="0.035 0.0 0.41" euler="0.0 0.0 0.0">
-              <inertial pos="0.131759 0.008434 -0.000350" mass="4.324796" diaginertia="0.028611 0.056927 0.047176" />
-              <joint name="LittleFinger-2nd-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 0.0" damping="0.5" armature="0.001" />
-              <geom type="mesh" mesh="new_link_8_2" group="1" contype="0" conaffinity="0" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-              <body name="little_finger-3rd-end" pos="0.008 0.0 0.209" euler="0.0 0.0 0.0">
-                <inertial pos="0.139689 0.006114 -0.000002" mass="3.689293" diaginertia="0.010866 0.023845 0.023111" />
-                <joint name="LittleFinger-3rd-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 0.0" damping="0.5" armature="0.001" />
-                <geom type="mesh" mesh="little_finger-3rd-end_3" group="1" contype="1" conaffinity="1" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-                <site name="little_finger-3rd-end_sensor_0_1" pos="0.03   0.03   0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_0_2" pos="0.03   0      0.28 " size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_0_3" pos="0.03   -0.03  0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_1_1" pos="0      0.03   0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_1_2" pos="0      0      0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_1_3" pos="0      -0.03  0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_2_1" pos="-0.03  0.03   0.26" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_2_2" pos="-0.03  0      0.26" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_2_3" pos="-0.03  -0.03  0.26" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_3_1" pos="-0.045 0.03   0.23" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_3_2" pos="-0.045 0      0.23" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_3_3" pos="-0.045 -0.03  0.23" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_4_1" pos="-0.05  0.03   0.2" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_4_2" pos="-0.05  0      0.2" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_4_3" pos="-0.05  -0.03  0.2" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_5_1" pos="-0.06  0.03   0.17" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_5_2" pos="-0.06  0      0.17" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_5_3" pos="-0.06  -0.03  0.17" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_6_1" pos="-0.065 0.03   0.14" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_6_2" pos="-0.065 0      0.14" size="0.01" rgba="1 0 0 1"/>
-                <site name="little_finger-3rd-end_sensor_6_3" pos="-0.065 -0.03  0.14" size="0.01" rgba="1 0 0 1"/>
-              </body>
-            </body>
-          </body>
-        </body>
-        <body name="new_link_1" pos="0.16 0.14800000000000002 0.9229999999999999" euler="-0.08726646259971647 0.0 0.0">
-          <inertial pos="0 0 0" mass="0.05" diaginertia="0.0001 0.0001 0.0001" />
-          <joint name="RingFinger-1st_roll" type="hinge" axis="1 0 0" range="-0.17453292519943295 0.17453292519943295" damping="0.5" armature="0.001" />
-          <geom type="mesh" mesh="ring_finger-1st_roll_join_17" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" group="1" contype="0" conaffinity="0" />
-          <body name="new_link_6" pos="0.0 0.0 0.0" euler="0.0 0.0 0.0">
-            <inertial pos="0.195273 0.022019 -0.001666" mass="8.565548" diaginertia="0.071855 0.220305 0.218803" />
-            <joint name="RingFinger-1st-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 0.0" damping="0.5" armature="0.001" />
-            <geom type="mesh" mesh="new_link_6_4" group="1" contype="0" conaffinity="0" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-            <body name="new_link_9" pos="0.035 0.0 0.41" euler="0.0 0.0 0.0">
-              <inertial pos="0.131758 0.008447 -0.000350" mass="4.324796" diaginertia="0.028611 0.056927 0.047176" />
-              <joint name="RingFinger-2nd-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 0.0" damping="0.5" armature="0.001" />
-              <geom type="mesh" mesh="new_link_9_5" group="1" contype="0" conaffinity="0" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-              <body name="ring_finger-3rd-end" pos="0.008 0.0 0.24" euler="0.0 0.0 0.0">
-                <inertial pos="0.139689 0.006128 -0.000002" mass="3.689293" diaginertia="0.010866 0.023845 0.023111" />
-                <joint name="RingFinger-3rd-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 0.0" damping="0.5" armature="0.001" />
-                <geom type="mesh" mesh="ring_finger-3rd-end_6" group="1" contype="1" conaffinity="1" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-                <site name="ring_finger-3rd-end_sensor_0_1" pos="0.03   0.03   0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_0_2" pos="0.03   0      0.28 " size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_0_3" pos="0.03   -0.03  0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_1_1" pos="0      0.03   0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_1_2" pos="0      0      0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_1_3" pos="0      -0.03  0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_2_1" pos="-0.03  0.03   0.26" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_2_2" pos="-0.03  0      0.26" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_2_3" pos="-0.03  -0.03  0.26" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_3_1" pos="-0.045 0.03   0.23" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_3_2" pos="-0.045 0      0.23" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_3_3" pos="-0.045 -0.03  0.23" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_4_1" pos="-0.05  0.03   0.2" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_4_2" pos="-0.05  0      0.2" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_4_3" pos="-0.05  -0.03  0.2" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_5_1" pos="-0.06  0.03   0.17" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_5_2" pos="-0.06  0      0.17" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_5_3" pos="-0.06  -0.03  0.17" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_6_1" pos="-0.065 0.03   0.14" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_6_2" pos="-0.065 0      0.14" size="0.01" rgba="1 0 0 1"/>
-                <site name="ring_finger-3rd-end_sensor_6_3" pos="-0.065 -0.03  0.14" size="0.01" rgba="1 0 0 1"/>
-              </body>
-            </body>
-          </body>
-        </body>
-        <body name="new_link_2" pos="0.16 -0.08 0.955" euler="0.0 0.0 0.0">
-          <inertial pos="0 0 0" mass="0.05" diaginertia="0.0001 0.0001 0.0001" />
-          <joint name="MiddleFinger_1st_roll" type="hinge" axis="1 0 0" range="-0.17453292519943295 0.17453292519943295" damping="0.5" armature="0.001" />
-          <geom type="mesh" mesh="middle_finger_1st_roll_join_18" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" group="1" contype="0" conaffinity="0" />
-          <body name="new_link_7" pos="0.0 0.0 0.0" euler="0.0 0.0 0.0">
-            <inertial pos="0.211970 0.022429 -0.002001" mass="9.018222" diaginertia="0.076429 0.254920 0.252947" />
-            <joint name="MiddleFinger-1st-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 0.0" damping="0.5" armature="0.001" />
-            <geom type="mesh" mesh="new_link_7_7" group="1" contype="0" conaffinity="0" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-            <body name="new_link_10" pos="0.035 0.0 0.44" euler="0.0 0.0 0.0">
-              <inertial pos="0.146280 0.007522 -0.000342" mass="4.985243" diaginertia="0.032589 0.070187 0.059624" />
-              <joint name="MiddleFinger-2nd-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 0.0" damping="0.5" armature="0.001" />
-              <geom type="mesh" mesh="new_link_10_8" group="1" contype="0" conaffinity="0" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-              <body name="middle_finger-3rd-end" pos="0.008 0.0 0.27" euler="0.0 0.0 0.0">
-                <inertial pos="0.139657 0.006068 -0.000065" mass="3.689293" diaginertia="0.010866 0.023845 0.023111" />
-                <joint name="MiddleFinger-3rd-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 -0.03490658503988659" damping="0.5" armature="0.001" />
-                <geom type="mesh" mesh="middle_finger-3rd-end_9" group="1" contype="1" conaffinity="1" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-                <site name="middle_finger-3rd-end_sensor_0_1" pos="0.03   0.03   0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_0_2" pos="0.03   0      0.28 " size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_0_3" pos="0.03   -0.03  0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_1_1" pos="0      0.03   0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_1_2" pos="0      0      0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_1_3" pos="0      -0.03  0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_2_1" pos="-0.03  0.03   0.26" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_2_2" pos="-0.03  0      0.26" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_2_3" pos="-0.03  -0.03  0.26" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_3_1" pos="-0.045 0.03   0.23" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_3_2" pos="-0.045 0      0.23" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_3_3" pos="-0.045 -0.03  0.23" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_4_1" pos="-0.05  0.03   0.2" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_4_2" pos="-0.05  0      0.2" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_4_3" pos="-0.05  -0.03  0.2" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_5_1" pos="-0.06  0.03   0.17" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_5_2" pos="-0.06  0      0.17" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_5_3" pos="-0.06  -0.03  0.17" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_6_1" pos="-0.065 0.03   0.14" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_6_2" pos="-0.065 0      0.14" size="0.01" rgba="1 0 0 1"/>
-                <site name="middle_finger-3rd-end_sensor_6_3" pos="-0.065 -0.03  0.14" size="0.01" rgba="1 0 0 1"/>
-              </body>
-            </body>
-          </body>
-        </body>
-        <body name="new_link_3" pos="0.16 -0.31 0.9229999999999999" euler="0.08726646259971647 0.0 0.0">
-          <inertial pos="0 0 0" mass="0.05" diaginertia="0.0001 0.0001 0.0001" />
-          <joint name="IndexFinger_1st_roll" type="hinge" axis="1 0 0" range="-0.17453292519943295 0.17453292519943295" damping="0.5" armature="0.001" />
-          <geom type="mesh" mesh="index_finger_1st_roll_join_19" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" group="1" contype="0" conaffinity="0" />
-          <body name="index_finger-1st-pitch" pos="0.0 0.0 0.0" euler="0.0 0.0 0.0">
-            <inertial pos="0.195273 0.022019 -0.001666" mass="8.565548" diaginertia="0.071855 0.220305 0.218803" />
-            <joint name="IndexFinger-1st-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 0.0" damping="0.5" armature="0.001" />
-            <geom type="mesh" mesh="index_finger-1st-pitch_10" group="1" contype="0" conaffinity="0" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-            <body name="index_finger-2st-pitch" pos="0.035 0.0 0.41" euler="0.0 0.0 0.0">
-              <inertial pos="0.131759 0.008434 -0.000350" mass="4.324796" diaginertia="0.028611 0.056927 0.047176" />
-              <joint name="IndexFinger-2nd-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 -0.05235987755982988" damping="0.5" armature="0.001" />
-              <geom type="mesh" mesh="index_finger-2st-pitch_11" group="1" contype="0" conaffinity="0" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-              <body name="index_finger-3rd-end" pos="0.008 0.0 0.24" euler="0.0 0.0 0.0">
-                <inertial pos="0.139689 0.006114 -0.000002" mass="3.689293" diaginertia="0.010866 0.023845 0.023111" />
-                <joint name="IndexFinger-3rd-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 0.0" damping="0.5" armature="0.001" />
-                <geom type="mesh" mesh="index_finger-3rd-end_12" group="1" contype="1" conaffinity="1" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="-1.5707963267948966 0.0 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-                <site name="index_finger-3rd-end_sensor_0_1" pos="0.03   0.03   0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_0_2" pos="0.03   0      0.28 " size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_0_3" pos="0.03   -0.03  0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_1_1" pos="0      0.03   0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_1_2" pos="0      0      0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_1_3" pos="0      -0.03  0.275" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_2_1" pos="-0.03  0.03   0.26" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_2_2" pos="-0.03  0      0.26" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_2_3" pos="-0.03  -0.03  0.26" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_3_1" pos="-0.045 0.03   0.23" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_3_2" pos="-0.045 0      0.23" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_3_3" pos="-0.045 -0.03  0.23" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_4_1" pos="-0.05  0.03   0.2" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_4_2" pos="-0.05  0      0.2" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_4_3" pos="-0.05  -0.03  0.2" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_5_1" pos="-0.06  0.03   0.17" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_5_2" pos="-0.06  0      0.17" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_5_3" pos="-0.06  -0.03  0.17" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_6_1" pos="-0.065 0.03   0.14" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_6_2" pos="-0.065 0      0.14" size="0.01" rgba="1 0 0 1"/>
-                <site name="index_finger-3rd-end_sensor_6_3" pos="-0.065 -0.03  0.14" size="0.01" rgba="1 0 0 1"/>
-              </body>
-            </body>
-          </body>
-        </body>
-        <body name="new_link_4" pos="-0.07 -0.317 0.267" euler="0.0 0.0 3.141592653589793">
-          <inertial pos="0 0 0" mass="0.05" diaginertia="0.0001 0.0001 0.0001" />
-          <joint name="thumb_1st_yaw" type="hinge" axis="0 0 1" range="-0.5235987755982988 1.5707963267948966" damping="0.5" armature="0.001" />
-          <geom type="mesh" mesh="thumb_1st_yaw_join_20" pos="0.0 0.0 0.0" euler="1.5707963267948966 0.0 1.5707963267948966" rgba="0.941 0.941 0.941 1.0" group="1" contype="0" conaffinity="0" />
-          <body name="thumb-link" pos="0.0 0.0 0.0" euler="0.0 0.0 0.0">
-            <inertial pos="-0.019578 -0.217581 -0.011487" mass="9.483372" diaginertia="0.256054 0.085669 0.245192" />
-            <joint name="Thumb-1st-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 0.0" damping="0.5" armature="0.001" />
-            <geom type="mesh" mesh="thumb-link_13" group="1" contype="0" conaffinity="0" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="-1.5707963267948966 -3.141592653589793 -1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-            <body name="new_link_11" pos="0.44 0.0 -0.035" euler="0.0 0.0 0.0">
-              <inertial pos="-0.008434 -0.131759 -0.000150" mass="4.324796" diaginertia="0.056927 0.028611 0.047176" />
-              <joint name="Thumb-2nd-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 0.0" damping="0.5" armature="0.001" />
-              <geom type="mesh" mesh="new_link_11_14" group="1" contype="0" conaffinity="0" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="1.5707963267948966 0.0 1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-              <body name="thumb-3rd-end" pos="0.24 0.0 -0.008" euler="0.0 0.0 0.0">
-                <inertial pos="-0.008551 -0.139561 0.000002" mass="3.689293" diaginertia="0.023838 0.010874 0.023111" />
-                <joint name="Thumb-3rd-pitch" type="hinge" axis="0 1 0" range="-1.5707963267948966 0.0" damping="0.5" armature="0.001" />
-                <geom type="mesh" mesh="thumb-3rd-end_15" group="1" contype="1" conaffinity="1" condim="3" margin="0.002" pos="0.0 0.0 0.0" euler="1.5707963267948966 0.0 1.5707963267948966" rgba="0.941 0.941 0.941 1.0" />
-                <site name="thumb-3rd-end_sensor_0_1" pos="0.275 0.03   -0.03" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_0_2" pos="0.28     0   -0.03" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_0_3" pos="0.275 -0.03  -0.03" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_1_1" pos="0.275 0.03   0" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_1_2" pos="0.275 0      0" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_1_3" pos="0.275 -0.03  0" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_2_1" pos="0.26 0.03   0.03" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_2_2" pos="0.26 0      0.03" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_2_3" pos="0.26 -0.03  0.03" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_3_1" pos="0.23 0.03   0.045" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_3_2" pos="0.23 0      0.045" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_3_3" pos="0.23 -0.03   0.045" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_4_1" pos="0.2 0.03   0.05" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_4_2" pos="0.2 0      0.05" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_4_3" pos="0.2 -0.03  0.05" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_5_1" pos="0.17 0.03  0.06" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_5_2" pos="0.17 0     0.06" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_5_3" pos="0.17 -0.03 0.06" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_6_1" pos="0.14 0.03  0.065" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_6_2" pos="0.14 0     0.065" size="0.01" rgba="1 0 0 1"/>
-                <site name="thumb-3rd-end_sensor_6_3" pos="0.14 -0.03 0.065" size="0.01" rgba="1 0 0 1"/>
-              </body>
-            </body>
-          </body>
-        </body>
-      </body>
-    </body>  <!-- End fixed_world -->
-  </worldbody>
-  <actuator>
-            <position name="LittleFinger-1st_roll_act" joint="LittleFinger-1st_roll" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-0.17453292519943295 0.17453292519943295"/>
-              <position name="LittleFinger-1st-pitch_act" joint="LittleFinger-1st-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 0.0"/>
-                <position name="LittleFinger-2nd-pitch_act" joint="LittleFinger-2nd-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 0.0"/>
-                  <position name="LittleFinger-3rd-pitch_act" joint="LittleFinger-3rd-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 0.0"/>
-            <position name="RingFinger-1st_roll_act" joint="RingFinger-1st_roll" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-0.17453292519943295 0.17453292519943295"/>
-              <position name="RingFinger-1st-pitch_act" joint="RingFinger-1st-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 0.0"/>
-                <position name="RingFinger-2nd-pitch_act" joint="RingFinger-2nd-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 0.0"/>
-                  <position name="RingFinger-3rd-pitch_act" joint="RingFinger-3rd-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 0.0"/>
-            <position name="MiddleFinger_1st_roll_act" joint="MiddleFinger_1st_roll" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-0.17453292519943295 0.17453292519943295"/>
-              <position name="MiddleFinger-1st-pitch_act" joint="MiddleFinger-1st-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 0.0"/>
-                <position name="MiddleFinger-2nd-pitch_act" joint="MiddleFinger-2nd-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 0.0"/>
-                  <position name="MiddleFinger-3rd-pitch_act" joint="MiddleFinger-3rd-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 -0.03490658503988659"/>
-            <position name="IndexFinger_1st_roll_act" joint="IndexFinger_1st_roll" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-0.17453292519943295 0.17453292519943295"/>
-              <position name="IndexFinger-1st-pitch_act" joint="IndexFinger-1st-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 0.0"/>
-                <position name="IndexFinger-2nd-pitch_act" joint="IndexFinger-2nd-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 -0.05235987755982988"/>
-                  <position name="IndexFinger-3rd-pitch_act" joint="IndexFinger-3rd-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 0.0"/>
-            <position name="thumb_1st_yaw_act" joint="thumb_1st_yaw" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-0.5235987755982988 1.5707963267948966"/>
-              <position name="Thumb-1st-pitch_act" joint="Thumb-1st-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 0.0"/>
-                <position name="Thumb-2nd-pitch_act" joint="Thumb-2nd-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 0.0"/>
-                  <position name="Thumb-3rd-pitch_act" joint="Thumb-3rd-pitch" kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" ctrlrange="-1.5707963267948966 0.0"/>
-  </actuator>
-  <sensor>
-    <touch name="sensor_little_finger-3rd-end_sensor_0_1" site="little_finger-3rd-end_sensor_0_1" />
-    <touch name="sensor_little_finger-3rd-end_sensor_0_2" site="little_finger-3rd-end_sensor_0_2" />
-    <touch name="sensor_little_finger-3rd-end_sensor_0_3" site="little_finger-3rd-end_sensor_0_3" />
-    <touch name="sensor_little_finger-3rd-end_sensor_1_1" site="little_finger-3rd-end_sensor_1_1" />
-    <touch name="sensor_little_finger-3rd-end_sensor_1_2" site="little_finger-3rd-end_sensor_1_2" />
-    <touch name="sensor_little_finger-3rd-end_sensor_1_3" site="little_finger-3rd-end_sensor_1_3" />
-    <touch name="sensor_little_finger-3rd-end_sensor_2_1" site="little_finger-3rd-end_sensor_2_1" />
-    <touch name="sensor_little_finger-3rd-end_sensor_2_2" site="little_finger-3rd-end_sensor_2_2" />
-    <touch name="sensor_little_finger-3rd-end_sensor_2_3" site="little_finger-3rd-end_sensor_2_3" />
-    <touch name="sensor_little_finger-3rd-end_sensor_3_1" site="little_finger-3rd-end_sensor_3_1" />
-    <touch name="sensor_little_finger-3rd-end_sensor_3_2" site="little_finger-3rd-end_sensor_3_2" />
-    <touch name="sensor_little_finger-3rd-end_sensor_3_3" site="little_finger-3rd-end_sensor_3_3" />
-    <touch name="sensor_little_finger-3rd-end_sensor_4_1" site="little_finger-3rd-end_sensor_4_1" />
-    <touch name="sensor_little_finger-3rd-end_sensor_4_2" site="little_finger-3rd-end_sensor_4_2" />
-    <touch name="sensor_little_finger-3rd-end_sensor_4_3" site="little_finger-3rd-end_sensor_4_3" />
-    <touch name="sensor_little_finger-3rd-end_sensor_5_1" site="little_finger-3rd-end_sensor_5_1" />
-    <touch name="sensor_little_finger-3rd-end_sensor_5_2" site="little_finger-3rd-end_sensor_5_2" />
-    <touch name="sensor_little_finger-3rd-end_sensor_5_3" site="little_finger-3rd-end_sensor_5_3" />
-    <touch name="sensor_little_finger-3rd-end_sensor_6_1" site="little_finger-3rd-end_sensor_6_1" />
-    <touch name="sensor_little_finger-3rd-end_sensor_6_2" site="little_finger-3rd-end_sensor_6_2" />
-    <touch name="sensor_little_finger-3rd-end_sensor_6_3" site="little_finger-3rd-end_sensor_6_3" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_0_1" site="ring_finger-3rd-end_sensor_0_1" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_0_2" site="ring_finger-3rd-end_sensor_0_2" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_0_3" site="ring_finger-3rd-end_sensor_0_3" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_1_1" site="ring_finger-3rd-end_sensor_1_1" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_1_2" site="ring_finger-3rd-end_sensor_1_2" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_1_3" site="ring_finger-3rd-end_sensor_1_3" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_2_1" site="ring_finger-3rd-end_sensor_2_1" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_2_2" site="ring_finger-3rd-end_sensor_2_2" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_2_3" site="ring_finger-3rd-end_sensor_2_3" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_3_1" site="ring_finger-3rd-end_sensor_3_1" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_3_2" site="ring_finger-3rd-end_sensor_3_2" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_3_3" site="ring_finger-3rd-end_sensor_3_3" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_4_1" site="ring_finger-3rd-end_sensor_4_1" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_4_2" site="ring_finger-3rd-end_sensor_4_2" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_4_3" site="ring_finger-3rd-end_sensor_4_3" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_5_1" site="ring_finger-3rd-end_sensor_5_1" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_5_2" site="ring_finger-3rd-end_sensor_5_2" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_5_3" site="ring_finger-3rd-end_sensor_5_3" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_6_1" site="ring_finger-3rd-end_sensor_6_1" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_6_2" site="ring_finger-3rd-end_sensor_6_2" />
-    <touch name="sensor_ring_finger-3rd-end_sensor_6_3" site="ring_finger-3rd-end_sensor_6_3" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_0_1" site="middle_finger-3rd-end_sensor_0_1" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_0_2" site="middle_finger-3rd-end_sensor_0_2" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_0_3" site="middle_finger-3rd-end_sensor_0_3" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_1_1" site="middle_finger-3rd-end_sensor_1_1" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_1_2" site="middle_finger-3rd-end_sensor_1_2" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_1_3" site="middle_finger-3rd-end_sensor_1_3" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_2_1" site="middle_finger-3rd-end_sensor_2_1" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_2_2" site="middle_finger-3rd-end_sensor_2_2" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_2_3" site="middle_finger-3rd-end_sensor_2_3" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_3_1" site="middle_finger-3rd-end_sensor_3_1" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_3_2" site="middle_finger-3rd-end_sensor_3_2" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_3_3" site="middle_finger-3rd-end_sensor_3_3" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_4_1" site="middle_finger-3rd-end_sensor_4_1" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_4_2" site="middle_finger-3rd-end_sensor_4_2" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_4_3" site="middle_finger-3rd-end_sensor_4_3" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_5_1" site="middle_finger-3rd-end_sensor_5_1" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_5_2" site="middle_finger-3rd-end_sensor_5_2" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_5_3" site="middle_finger-3rd-end_sensor_5_3" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_6_1" site="middle_finger-3rd-end_sensor_6_1" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_6_2" site="middle_finger-3rd-end_sensor_6_2" />
-    <touch name="sensor_middle_finger-3rd-end_sensor_6_3" site="middle_finger-3rd-end_sensor_6_3" />
-    <touch name="sensor_index_finger-3rd-end_sensor_0_1" site="index_finger-3rd-end_sensor_0_1" />
-    <touch name="sensor_index_finger-3rd-end_sensor_0_2" site="index_finger-3rd-end_sensor_0_2" />
-    <touch name="sensor_index_finger-3rd-end_sensor_0_3" site="index_finger-3rd-end_sensor_0_3" />
-    <touch name="sensor_index_finger-3rd-end_sensor_1_1" site="index_finger-3rd-end_sensor_1_1" />
-    <touch name="sensor_index_finger-3rd-end_sensor_1_2" site="index_finger-3rd-end_sensor_1_2" />
-    <touch name="sensor_index_finger-3rd-end_sensor_1_3" site="index_finger-3rd-end_sensor_1_3" />
-    <touch name="sensor_index_finger-3rd-end_sensor_2_1" site="index_finger-3rd-end_sensor_2_1" />
-    <touch name="sensor_index_finger-3rd-end_sensor_2_2" site="index_finger-3rd-end_sensor_2_2" />
-    <touch name="sensor_index_finger-3rd-end_sensor_2_3" site="index_finger-3rd-end_sensor_2_3" />
-    <touch name="sensor_index_finger-3rd-end_sensor_3_1" site="index_finger-3rd-end_sensor_3_1" />
-    <touch name="sensor_index_finger-3rd-end_sensor_3_2" site="index_finger-3rd-end_sensor_3_2" />
-    <touch name="sensor_index_finger-3rd-end_sensor_3_3" site="index_finger-3rd-end_sensor_3_3" />
-    <touch name="sensor_index_finger-3rd-end_sensor_4_1" site="index_finger-3rd-end_sensor_4_1" />
-    <touch name="sensor_index_finger-3rd-end_sensor_4_2" site="index_finger-3rd-end_sensor_4_2" />
-    <touch name="sensor_index_finger-3rd-end_sensor_4_3" site="index_finger-3rd-end_sensor_4_3" />
-    <touch name="sensor_index_finger-3rd-end_sensor_5_1" site="index_finger-3rd-end_sensor_5_1" />
-    <touch name="sensor_index_finger-3rd-end_sensor_5_2" site="index_finger-3rd-end_sensor_5_2" />
-    <touch name="sensor_index_finger-3rd-end_sensor_5_3" site="index_finger-3rd-end_sensor_5_3" />
-    <touch name="sensor_index_finger-3rd-end_sensor_6_1" site="index_finger-3rd-end_sensor_6_1" />
-    <touch name="sensor_index_finger-3rd-end_sensor_6_2" site="index_finger-3rd-end_sensor_6_2" />
-    <touch name="sensor_index_finger-3rd-end_sensor_6_3" site="index_finger-3rd-end_sensor_6_3" />
-    <touch name="sensor_thumb-3rd-end_sensor_0_1" site="thumb-3rd-end_sensor_0_1" />
-    <touch name="sensor_thumb-3rd-end_sensor_0_2" site="thumb-3rd-end_sensor_0_2" />
-    <touch name="sensor_thumb-3rd-end_sensor_0_3" site="thumb-3rd-end_sensor_0_3" />
-    <touch name="sensor_thumb-3rd-end_sensor_1_1" site="thumb-3rd-end_sensor_1_1" />
-    <touch name="sensor_thumb-3rd-end_sensor_1_2" site="thumb-3rd-end_sensor_1_2" />
-    <touch name="sensor_thumb-3rd-end_sensor_1_3" site="thumb-3rd-end_sensor_1_3" />
-    <touch name="sensor_thumb-3rd-end_sensor_2_1" site="thumb-3rd-end_sensor_2_1" />
-    <touch name="sensor_thumb-3rd-end_sensor_2_2" site="thumb-3rd-end_sensor_2_2" />
-    <touch name="sensor_thumb-3rd-end_sensor_2_3" site="thumb-3rd-end_sensor_2_3" />
-    <touch name="sensor_thumb-3rd-end_sensor_3_1" site="thumb-3rd-end_sensor_3_1" />
-    <touch name="sensor_thumb-3rd-end_sensor_3_2" site="thumb-3rd-end_sensor_3_2" />
-    <touch name="sensor_thumb-3rd-end_sensor_3_3" site="thumb-3rd-end_sensor_3_3" />
-    <touch name="sensor_thumb-3rd-end_sensor_4_1" site="thumb-3rd-end_sensor_4_1" />
-    <touch name="sensor_thumb-3rd-end_sensor_4_2" site="thumb-3rd-end_sensor_4_2" />
-    <touch name="sensor_thumb-3rd-end_sensor_4_3" site="thumb-3rd-end_sensor_4_3" />
-    <touch name="sensor_thumb-3rd-end_sensor_5_1" site="thumb-3rd-end_sensor_5_1" />
-    <touch name="sensor_thumb-3rd-end_sensor_5_2" site="thumb-3rd-end_sensor_5_2" />
-    <touch name="sensor_thumb-3rd-end_sensor_5_3" site="thumb-3rd-end_sensor_5_3" />
-    <touch name="sensor_thumb-3rd-end_sensor_6_1" site="thumb-3rd-end_sensor_6_1" />
-    <touch name="sensor_thumb-3rd-end_sensor_6_2" site="thumb-3rd-end_sensor_6_2" />
-    <touch name="sensor_thumb-3rd-end_sensor_6_3" site="thumb-3rd-end_sensor_6_3" />
-  </sensor>
-</mujoco>
+younleakim@younleakim-400TEA-400SEA:~/Downloads/direct_hand_parm$ ./run_torque_replay_0_recording_1768623534448.sh 
+Installing dependencies (mujoco, matplotlib, numpy)...
+========================================
+  MuJoCo Motion Analysis Tool
+========================================
+
+Select Analysis Mode:
+
+0. Auto Parameter Optimization (NEW)
+   - Finds optimal motor parameters automatically
+   - Or diagnoses trajectory issues
+
+1. Joint Torque Visualization
+   - Theoretical torque (inverse dynamics)
+
+2. Motor Sizing Validation
+   - Set motor parameters and validate
+
+3. Fingertip Sensor Forces
+   - Contact force visualization
+
+========================================
+Enter choice [0 to auto-optimize, 2 for manual tuning]: 2
+Starting Motor Validation...
+Loading model: direct_hand_parm.xml
+Loaded Recording 1768623534448. Mode: Motor Validation
+
+=== Configuration ===
+Control Params (global): kp=200.0, kv=20.0
+Motor Specs (default): gear=50.0, forcelim=300.0
+Total joints: 20, Total actuators: 20
+
+First 3 joints:
+  LittleFinger-1st_roll: gear=50.0, forcelim=300.0
+  LittleFinger-1st-pitch: gear=50.0, forcelim=300.0
+  LittleFinger-2nd-pitch: gear=50.0, forcelim=300.0
+
+======================================================================
+TRAJECTORY ANALYSIS
+======================================================================
+Total joints in model: 20
+Joints in recording: 20
+
+Recorded joints: ['IndexFinger-1st-pitch', 'IndexFinger-2nd-pitch', 'IndexFinger-3rd-pitch', 'IndexFinger_1st_roll', 'LittleFinger-1st-pitch', 'LittleFinger-1st_roll', 'LittleFinger-2nd-pitch', 'LittleFinger-3rd-pitch', 'MiddleFinger-1st-pitch', 'MiddleFinger-2nd-pitch', 'MiddleFinger-3rd-pitch', 'MiddleFinger_1st_roll', 'RingFinger-1st-pitch', 'RingFinger-1st_roll', 'RingFinger-2nd-pitch', 'RingFinger-3rd-pitch', 'Thumb-1st-pitch', 'Thumb-2nd-pitch', 'Thumb-3rd-pitch', 'thumb_1st_yaw']
+  LittleFinger-1st_roll: RECORDED - start=0.0000, range=[0.0000, 0.0000], delta=0.0000
+  LittleFinger-1st-pitch: RECORDED - start=0.0000, range=[0.0000, 0.0000], delta=0.0000
+  LittleFinger-2nd-pitch: RECORDED - start=0.0000, range=[0.0000, 0.0000], delta=0.0000
+  LittleFinger-3rd-pitch: RECORDED - start=0.0000, range=[0.0000, 0.0000], delta=0.0000
+  RingFinger-1st_roll: RECORDED - start=0.0000, range=[0.0000, 0.0000], delta=0.0000
+  RingFinger-1st-pitch: RECORDED - start=0.0000, range=[0.0000, 0.0000], delta=0.0000
+  RingFinger-2nd-pitch: RECORDED - start=0.0000, range=[0.0000, 0.0000], delta=0.0000
+  RingFinger-3rd-pitch: RECORDED - start=0.0000, range=[0.0000, 0.0000], delta=0.0000
+  MiddleFinger_1st_roll: RECORDED - start=0.0000, range=[0.0000, 0.0255], delta=0.0255
+  MiddleFinger-1st-pitch: RECORDED - start=0.0000, range=[-1.5708, 0.0000], delta=1.5708
+  MiddleFinger-2nd-pitch: RECORDED - start=0.0000, range=[-0.2208, 0.0000], delta=0.2208
+  MiddleFinger-3rd-pitch: RECORDED - start=0.0000, range=[0.0000, 0.0000], delta=0.0000
+  IndexFinger_1st_roll: RECORDED - start=0.0000, range=[0.0000, 0.0000], delta=0.0000
+  IndexFinger-1st-pitch: RECORDED - start=0.0000, range=[-1.5708, 0.0000], delta=1.5708
+  IndexFinger-2nd-pitch: RECORDED - start=0.0000, range=[0.0000, 0.0000], delta=0.0000
+  IndexFinger-3rd-pitch: RECORDED - start=0.0000, range=[0.0000, 0.0000], delta=0.0000
+  thumb_1st_yaw: RECORDED - start=0.0000, range=[-0.3936, 0.0000], delta=0.3936
+  Thumb-1st-pitch: RECORDED - start=0.0000, range=[-0.9408, 0.0000], delta=0.9408
+  Thumb-2nd-pitch: RECORDED - start=0.0000, range=[0.0000, 0.0000], delta=0.0000
+  Thumb-3rd-pitch: RECORDED - start=0.0000, range=[0.0000, 0.0000], delta=0.0000
+======================================================================
+
+Creating UI window...
+Showing UI window...
+UI window created successfully!
+Figure has 22 axes
+
+=== Motor Validation Mode Started ===
+Duration: 6.83s | Joints: 20 | CSV: motor_validation_log.csv
+Joints in recording: 20 / 20
+UI: Adjust Control (top), then Motor specs per joint (middle)
+    Click 'Apply Control to All' to update controller globally
+    Select joint, adjust motor specs, click 'Apply Motor' for that joint
+
+Initialized robot to first keyframe position
+DISPLAY: :0
+MUJOCO_GL: NOT SET (using default)
+MuJoCo version: 3.4.0
+Attempting to create viewer window...
+Starting motor validation simulation...
+
+[T=0.00s] Step 0/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.000, error=0.000, torque=0.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=0.001, error=-0.001, torque=0.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=0.000, actual=0.001, error=-0.001, torque=0.0Nm (range=1.571)
+
+=== First Step Debug (after mj_step) ===
+  LittleFinger-1st_roll:
+    target=0.0000, actual=-0.0000, error=0.0000
+    force=0.0000, kp=200.0
+    expected_force = kp * error = 0.0008
+  LittleFinger-1st-pitch:
+    target=0.0000, actual=0.0000, error=-0.0000
+    force=0.0000, kp=200.0
+    expected_force = kp * error = -0.0015
+  LittleFinger-2nd-pitch:
+    target=0.0000, actual=0.0000, error=-0.0000
+    force=0.0000, kp=200.0
+    expected_force = kp * error = -0.0006
+
+
+[T=0.10s] Step 101/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.018, error=0.018, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-0.345, error=0.345, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=0.000, actual=-0.255, error=0.255, torque=-300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st-pitch: target=0.000, actual=-0.115, error=0.115, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=0.058, error=-0.058, ctrl=0.000, torque=300.0Nm
+    LittleFinger-3rd-pitch: target=0.000, actual=-1.236, error=1.236, ctrl=0.000, torque=-300.0Nm
+
+[T=0.20s] Step 202/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=0.004, error=-0.004, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-0.900, error=0.900, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=0.000, actual=-0.365, error=0.365, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.074, error=-0.074, ctrl=0.000, torque=300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.215, error=0.215, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-0.619, error=0.619, ctrl=0.000, torque=300.0Nm
+
+[T=0.31s] Step 305/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.010, error=0.010, torque=-300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-1.522, error=1.522, torque=300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=0.000, actual=-0.490, error=0.490, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.112, error=-0.112, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.288, error=0.288, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-1.179, error=1.179, ctrl=0.000, torque=-300.0Nm
+
+[T=0.41s] Step 410/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.044, error=0.044, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-1.582, error=1.582, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=0.000, actual=-0.361, error=0.361, torque=-300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.164, error=-0.164, ctrl=0.000, torque=300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.527, error=0.527, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-1.043, error=1.043, ctrl=0.000, torque=300.0Nm
+
+[T=0.51s] Step 514/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.002, error=0.002, torque=-300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-1.089, error=1.089, torque=300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=0.000, actual=-0.476, error=0.476, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.177, error=-0.177, ctrl=0.000, torque=245.7Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.635, error=0.635, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-1.403, error=1.403, ctrl=0.000, torque=300.0Nm
+
+[T=0.62s] Step 616/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=0.004, error=-0.004, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-0.772, error=0.772, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.037, actual=-0.540, error=0.503, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.178, error=-0.178, ctrl=0.000, torque=185.1Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.609, error=0.609, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-1.284, error=1.284, ctrl=0.000, torque=-300.0Nm
+
+[T=0.72s] Step 716/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.012, error=0.012, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-0.893, error=0.893, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.141, actual=-0.521, error=0.380, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.176, error=-0.176, ctrl=0.000, torque=300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.744, error=0.744, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-0.854, error=0.854, ctrl=0.000, torque=-300.0Nm
+
+[T=0.82s] Step 820/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.038, error=0.038, torque=-300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-1.158, error=1.158, torque=300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.249, actual=-0.464, error=0.215, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.180, error=-0.180, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.824, error=0.824, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-0.417, error=0.417, ctrl=0.000, torque=-300.0Nm
+
+[T=0.92s] Step 923/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.027, error=0.027, torque=-300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-1.308, error=1.308, torque=300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.356, actual=-0.442, error=0.085, torque=-300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.175, error=-0.175, ctrl=0.000, torque=154.9Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.737, error=0.737, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-0.816, error=0.816, ctrl=0.000, torque=300.0Nm
+
+[T=1.03s] Step 1025/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.050, error=0.050, torque=-300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-1.030, error=1.030, torque=300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.462, actual=-0.438, error=-0.024, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.167, error=-0.167, ctrl=0.000, torque=300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.658, error=0.658, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-1.546, error=1.546, ctrl=0.000, torque=-300.0Nm
+
+[T=1.13s] Step 1128/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.038, error=0.038, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-0.987, error=0.987, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.569, actual=-0.464, error=-0.105, torque=-300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.144, error=-0.144, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.706, error=0.706, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-1.418, error=1.418, ctrl=0.000, torque=300.0Nm
+
+[T=1.23s] Step 1231/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.050, error=0.050, torque=-300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-0.968, error=0.968, torque=300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.676, actual=-0.414, error=-0.262, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.133, error=-0.133, ctrl=0.000, torque=300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.625, error=0.625, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-1.177, error=1.177, ctrl=0.000, torque=300.0Nm
+
+[T=1.33s] Step 1334/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.102, error=0.102, torque=-300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-0.949, error=0.949, torque=300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.783, actual=-0.347, error=-0.436, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.115, error=-0.115, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.554, error=0.554, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-1.666, error=1.666, ctrl=0.000, torque=-300.0Nm
+
+[T=1.43s] Step 1434/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.080, error=0.080, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-1.394, error=1.394, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.887, actual=-0.332, error=-0.554, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.095, error=-0.095, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.582, error=0.582, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-1.354, error=1.354, ctrl=0.000, torque=-300.0Nm
+
+[T=1.54s] Step 1538/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.208, error=0.208, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-1.185, error=1.185, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-0.995, actual=-0.090, error=-0.905, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.081, error=-0.081, ctrl=0.000, torque=300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.456, error=0.456, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-1.253, error=1.253, ctrl=0.000, torque=-300.0Nm
+
+[T=1.64s] Step 1642/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.004, error=0.004, torque=300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-1.466, error=1.466, torque=-300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-1.103, actual=-0.084, error=-1.018, torque=-300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st_roll: target=0.000, actual=0.058, error=-0.058, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-1st-pitch: target=0.000, actual=-0.433, error=0.433, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-1.295, error=1.295, ctrl=0.000, torque=-300.0Nm
+
+[T=1.74s] Step 1742/6835
+  Moving joints (should track trajectory):
+    MiddleFinger-1st-pitch: target=0.000, actual=-0.017, error=0.017, torque=-300.0Nm (range=1.571)
+    MiddleFinger-2nd-pitch: target=0.000, actual=-1.471, error=1.471, torque=300.0Nm (range=0.221)
+    IndexFinger-1st-pitch: target=-1.206, actual=0.004, error=-1.210, torque=300.0Nm (range=1.571)
+  ⚠️ Static joints with large error (should stay at 0):
+    LittleFinger-1st-pitch: target=0.000, actual=-0.317, error=0.317, ctrl=0.000, torque=300.0Nm
+    LittleFinger-2nd-pitch: target=0.000, actual=-1.468, error=1.468, ctrl=0.000, torque=-300.0Nm
+    LittleFinger-3rd-pitch: target=0.000, actual=-0.078, error=0.078, ctrl=0.000, torque=300.0Nm
+^CTraceback (most recent call last):
+  File "/home/younleakim/Downloads/direct_hand_parm/replay_motor_validation.py", line 596, in <module>
+    viewer.sync()
+  File "/home/younleakim/Downloads/direct_hand_parm/venv/lib/python3.10/site-packages/mujoco/viewer.py", line 236, in sync
+    sim.sync(state_only)  # locks internally
+KeyboardInterrupt
