@@ -2438,7 +2438,7 @@ try:
                 error = target_pos - actual_pos
                 velocity = data.qvel[dof_adr]
                 
-            tracking_errors.append(error ** 2)
+                tracking_errors.append(error ** 2)
                 
                 # Get actuator force/torque
                 torque = 0.0
