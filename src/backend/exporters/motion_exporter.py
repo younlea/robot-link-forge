@@ -919,6 +919,7 @@ import mujoco
 import mujoco.viewer
 import numpy as np
 import json
+from scipy.interpolate import CubicSpline
 
 try:
     import matplotlib.pyplot as plt
@@ -999,11 +1000,17 @@ for jname in recorded_joints:
     positions = [first_pos] + [kf["joints"].get(jname, first_pos) for kf in keyframes]
     
     t_interp = np.linspace(0, duration, n_steps)
-    q_interp = np.interp(t_interp, times, positions)
+    
+    # Use cubic spline for smooth interpolation (reduces acceleration spikes)
+    from scipy.interpolate import CubicSpline
+    cs = CubicSpline(times, positions, bc_type='clamped')  # clamped = zero velocity at endpoints
+    q_interp = cs(t_interp)
+    qvel_interp = cs(t_interp, 1)  # First derivative (velocity)
+    qacc_interp = cs(t_interp, 2)  # Second derivative (acceleration)
     
     qpos_traj[:, qadr] = q_interp
-    qvel_traj[:, dof_adr] = np.gradient(q_interp, dt)
-    qacc_traj[:, dof_adr] = np.gradient(qvel_traj[:, dof_adr], dt)
+    qvel_traj[:, dof_adr] = qvel_interp
+    qacc_traj[:, dof_adr] = qacc_interp
 
 # DEBUG: Check trajectory variation
 print("\\n🔍 TRAJECTORY DIAGNOSTIC:")
@@ -1012,12 +1019,15 @@ for jname in ['IndexFinger-1st-pitch', 'MiddleFinger-1st-pitch', 'Thumb-1st-pitc
     if jname in joint_ids:
         jid = joint_ids[jname]
         qadr = model.jnt_qposadr[jid]
+        dof_adr = model.jnt_dofadr[jid]
         print(f"  {{jname}}:")
         print(f"    Step 0:    {{qpos_traj[0, qadr]:.4f}} rad")
         print(f"    Step 500:  {{qpos_traj[500, qadr]:.4f}} rad")
         print(f"    Step 2500: {{qpos_traj[2500, qadr]:.4f}} rad")
         print(f"    Step 5000: {{qpos_traj[5000, qadr]:.4f}} rad")
         print(f"    Range: {{np.max(qpos_traj[:, qadr]) - np.min(qpos_traj[:, qadr]):.4f}} rad")
+        print(f"    Vel range: {{np.min(qvel_traj[:, dof_adr]):.2f}} to {{np.max(qvel_traj[:, dof_adr]):.2f}} rad/s")
+        print(f"    Acc range: {{np.min(qacc_traj[:, dof_adr]):.2f}} to {{np.max(qacc_traj[:, dof_adr]):.2f}} rad/s²")
 
 print("\\n" + "="*70)
 print("PHASE 1: INVERSE DYNAMICS ANALYSIS")
