@@ -1211,18 +1211,11 @@ for sample_step in [0, 500, 2500, 5000]:
 try:
     with mujoco.viewer.launch_passive(model, data) as viewer:
         start_time = time.time()
-        step = 0
+        sim_step = 0  # Simulation step counter
         
-        while viewer.is_running() and step < n_steps:
-            now = time.time()
-            elapsed = now - start_time
-            
-            if elapsed > duration:
-                break
-            
-            step = int(elapsed / dt)
-            if step >= n_steps:
-                step = n_steps - 1
+        while viewer.is_running() and sim_step < n_steps:
+            # Use simulation steps, not real time!
+            # Real time can be too fast and skip steps
             
             # CRITICAL: We have position actuators, not motor actuators!
             # data.ctrl expects target positions, not forces
@@ -1239,11 +1232,14 @@ try:
                     dof_adr = model.jnt_dofadr[jid]
                     
                     # Apply force directly to the DOF
-                    force = torque_history[step][aid]
+                    force = torque_history[sim_step][aid]
                     data.qfrc_applied[dof_adr] = force
             
             mujoco.mj_step(model, data)
             viewer.sync()
+            
+            # Calculate elapsed time for logging
+            elapsed = sim_step * dt
             
             # Log tracking error with detailed diagnostics
             errors = []
@@ -1252,7 +1248,7 @@ try:
             
             for jname, jnt_idx in joint_ids.items():
                 qadr = model.jnt_qposadr[jnt_idx]
-                error = qpos_traj[step, qadr] - data.qpos[qadr]
+                error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
                 errors.append(error ** 2)
                 
                 # Get actuator control value (use actuator_ids, not joint_ids!)
@@ -1278,8 +1274,8 @@ try:
             times.append(elapsed)
             
             # Save Phase 2 data every 10 steps (reduce file size)
-            if step % 10 == 0:
-                log_entry = {{'time': elapsed, 'step': step}}
+            if sim_step % 10 == 0:
+                log_entry = {{'time': elapsed, 'step': sim_step}}
                 for jname in joint_ids.keys():
                     if jname in actuator_ids:
                         jid = joint_ids[jname]
@@ -1287,7 +1283,7 @@ try:
                         qadr = model.jnt_qposadr[jid]
                         dof_adr = model.jnt_dofadr[jid]
                         
-                        target = qpos_traj[step, qadr]
+                        target = qpos_traj[sim_step, qadr]
                         actual = data.qpos[qadr]
                         applied_force = data.qfrc_applied[dof_adr]  # Actually applied force
                         
@@ -1299,7 +1295,7 @@ try:
                 phase2_log.append(log_entry)
             
             # Print progress with diagnostics
-            if step % 500 == 0:
+            if sim_step % 500 == 0:
                 # Find worst 3 joints
                 error_details.sort(key=lambda x: x[1], reverse=True)
                 worst_joints = error_details[:3]
@@ -1311,6 +1307,8 @@ try:
                 print()
                 if saturated_joints:
                     print(f"    Saturated: {{', '.join(saturated_joints[:5])}}")
+            
+            sim_step += 1  # Increment simulation step
         
         print("\\nSimulation complete!")
         
