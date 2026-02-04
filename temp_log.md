@@ -77,8 +77,10 @@ Inverse Dynamics Results:
   Overall Peak Torque: 38.40 Nm
   Average Peak Torque: 8.79 Nm
 
-Applying 1.2x safety margin...
-  Adjusted force limits: 10.54 Nm (avg), 46.08 Nm (max)
+Applying 2.0x safety margin...
+  → Inverse dynamics only accounts for ideal motion
+  → Forward simulation needs extra for friction, damping, numerical errors
+  Adjusted force limits: 17.57 Nm (avg), 76.79 Nm (max)
 
 ======================================================================
 PHASE 2: FORWARD SIMULATION WITH COMPUTED LIMITS
@@ -87,31 +89,32 @@ PHASE 2: FORWARD SIMULATION WITH COMPUTED LIMITS
   Actuator 1: forcelimit = ±0.01 Nm
   Actuator 2: forcelimit = ±0.00 Nm
   Actuator 3: forcelimit = ±0.00 Nm
-  Actuator 4: forcelimit = ±0.00 Nm
+  Actuator 4: forcelimit = ±0.01 Nm
   Actuator 5: forcelimit = ±0.01 Nm
   Actuator 6: forcelimit = ±0.00 Nm
   Actuator 7: forcelimit = ±0.00 Nm
-  Actuator 8: forcelimit = ±0.69 Nm
-  Actuator 9: forcelimit = ±38.31 Nm
-  Actuator 10: forcelimit = ±18.38 Nm
-  Actuator 11: forcelimit = ±4.61 Nm
-  Actuator 12: forcelimit = ±0.34 Nm
-  Actuator 13: forcelimit = ±46.08 Nm
-  Actuator 14: forcelimit = ±18.73 Nm
-  Actuator 15: forcelimit = ±8.78 Nm
-  Actuator 16: forcelimit = ±2.71 Nm
-  Actuator 17: forcelimit = ±41.38 Nm
-  Actuator 18: forcelimit = ±20.74 Nm
-  Actuator 19: forcelimit = ±10.10 Nm
+  Actuator 8: forcelimit = ±1.15 Nm
+  Actuator 9: forcelimit = ±63.85 Nm
+  Actuator 10: forcelimit = ±30.63 Nm
+  Actuator 11: forcelimit = ±7.69 Nm
+  Actuator 12: forcelimit = ±0.57 Nm
+  Actuator 13: forcelimit = ±76.79 Nm
+  Actuator 14: forcelimit = ±31.21 Nm
+  Actuator 15: forcelimit = ±14.63 Nm
+  Actuator 16: forcelimit = ±4.52 Nm
+  Actuator 17: forcelimit = ±68.96 Nm
+  Actuator 18: forcelimit = ±34.56 Nm
+  Actuator 19: forcelimit = ±16.84 Nm
 
 Control gains: kp=50.0, kv=10.0
 Note: Gains reduced to work within computed torque limits
 
 Starting forward simulation...
-  T=0.00s: RMS error=0.0805 rad, Max torque=0.00 Nm
-  T=1.00s: RMS error=0.4839 rad, Max torque=46.08 Nm
-  T=1.50s: RMS error=0.5857 rad, Max torque=46.08 Nm
-  T=4.00s: RMS error=0.5448 rad, Max torque=46.08 Nm
+  T=0.00s: RMS error=0.0895 rad, Max torque=0.00 Nm
+    Worst errors: IndexFinger-2nd-pitch=18.4° (0.0Nm)  MiddleFinger-3rd-pitch=13.3° (0.0Nm)  IndexFinger-1st-pitch=2.8° (0.0Nm)  
+  T=2.00s: RMS error=0.6375 rad, Max torque=76.79 Nm
+    Worst errors: IndexFinger-3rd-pitch=95.1° (14.6Nm)  MiddleFinger-3rd-pitch=81.2° (7.7Nm)  MiddleFinger-1st-pitch=72.8° (63.9Nm)  
+    Saturated: LittleFinger-1st_roll, LittleFinger-1st-pitch, LittleFinger-2nd-pitch, LittleFinger-3rd-pitch, RingFinger-1st_roll
 
 Simulation complete!
 
@@ -120,13 +123,13 @@ VALIDATION RESULTS
 ======================================================================
 
 Tracking Performance:
-  Average RMS Error: 0.552695 rad (31.667 deg)
-  Maximum RMS Error: 0.700390 rad (40.129 deg)
+  Average RMS Error: 0.581137 rad (33.297 deg)
+  Maximum RMS Error: 0.891209 rad (51.063 deg)
 
 Torque Usage:
-  Average Torque: 46.04 Nm
-  Peak Torque: 46.08 Nm
-  Computed Limit: 46.08 Nm
+  Average Torque: 76.74 Nm
+  Peak Torque: 76.79 Nm
+  Computed Limit: 76.79 Nm
   Usage: 100.0%
 
 ======================================================================
