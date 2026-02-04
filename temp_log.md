@@ -130,6 +130,10 @@ Calculating required torques for trajectory...
   Step 6000/6836: Max torque so far = 38.40 Nm
   Step 6500/6836: Max torque so far = 38.40 Nm
 
+💾 Saving torque history to CSV...
+  Saved 6836 steps × 20 joints to phase1_torque_history.csv
+  File size: ~1068.1 KB
+
 Inverse Dynamics Results:
   Joint Name                    | Max Torque (Nm)
   ------------------------------------------------------------
@@ -203,38 +207,38 @@ Starting forward simulation...
       Thumb-1st-pitch               :   -14.23 Nm
       Thumb-2nd-pitch               :    -7.09 Nm
       Thumb-3rd-pitch               :    -3.47 Nm
-  T=0.00s: RMS error=0.0916 rad, Max torque=2.91 Nm
-    Worst errors: IndexFinger-2nd-pitch=18.1° (2.9Nm)  MiddleFinger-3rd-pitch=13.3° (1.7Nm)  Thumb-1st-pitch=6.0° (0.0Nm)  
-WARNING: Nan, Inf or huge value in QACC at DOF 13. The simulation is unstable. Time = 0.0070.
+  T=0.00s: RMS error=0.0890 rad, Max torque=0.00 Nm
+    Worst errors: IndexFinger-2nd-pitch=18.3° (0.0Nm)  MiddleFinger-3rd-pitch=13.3° (0.0Nm)  IndexFinger-1st-pitch=2.8° (0.0Nm)  
+WARNING: Nan, Inf or huge value in QACC at DOF 9. The simulation is unstable. Time = 0.0070.
 
-  T=2.00s: RMS error=127.2255 rad, Max torque=12.76 Nm
-    Worst errors: MiddleFinger-2nd-pitch=23502.9° (0.0Nm)  MiddleFinger-3rd-pitch=20205.2° (1.7Nm)  MiddleFinger-1st-pitch=6566.8° (0.0Nm)  
-  T=3.00s: RMS error=0.1961 rad, Max torque=0.00 Nm
-    Worst errors: IndexFinger-1st-pitch=39.2° (0.0Nm)  Thumb-1st-pitch=21.8° (0.0Nm)  IndexFinger-2nd-pitch=18.4° (0.0Nm)  
-  T=3.50s: RMS error=3.6938 rad, Max torque=2.91 Nm
-    Worst errors: IndexFinger-2nd-pitch=576.1° (2.9Nm)  MiddleFinger-3rd-pitch=551.5° (1.7Nm)  IndexFinger-3rd-pitch=365.0° (0.0Nm)  
+  T=2.00s: RMS error=0.4036 rad, Max torque=0.00 Nm
+    Worst errors: IndexFinger-1st-pitch=87.3° (0.0Nm)  Thumb-1st-pitch=50.6° (0.0Nm)  IndexFinger-2nd-pitch=18.4° (0.0Nm)  
+  T=3.50s: RMS error=6.8945 rad, Max torque=0.00 Nm
+    Worst errors: MiddleFinger-1st-pitch=922.6° (0.0Nm)  MiddleFinger-2nd-pitch=618.8° (0.0Nm)  IndexFinger_1st_roll=560.9° (0.0Nm)  
+  T=6.00s: RMS error=79.9531 rad, Max torque=0.00 Nm
+    Worst errors: RingFinger-2nd-pitch=14723.3° (0.0Nm)  MiddleFinger_1st_roll=11354.0° (0.0Nm)  MiddleFinger-1st-pitch=5179.8° (0.0Nm)  
 
 Simulation complete!
+
+💾 Saving Phase 2 control history to CSV...
+  Saved 152 samples (every 10 steps) to phase2_control_applied.csv
 
 ======================================================================
 VALIDATION RESULTS
 ======================================================================
 
 Tracking Performance:
-  Average RMS Error: 82.971201 rad (4753.900 deg)
-  Maximum RMS Error: 2763.770866 rad (158352.406 deg)
+  Average RMS Error: 46.491740 rad (2663.780 deg)
+  Maximum RMS Error: 1504.295978 rad (86189.811 deg)
 
 Torque Usage:
-  Average Torque: 3.02 Nm
-  Peak Torque: 38.40 Nm
+  Average Torque: 0.00 Nm
+  Peak Torque: 0.00 Nm
   Computed Limit: 76.79 Nm
-  Usage: 50.0%
+  Usage: 0.0%
 
 ======================================================================
 ✗ FAILED: Cannot track trajectory even with computed torques
   → Problem is in physics model or timestep
   → Check: mass, inertia, timestep, solver settings
 ======================================================================
-
-Plot saved to: mode4_validation.png
-
