@@ -1,4 +1,80 @@
-/Downloads/direct_hand_parm$ ./run_torque_replay_0_recording_1768623534448.sh 
+Processing STL with trimesh: /tmp/tmps09_blf9
+  Faces: 184620
+  Face count 184620 exceeds safety limit 150000. Decimating...
+  Decimated to: 150000 faces
+Processing STL with trimesh: /tmp/tmpe78f3brq
+  Faces: 40378
+Processing STL with trimesh: /tmp/tmp6tqh5a8s
+  Faces: 46982
+Processing STL with trimesh: /tmp/tmpc7a90e8k
+  Faces: 15918
+Processing STL with trimesh: /tmp/tmppsfqqizm
+  Faces: 40378
+Processing STL with trimesh: /tmp/tmpq1upmf6e
+  Faces: 46982
+Processing STL with trimesh: /tmp/tmpt4bn2kvc
+  Faces: 15918
+Processing STL with trimesh: /tmp/tmp_rzsc50b
+  Faces: 39574
+Processing STL with trimesh: /tmp/tmpdnzlefmm
+  Faces: 47050
+Processing STL with trimesh: /tmp/tmppic7mlnr
+  Faces: 15918
+Processing STL with trimesh: /tmp/tmp1aa1zlyu
+  Faces: 40378
+Processing STL with trimesh: /tmp/tmpu5is4cjd
+  Faces: 46982
+Processing STL with trimesh: /tmp/tmp9ildjng5
+  Faces: 15918
+Processing STL with trimesh: /tmp/tmp9fnvb_nd
+  Faces: 40188
+Processing STL with trimesh: /tmp/tmpcb4m9kbz
+  Faces: 46982
+Processing STL with trimesh: /tmp/tmp59szk6rq
+  Faces: 15918
+Processing STL with trimesh: /tmp/tmpe604w6bm
+  Faces: 5096
+Processing STL with trimesh: /tmp/tmp1b32djdw
+  Faces: 5096
+Processing STL with trimesh: /tmp/tmp4sj6jt9w
+  Faces: 5096
+Processing STL with trimesh: /tmp/tmpx7c1uvz6
+  Faces: 5096
+Processing STL with trimesh: /tmp/tmpdom0x5rd
+  Faces: 5584
+[DEBUG_MJCF] Body: little_finger-3rd-end | Leaf: True | Direct: True | Standard: False
+[DEBUG_MJCF]   -> Config FOUND for Little
+[DEBUG_MJCF] Body: ring_finger-3rd-end | Leaf: True | Direct: True | Standard: False
+[DEBUG_MJCF]   -> Config FOUND for Ring
+[DEBUG_MJCF] Body: middle_finger-3rd-end | Leaf: True | Direct: True | Standard: False
+[DEBUG_MJCF]   -> Config FOUND for Middle
+[DEBUG_MJCF] Body: index_finger-3rd-end | Leaf: True | Direct: True | Standard: False
+[DEBUG_MJCF]   -> Config FOUND for index
+[DEBUG_MJCF] Body: thumb-link | Leaf: False | Direct: False | Standard: False
+[DEBUG_MJCF] Body: thumb-3rd-end | Leaf: True | Direct: True | Standard: False
+[DEBUG_MJCF]   -> Config FOUND for thumb
+
+======================================================================
+MJCF EXPORT VALIDATION
+======================================================================
+✓ fixed_world anchor found
+✓ Robot base welded to fixed_world (no joint) - STABLE
+Total bodies: 22, Total joints: 20
+
+First 5 lines after <worldbody>:
+      <light diffuse=".5 .5 .5" pos="0 0 3" dir="0 0 -1"/>
+      <geom type="plane" size="5 5 0.1" rgba=".9 .9 .9 1"/>
+      <!-- Fixed world anchor - prevents robot from falling -->
+      <body name="fixed_world" pos="0 0 0.5" mocap="false">
+        <!-- Robot base attached here with no joints = welded -->
+======================================================================
+
+INFO:     127.0.0.1:46364 - "POST /api/export-mujoco-mjcf HTTP/1.1" 200 OK
+
+
+
+
+~/Downloads/direct_hand_parm$ ./run_torque_replay_0_recording_1768623534448.sh 
 Creating virtual environment...
 Installing dependencies (mujoco, matplotlib, numpy)...
 ========================================
@@ -27,12 +103,13 @@ Loading model: direct_hand_parm.xml
 Traceback (most recent call last):
   File "/home/younleakim/Downloads/direct_hand_parm/replay_motor_validation.py", line 32, in <module>
     model = mujoco.MjModel.from_xml_path(MODEL_XML)
-ValueError: Error: inertia must satisfy A + B >= C; use 'balanceinertia' to fix
-Element name 'new_link_8', id 5, line 45
+ValueError: Error: mass and inertia of moving bodies must be larger than mjMINVAL
+Element name 'little_finger-3rd-end', id 6, line 49
 
 
+xml
 <mujoco model="direct_hand_parm">
-  <compiler angle="radian" meshdir="meshes"/>
+  <compiler angle="radian" meshdir="meshes" balanceinertia="true"/>
   <option timestep="0.001" iterations="100" solver="Newton" tolerance="1e-10" gravity="0 0 -9.81"/>
   <asset>
     <mesh name="direct_hand_parm_0" file="direct_hand_parm.stl" scale="0.01 0.01 0.01"/>
