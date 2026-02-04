@@ -1016,11 +1016,14 @@ for i, jname in enumerate(joint_ids.keys()):
 print(f"\\n  Overall Peak Torque: {{np.max(max_torques):.2f}} Nm")
 print(f"  Average Peak Torque: {{np.mean(max_torques):.2f}} Nm")
 
-# Add safety margin
-safety_margin = 1.2
+# Add safety margin - need more for real forward dynamics!
+# Inverse dynamics is ideal, forward needs extra for friction, damping, errors
+safety_margin = 2.0  # Increased from 1.2
 adjusted_limits = max_torques * safety_margin
 
 print(f"\\nApplying {{safety_margin}}x safety margin...")
+print(f"  → Inverse dynamics only accounts for ideal motion")
+print(f"  → Forward simulation needs extra for friction, damping, numerical errors")
 print(f"  Adjusted force limits: {{np.mean(adjusted_limits):.2f}} Nm (avg), {{np.max(adjusted_limits):.2f}} Nm (max)")
 
 print("\\n" + "="*70)
@@ -1095,14 +1098,23 @@ try:
             mujoco.mj_step(model, data)
             viewer.sync()
             
-            # Log tracking error
+            # Log tracking error with detailed diagnostics
             errors = []
+            error_details = []
+            saturated_joints = []
+            
             for jname, jnt_idx in joint_ids.items():
                 if jnt_idx >= model.nu:
                     continue
                 qadr = model.jnt_qposadr[jnt_idx]
                 error = qpos_traj[step, qadr] - data.qpos[qadr]
                 errors.append(error ** 2)
+                error_details.append((jname, abs(error), abs(data.ctrl[jnt_idx])))
+                
+                # Check if saturated
+                limit = adjusted_limits[jnt_idx]
+                if abs(data.ctrl[jnt_idx]) >= limit * 0.99:
+                    saturated_joints.append(jname)
             
             rms_error = np.sqrt(np.mean(errors))
             max_ctrl = np.max(np.abs(data.ctrl[:model.nu]))
@@ -1111,9 +1123,19 @@ try:
             control_torques.append(max_ctrl)
             times.append(elapsed)
             
-            # Print progress
+            # Print progress with diagnostics
             if step % 500 == 0:
+                # Find worst 3 joints
+                error_details.sort(key=lambda x: x[1], reverse=True)
+                worst_joints = error_details[:3]
+                
                 print(f"  T={{elapsed:.2f}}s: RMS error={{rms_error:.4f}} rad, Max torque={{max_ctrl:.2f}} Nm")
+                print(f"    Worst errors: ", end="")
+                for jname, err, ctrl in worst_joints:
+                    print(f"{{jname}}={{np.rad2deg(err):.1f}}° ({{ctrl:.1f}}Nm)  ", end="")
+                print()
+                if saturated_joints:
+                    print(f"    Saturated: {{', '.join(saturated_joints[:5])}}")
         
         print("\\nSimulation complete!")
 
