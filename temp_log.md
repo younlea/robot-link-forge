@@ -100,16 +100,10 @@ Starting forward simulation...
     Worst errors: IndexFinger-2nd-pitch=18.1° (2.9Nm)  MiddleFinger-3rd-pitch=13.3° (1.7Nm)  Thumb-1st-pitch=6.0° (0.0Nm)  
 WARNING: Nan, Inf or huge value in QACC at DOF 13. The simulation is unstable. Time = 0.0070.
 
-  T=1.00s: RMS error=6.4881 rad, Max torque=2.91 Nm
-    Worst errors: IndexFinger-2nd-pitch=745.5° (2.9Nm)  RingFinger-3rd-pitch=570.4° (0.0Nm)  LittleFinger-3rd-pitch=570.3° (0.0Nm)  
-  T=1.50s: RMS error=6.9027 rad, Max torque=2.91 Nm
-    Worst errors: MiddleFinger-1st-pitch=922.7° (0.0Nm)  MiddleFinger-2nd-pitch=618.8° (0.0Nm)  IndexFinger_1st_roll=552.8° (0.0Nm)  
-  T=2.00s: RMS error=12.3248 rad, Max torque=2.92 Nm
-    Worst errors: MiddleFinger_1st_roll=2606.0° (0.0Nm)  MiddleFinger-2nd-pitch=1291.5° (0.0Nm)  thumb_1st_yaw=560.2° (0.0Nm)  
-  T=2.50s: RMS error=15.0454 rad, Max torque=2.92 Nm
-    Worst errors: MiddleFinger-2nd-pitch=2005.1° (0.0Nm)  RingFinger-1st_roll=1850.4° (0.0Nm)  MiddleFinger-1st-pitch=1815.4° (0.0Nm)  
-  T=4.50s: RMS error=6.5116 rad, Max torque=2.92 Nm
-    Worst errors: MiddleFinger-2nd-pitch=1294.3° (0.0Nm)  IndexFinger-2nd-pitch=509.3° (2.9Nm)  RingFinger-3rd-pitch=321.2° (0.0Nm)  
+  T=1.00s: RMS error=7.0789 rad, Max torque=2.92 Nm
+    Worst errors: MiddleFinger-1st-pitch=891.5° (0.0Nm)  thumb_1st_yaw=658.0° (0.0Nm)  MiddleFinger-2nd-pitch=618.9° (0.0Nm)  
+  T=2.50s: RMS error=79.9848 rad, Max torque=2.92 Nm
+    Worst errors: IndexFinger-1st-pitch=16260.0° (0.6Nm)  MiddleFinger-2nd-pitch=10792.0° (0.0Nm)  RingFinger-1st_roll=4629.7° (0.0Nm)  
 
 Simulation complete!
 
@@ -118,19 +112,17 @@ VALIDATION RESULTS
 ======================================================================
 
 Tracking Performance:
-  Average RMS Error: 73.316517 rad (4200.727 deg)
-  Maximum RMS Error: 2447.263134 rad (140217.849 deg)
+  Average RMS Error: 83.709375 rad (4796.194 deg)
+  Maximum RMS Error: 2367.392745 rad (135641.613 deg)
 
 Torque Usage:
-  Average Torque: 3.19 Nm
-  Peak Torque: 38.40 Nm
+  Average Torque: 2.99 Nm
+  Peak Torque: 37.88 Nm
   Computed Limit: 76.79 Nm
-  Usage: 50.0%
+  Usage: 49.3%
 
 ======================================================================
 ✗ FAILED: Cannot track trajectory even with computed torques
   → Problem is in physics model or timestep
   → Check: mass, inertia, timestep, solver settings
 ======================================================================
-
-Plot saved to: mode4_validation.png
