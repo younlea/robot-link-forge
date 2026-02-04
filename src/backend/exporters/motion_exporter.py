@@ -2488,7 +2488,7 @@ try:
                         fig.canvas.flush_events()
                         plt.pause(0.001)  # Force UI update
                     except Exception as e:
-                        print(f"Warning: Plot update failed: {e}")
+                        print(f"Warning: Plot update failed: {{e}}")
                 
                 last_print = now
 
