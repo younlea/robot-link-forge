@@ -981,7 +981,7 @@ print("PHASE 1: INVERSE DYNAMICS ANALYSIS")
 print("="*70)
 print("Calculating required torques for trajectory...")
 
-# Phase 1: Run inverse dynamics to find max torques per joint
+# Phase 1: Run inverse dynamics to compute required torques
 max_torques = np.zeros(model.nu)
 torque_history = []
 
@@ -996,8 +996,13 @@ for step in range(n_steps):
     
     mujoco.mj_inverse(model, data)
     
-    # Record torques
-    torques = np.abs(data.qfrc_inverse[:model.nu])
+    # Record ACTUAL torques (not absolute) for feedforward control
+    torques_actual = data.qfrc_inverse[:model.nu].copy()
+    torque_history.append(torques_actual)
+    
+    # Track max for statistics
+    torques = np.abs(torques_actual)
+    max_torques = np.maximum(max_torques, torques)
     max_torques = np.maximum(max_torques, torques)
     torque_history.append(torques.copy())
     
@@ -1027,25 +1032,43 @@ print(f"  → Forward simulation needs extra for friction, damping, numerical er
 print(f"  Adjusted force limits: {{np.mean(adjusted_limits):.2f}} Nm (avg), {{np.max(adjusted_limits):.2f}} Nm (max)")
 
 print("\\n" + "="*70)
-print("PHASE 2: FORWARD SIMULATION WITH COMPUTED LIMITS")
+print("PHASE 2: FORWARD SIMULATION WITH COMPUTED TORQUES")
 print("="*70)
 
-# Apply computed limits to actuators
-for i in range(model.nu):
-    model.actuator_forcerange[i] = [-adjusted_limits[i], adjusted_limits[i]]
-    print(f"  Actuator {{i}}: forcelimit = ±{{adjusted_limits[i]:.2f}} Nm")
+# We will use the EXACT torques computed by inverse dynamics
+# No PD controller needed - this is pure feedforward control
+print("Using feedforward control: data.ctrl = inverse_dynamics_torque")
+print("If this works perfectly, it validates the physics model.")
+print("If it fails, there's a mismatch between inverse and forward dynamics.")
 
-# Control parameters - lower gains to avoid saturation
-# With torque limits, we need moderate gains to stay within bounds
-kp = 50.0  # Reduced from 200 to avoid exceeding limits
-kv = 10.0  # Reduced from 20 for smoother control
-print(f"\\nControl gains: kp={{kp}}, kv={{kv}}")
-print("Note: Gains reduced to work within computed torque limits")
-
-# Reset simulation
+# Reset simulation and stabilize initial pose
 data.qpos[:] = qpos_traj[0]
 data.qvel[:] = 0.0
-mujoco.mj_forward(model, data)
+data.qacc[:] = 0.0
+
+# CRITICAL: Stabilize initial pose using computed torques
+print("\\nStabilizing initial pose with inverse dynamics torques...")
+for i in range(100):
+    # Use torques from first timestep to hold position
+    data.ctrl[:model.nu] = torque_history[0]
+    mujoco.mj_step(model, data)
+
+# Check initial error
+init_errors = []
+for jname, jnt_idx in joint_ids.items():
+    if jnt_idx >= model.nu:
+        continue
+    qadr = model.jnt_qposadr[jnt_idx]
+    error = qpos_traj[0, qadr] - data.qpos[qadr]
+    init_errors.append(error ** 2)
+    if abs(error) > 0.1:  # > 5.7 degrees
+        print(f"  Warning: {{jname}} has {{np.rad2deg(abs(error)):.1f}}° initial error")
+
+init_rms = np.sqrt(np.mean(init_errors))
+print(f"Initial RMS error after stabilization: {{init_rms:.4f}} rad ({{np.rad2deg(init_rms):.2f}}°)")
+
+if init_rms > 0.2:
+    print("  ⚠️  Large initial error! Physics may be unstable or gains too weak")
 
 # Tracking data
 tracking_errors = []
@@ -1070,30 +1093,10 @@ try:
             if step >= n_steps:
                 step = n_steps - 1
             
-            # PD Control with torque limiting
-            for jname, jnt_idx in joint_ids.items():
-                if jnt_idx >= model.nu:
-                    continue
-                    
-                qadr = model.jnt_qposadr[jnt_idx]
-                dof_adr = model.jnt_dofadr[jnt_idx]
-                
-                q_target = qpos_traj[step, qadr]
-                qd_target = qvel_traj[step, dof_adr]
-                
-                q_actual = data.qpos[qadr]
-                qd_actual = data.qvel[dof_adr]
-                
-                error = q_target - q_actual
-                error_d = qd_target - qd_actual
-                
-                ctrl = kp * error + kv * error_d
-                
-                # CRITICAL: Clamp to computed force limits
-                limit = adjusted_limits[jnt_idx]
-                ctrl = np.clip(ctrl, -limit, limit)
-                
-                data.ctrl[jnt_idx] = ctrl
+            # CRITICAL: Use computed torques from inverse dynamics (feedforward)
+            # This is the CORRECT approach - inverse dynamics told us what torques are needed
+            computed_torques = torque_history[step]
+            data.ctrl[:model.nu] = computed_torques
             
             mujoco.mj_step(model, data)
             viewer.sync()
