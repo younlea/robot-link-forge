@@ -73,10 +73,11 @@ def generate_mjcf_xml(
             )
 
     xml = [f'<mujoco model="{robot_name}">']
-    xml.append('  <compiler angle="radian" meshdir="meshes"/>')
+    xml.append('  <compiler angle="radian" meshdir="meshes" balanceinertia="true"/>')
     # Improved Global Physics for stability
     # timestep=0.001 (1ms) for better stability with PD control
     # solver=Newton for accuracy, iterations=100 for convergence
+    # balanceinertia=true automatically fixes inertia violations
     xml.append(
         '  <option timestep="0.001" iterations="100" solver="Newton" tolerance="1e-10" gravity="0 0 -9.81"/>'
     )
