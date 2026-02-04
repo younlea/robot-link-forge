@@ -1032,10 +1032,12 @@ for i in range(model.nu):
     model.actuator_forcerange[i] = [-adjusted_limits[i], adjusted_limits[i]]
     print(f"  Actuator {{i}}: forcelimit = ±{{adjusted_limits[i]:.2f}} Nm")
 
-# Control parameters
-kp = 200.0
-kv = 20.0
+# Control parameters - lower gains to avoid saturation
+# With torque limits, we need moderate gains to stay within bounds
+kp = 50.0  # Reduced from 200 to avoid exceeding limits
+kv = 10.0  # Reduced from 20 for smoother control
 print(f"\\nControl gains: kp={{kp}}, kv={{kv}}")
+print("Note: Gains reduced to work within computed torque limits")
 
 # Reset simulation
 data.qpos[:] = qpos_traj[0]
@@ -1065,7 +1067,7 @@ try:
             if step >= n_steps:
                 step = n_steps - 1
             
-            # PD Control
+            # PD Control with torque limiting
             for jname, jnt_idx in joint_ids.items():
                 if jnt_idx >= model.nu:
                     continue
@@ -1083,6 +1085,11 @@ try:
                 error_d = qd_target - qd_actual
                 
                 ctrl = kp * error + kv * error_d
+                
+                # CRITICAL: Clamp to computed force limits
+                limit = adjusted_limits[jnt_idx]
+                ctrl = np.clip(ctrl, -limit, limit)
+                
                 data.ctrl[jnt_idx] = ctrl
             
             mujoco.mj_step(model, data)
