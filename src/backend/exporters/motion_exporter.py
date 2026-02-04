@@ -1035,23 +1035,22 @@ print("\\n" + "="*70)
 print("PHASE 2: FORWARD SIMULATION WITH COMPUTED TORQUES")
 print("="*70)
 
-# We will use the EXACT torques computed by inverse dynamics
-# No PD controller needed - this is pure feedforward control
-print("Using feedforward control: data.ctrl = inverse_dynamics_torque")
-print("If this works perfectly, it validates the physics model.")
-print("If it fails, there's a mismatch between inverse and forward dynamics.")
+print("\\nUsing pure feedforward control:")
+print("  data.ctrl = torque_history[step]")
+print("  (Direct application of inverse dynamics forces)")
+print("\\nThis tests: Can the actuators track trajectory with computed forces?")
 
-# Reset simulation and stabilize initial pose
+# Reset simulation - DO NOT stabilize with torques!
+# Inverse dynamics torques are for MOTION, not for holding still
 data.qpos[:] = qpos_traj[0]
 data.qvel[:] = 0.0
 data.qacc[:] = 0.0
+data.ctrl[:] = 0.0  # Zero control initially
 
-# CRITICAL: Stabilize initial pose using computed torques
-print("\\nStabilizing initial pose with inverse dynamics torques...")
-for i in range(100):
-    # Use torques from first timestep to hold position
-    data.ctrl[:model.nu] = torque_history[0]
-    mujoco.mj_step(model, data)
+# Just let physics settle without control
+print("\\nLetting physics settle at initial pose...")
+for i in range(50):
+    mujoco.mj_forward(model, data)
 
 # Check initial error
 init_errors = []
@@ -1093,10 +1092,8 @@ try:
             if step >= n_steps:
                 step = n_steps - 1
             
-            # CRITICAL: Use computed torques from inverse dynamics (feedforward)
-            # This is the CORRECT approach - inverse dynamics told us what torques are needed
-            computed_torques = torque_history[step]
-            data.ctrl[:model.nu] = computed_torques
+            # Apply computed forces directly to actuators
+            data.ctrl[:model.nu] = torque_history[step]
             
             mujoco.mj_step(model, data)
             viewer.sync()
