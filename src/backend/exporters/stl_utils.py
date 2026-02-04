@@ -83,20 +83,22 @@ def calculate_inertia_from_stl(
 
         # Calculate physical properties
         # CRITICAL: STL files are typically in mm, but MuJoCo needs SI units (kg, m)
-        
+
         # Set density in kg/mm³ (convert from kg/m³)
         mesh.density = density / 1e9
-        
+
         # Get properties from trimesh (all in mm units with correct density)
-        mass_in_mm_units = mesh.mass  # This is in kg (correct because density is in kg/mm³)
+        mass_in_mm_units = (
+            mesh.mass
+        )  # This is in kg (correct because density is in kg/mm³)
         center_of_mass_mm = mesh.center_mass  # in mm
         inertia_mm = mesh.moment_inertia  # in kg·mm²
-        
+
         # Convert to SI units (meters)
         mass = mass_in_mm_units  # Already in kg
         center_of_mass = center_of_mass_mm / 1000  # mm to m
         inertia = inertia_mm / 1e6  # kg·mm² to kg·m²
-        
+
         # Do NOT apply scale - MuJoCo scale is for visualization only
         # Mass and inertia are physical properties, not visual
         if scale is not None:
@@ -105,36 +107,39 @@ def calculate_inertia_from_stl(
         # Ensure reasonable values
         if mass < 0.0001:  # Less than 0.1 gram
             mass = 0.001  # Default to 1 gram for very small parts
-        # Note: Removed upper limit - let real STL mass be used
-        # Heavy robots need heavy links!
-
-        # Ensure inertia is positive definite
+        
+        # CRITICAL: Validate and fix inertia to satisfy MuJoCo constraints
+        # MuJoCo requires: Ixx + Iyy >= Izz, Iyy + Izz >= Ixx, Izz + Ixx >= Iyy
         inertia_diag = np.diag(inertia)
-        if np.any(inertia_diag <= 0) or np.any(np.isnan(inertia_diag)):
-            # Use simple formula for cylinder
-            h = mesh.bounds[1][2] - mesh.bounds[0][2]
-            r = (
-                max(
-                    mesh.bounds[1][0] - mesh.bounds[0][0],
-                    mesh.bounds[1][1] - mesh.bounds[0][1],
-                )
-                / 2
-            )
-            # Apply scale to dimensions
-            if scale is not None:
-                h *= scale[2]
-                r *= scale[0]
-
-            ixx = iyy = mass * (3 * r**2 + h**2) / 12
-            izz = mass * r**2 / 2
-
-            # Minimum inertia to avoid numerical issues
+        ixx, iyy, izz = inertia_diag[0], inertia_diag[1], inertia_diag[2]
+        
+        # Check triangle inequality
+        needs_fix = False
+        if ixx + iyy < izz or iyy + izz < ixx or izz + ixx < iyy:
+            needs_fix = True
+            print(f"  WARNING: Inertia violates triangle inequality: [{ixx:.6f}, {iyy:.6f}, {izz:.6f}]")
+        
+        if needs_fix or np.any(inertia_diag <= 0) or np.any(np.isnan(inertia_diag)):
+            # Use simple box approximation instead
+            # Get bounding box dimensions in mm
+            bounds = mesh.bounds
+            dx = (bounds[1][0] - bounds[0][0]) / 1000  # Convert to m
+            dy = (bounds[1][1] - bounds[0][1]) / 1000
+            dz = (bounds[1][2] - bounds[0][2]) / 1000
+            
+            # Box inertia: I = m/12 * (b² + c²) for each axis
+            ixx = mass * (dy**2 + dz**2) / 12
+            iyy = mass * (dx**2 + dz**2) / 12
+            izz = mass * (dx**2 + dy**2) / 12
+            
+            # Ensure minimum values
             min_inertia = mass * 0.0001
             ixx = max(ixx, min_inertia)
             iyy = max(iyy, min_inertia)
             izz = max(izz, min_inertia)
-
+            
             inertia = np.diag([ixx, iyy, izz])
+            print(f"  -> Fixed to box approximation: [{ixx:.6f}, {iyy:.6f}, {izz:.6f}]")
 
         return {
             "mass": float(mass),
