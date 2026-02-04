@@ -85,47 +85,31 @@ Applying 2.0x safety margin...
 ======================================================================
 PHASE 2: FORWARD SIMULATION WITH COMPUTED TORQUES
 ======================================================================
-Using feedforward control: data.ctrl = inverse_dynamics_torque
-If this works perfectly, it validates the physics model.
-If it fails, there's a mismatch between inverse and forward dynamics.
 
-Stabilizing initial pose with inverse dynamics torques...
-WARNING: Nan, Inf or huge value in QACC at DOF 13. The simulation is unstable. Time = 0.0070.
+Using pure feedforward control:
+  data.ctrl = torque_history[step]
+  (Direct application of inverse dynamics forces)
 
-  Warning: LittleFinger-1st_roll has 186.0° initial error
-  Warning: LittleFinger-1st-pitch has 84.1° initial error
-  Warning: LittleFinger-2nd-pitch has 247.1° initial error
-  Warning: LittleFinger-3rd-pitch has 299.8° initial error
-  Warning: RingFinger-1st_roll has 119.1° initial error
-  Warning: RingFinger-1st-pitch has 256.0° initial error
-  Warning: RingFinger-2nd-pitch has 53.5° initial error
-  Warning: RingFinger-3rd-pitch has 321.2° initial error
-  Warning: MiddleFinger_1st_roll has 183.8° initial error
-  Warning: MiddleFinger-1st-pitch has 73.7° initial error
-  Warning: MiddleFinger-2nd-pitch has 1286.5° initial error
-  Warning: MiddleFinger-3rd-pitch has 113.5° initial error
-  Warning: IndexFinger_1st_roll has 199.5° initial error
-  Warning: IndexFinger-1st-pitch has 302.9° initial error
-  Warning: IndexFinger-2nd-pitch has 514.8° initial error
-  Warning: IndexFinger-3rd-pitch has 173.5° initial error
-  Warning: thumb_1st_yaw has 303.9° initial error
-  Warning: Thumb-1st-pitch has 113.1° initial error
-  Warning: Thumb-2nd-pitch has 185.4° initial error
-  Warning: Thumb-3rd-pitch has 118.9° initial error
-Initial RMS error after stabilization: 6.3721 rad (365.10°)
-  ⚠️  Large initial error! Physics may be unstable or gains too weak
+This tests: Can the actuators track trajectory with computed forces?
+
+Letting physics settle at initial pose...
+Initial RMS error after stabilization: 0.0000 rad (0.00°)
 
 Starting forward simulation...
-  T=0.00s: RMS error=14.7882 rad, Max torque=2.91 Nm
+  T=0.00s: RMS error=0.0916 rad, Max torque=2.91 Nm
+    Worst errors: IndexFinger-2nd-pitch=18.1° (2.9Nm)  MiddleFinger-3rd-pitch=13.3° (1.7Nm)  Thumb-1st-pitch=6.0° (0.0Nm)  
+WARNING: Nan, Inf or huge value in QACC at DOF 13. The simulation is unstable. Time = 0.0070.
+
+  T=1.00s: RMS error=6.4881 rad, Max torque=2.91 Nm
+    Worst errors: IndexFinger-2nd-pitch=745.5° (2.9Nm)  RingFinger-3rd-pitch=570.4° (0.0Nm)  LittleFinger-3rd-pitch=570.3° (0.0Nm)  
+  T=1.50s: RMS error=6.9027 rad, Max torque=2.91 Nm
+    Worst errors: MiddleFinger-1st-pitch=922.7° (0.0Nm)  MiddleFinger-2nd-pitch=618.8° (0.0Nm)  IndexFinger_1st_roll=552.8° (0.0Nm)  
+  T=2.00s: RMS error=12.3248 rad, Max torque=2.92 Nm
+    Worst errors: MiddleFinger_1st_roll=2606.0° (0.0Nm)  MiddleFinger-2nd-pitch=1291.5° (0.0Nm)  thumb_1st_yaw=560.2° (0.0Nm)  
+  T=2.50s: RMS error=15.0454 rad, Max torque=2.92 Nm
     Worst errors: MiddleFinger-2nd-pitch=2005.1° (0.0Nm)  RingFinger-1st_roll=1850.4° (0.0Nm)  MiddleFinger-1st-pitch=1815.4° (0.0Nm)  
-  T=3.00s: RMS error=6.8917 rad, Max torque=2.92 Nm
-    Worst errors: MiddleFinger-1st-pitch=922.7° (0.0Nm)  MiddleFinger-2nd-pitch=618.8° (0.0Nm)  IndexFinger_1st_roll=553.8° (0.0Nm)  
-  T=4.00s: RMS error=14.6863 rad, Max torque=12.76 Nm
-    Worst errors: MiddleFinger-2nd-pitch=2420.0° (0.0Nm)  RingFinger-1st-pitch=1729.8° (0.0Nm)  MiddleFinger_1st_roll=1594.9° (0.0Nm)  
-  T=5.50s: RMS error=80.8857 rad, Max torque=2.92 Nm
-    Worst errors: IndexFinger-1st-pitch=14188.2° (0.5Nm)  MiddleFinger-2nd-pitch=10782.5° (0.0Nm)  IndexFinger-2nd-pitch=7568.6° (2.9Nm)  
-  T=6.50s: RMS error=6.8256 rad, Max torque=2.92 Nm
-    Worst errors: MiddleFinger-1st-pitch=874.5° (0.0Nm)  MiddleFinger-2nd-pitch=621.3° (0.0Nm)  IndexFinger_1st_roll=559.7° (0.0Nm)  
+  T=4.50s: RMS error=6.5116 rad, Max torque=2.92 Nm
+    Worst errors: MiddleFinger-2nd-pitch=1294.3° (0.0Nm)  IndexFinger-2nd-pitch=509.3° (2.9Nm)  RingFinger-3rd-pitch=321.2° (0.0Nm)  
 
 Simulation complete!
 
@@ -134,14 +118,14 @@ VALIDATION RESULTS
 ======================================================================
 
 Tracking Performance:
-  Average RMS Error: 74.724954 rad (4281.425 deg)
-  Maximum RMS Error: 2201.461261 rad (126134.439 deg)
+  Average RMS Error: 73.316517 rad (4200.727 deg)
+  Maximum RMS Error: 2447.263134 rad (140217.849 deg)
 
 Torque Usage:
-  Average Torque: 3.17 Nm
-  Peak Torque: 37.88 Nm
+  Average Torque: 3.19 Nm
+  Peak Torque: 38.40 Nm
   Computed Limit: 76.79 Nm
-  Usage: 49.3%
+  Usage: 50.0%
 
 ======================================================================
 ✗ FAILED: Cannot track trajectory even with computed torques
@@ -150,4 +134,3 @@ Torque Usage:
 ======================================================================
 
 Plot saved to: mode4_validation.png
-
