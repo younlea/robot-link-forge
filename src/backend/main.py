@@ -43,6 +43,7 @@ from exporters.motion_exporter import (
     generate_torque_launch_script,
     generate_motor_analysis_script,
     generate_validation_script,
+    generate_inverse_to_forward_validation_script,
 )
 from exporters.stl_utils import ensure_binary_stl
 
@@ -2076,6 +2077,12 @@ python3 replay_mujoco.py {i}
         with open(os.path.join(package_dir, "validate_motor_params.py"), "w") as f:
             f.write(validation_py)
         os.chmod(os.path.join(package_dir, "validate_motor_params.py"), 0o755)
+        
+        # Generate Mode 4: Inverse-to-Forward Validation Script
+        mode4_py = generate_inverse_to_forward_validation_script(mjcf_filename, recording_data)
+        with open(os.path.join(package_dir, "inverse_to_forward_validation.py"), "w") as f:
+            f.write(mode4_py)
+        os.chmod(os.path.join(package_dir, "inverse_to_forward_validation.py"), 0o755)
 
         # Generate Bash Script for Torque Replay (Generic)
         torque_sh = generate_torque_launch_script("replay_with_torque.py", 0)

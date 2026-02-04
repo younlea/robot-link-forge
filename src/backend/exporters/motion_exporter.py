@@ -901,6 +901,284 @@ if __name__ == '__main__':
 """
 
 
+def generate_inverse_to_forward_validation_script(model_file: str, recording_data: dict) -> str:
+    """Generate Mode 4: Inverse-to-Forward Validation Script
+    
+    Phase 1: Run inverse dynamics to find required torques
+    Phase 2: Use those torques as motor limits and test forward tracking
+    """
+    rec_json = json.dumps(recording_data, indent=2)
+    
+    return f'''#!/usr/bin/env python3
+"""
+Mode 4: Inverse-to-Forward Validation
+Uses inverse dynamics torques as motor limits to test forward tracking
+"""
+import time
+import mujoco
+import mujoco.viewer
+import numpy as np
+import json
+
+try:
+    import matplotlib.pyplot as plt
+    HAS_MATPLOTLIB = True
+except ImportError:
+    HAS_MATPLOTLIB = False
+    print("Warning: matplotlib not available")
+
+# Load model
+model = mujoco.MjModel.from_xml_path("{model_file}")
+data = mujoco.MjData(model)
+
+# Load recording
+recording_data = {rec_json}
+duration = recording_data["duration"]
+keyframes = recording_data["keyframes"]
+
+# Build joint mapping
+joint_ids = {{}}
+for i in range(model.njnt):
+    jnt_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, i)
+    if jnt_name:
+        joint_ids[jnt_name] = i
+
+print(f"Model has {{model.njnt}} joints, {{model.nu}} actuators")
+print(f"Recording duration: {{duration:.2f}}s")
+
+# Interpolate trajectory
+dt = model.opt.timestep
+n_steps = int(duration / dt) + 1
+qpos_traj = np.zeros((n_steps, model.nq))
+qvel_traj = np.zeros((n_steps, model.nv))
+qacc_traj = np.zeros((n_steps, model.nv))
+
+for jname in recording_data["recorded_joints"]:
+    if jname not in joint_ids:
+        print(f"Warning: Joint {{jname}} in recording not found in model")
+        continue
+    
+    jnt_idx = joint_ids[jname]
+    qadr = model.jnt_qposadr[jnt_idx]
+    dof_adr = model.jnt_dofadr[jnt_idx]
+    
+    times = [kf["time"] for kf in keyframes]
+    positions = [kf["joints"].get(jname, 0.0) for kf in keyframes]
+    
+    t_interp = np.linspace(0, duration, n_steps)
+    q_interp = np.interp(t_interp, times, positions)
+    
+    qpos_traj[:, qadr] = q_interp
+    qvel_traj[:, dof_adr] = np.gradient(q_interp, dt)
+    qacc_traj[:, dof_adr] = np.gradient(qvel_traj[:, dof_adr], dt)
+
+print("\\n" + "="*70)
+print("PHASE 1: INVERSE DYNAMICS ANALYSIS")
+print("="*70)
+print("Calculating required torques for trajectory...")
+
+# Phase 1: Run inverse dynamics to find max torques per joint
+max_torques = np.zeros(model.nu)
+torque_history = []
+
+data.qpos[:] = qpos_traj[0]
+data.qvel[:] = 0.0
+mujoco.mj_forward(model, data)
+
+for step in range(n_steps):
+    data.qpos[:] = qpos_traj[step]
+    data.qvel[:] = qvel_traj[step]
+    data.qacc[:] = qacc_traj[step]
+    
+    mujoco.mj_inverse(model, data)
+    
+    # Record torques
+    torques = np.abs(data.qfrc_inverse[:model.nu])
+    max_torques = np.maximum(max_torques, torques)
+    torque_history.append(torques.copy())
+    
+    if step % 500 == 0:
+        print(f"  Step {{step}}/{{n_steps}}: Max torque so far = {{np.max(max_torques):.2f}} Nm")
+
+torque_history = np.array(torque_history)
+
+print("\\nInverse Dynamics Results:")
+print("  Joint Name                    | Max Torque (Nm)")
+print("  " + "-"*60)
+for i, jname in enumerate(joint_ids.keys()):
+    if i < model.nu:
+        print(f"  {{jname:30s}} | {{max_torques[i]:8.2f}}")
+
+print(f"\\n  Overall Peak Torque: {{np.max(max_torques):.2f}} Nm")
+print(f"  Average Peak Torque: {{np.mean(max_torques):.2f}} Nm")
+
+# Add safety margin
+safety_margin = 1.2
+adjusted_limits = max_torques * safety_margin
+
+print(f"\\nApplying {{safety_margin}}x safety margin...")
+print(f"  Adjusted force limits: {{np.mean(adjusted_limits):.2f}} Nm (avg), {{np.max(adjusted_limits):.2f}} Nm (max)")
+
+print("\\n" + "="*70)
+print("PHASE 2: FORWARD SIMULATION WITH COMPUTED LIMITS")
+print("="*70)
+
+# Apply computed limits to actuators
+for i in range(model.nu):
+    model.actuator_forcerange[i] = [-adjusted_limits[i], adjusted_limits[i]]
+    print(f"  Actuator {{i}}: forcelimit = ±{{adjusted_limits[i]:.2f}} Nm")
+
+# Control parameters
+kp = 200.0
+kv = 20.0
+print(f"\\nControl gains: kp={{kp}}, kv={{kv}}")
+
+# Reset simulation
+data.qpos[:] = qpos_traj[0]
+data.qvel[:] = 0.0
+mujoco.mj_forward(model, data)
+
+# Tracking data
+tracking_errors = []
+control_torques = []
+times = []
+
+print("\\nStarting forward simulation...")
+
+try:
+    with mujoco.viewer.launch_passive(model, data) as viewer:
+        start_time = time.time()
+        step = 0
+        
+        while viewer.is_running() and step < n_steps:
+            now = time.time()
+            elapsed = now - start_time
+            
+            if elapsed > duration:
+                break
+            
+            step = int(elapsed / dt)
+            if step >= n_steps:
+                step = n_steps - 1
+            
+            # PD Control
+            for jname, jnt_idx in joint_ids.items():
+                if jnt_idx >= model.nu:
+                    continue
+                    
+                qadr = model.jnt_qposadr[jnt_idx]
+                dof_adr = model.jnt_dofadr[jnt_idx]
+                
+                q_target = qpos_traj[step, qadr]
+                qd_target = qvel_traj[step, dof_adr]
+                
+                q_actual = data.qpos[qadr]
+                qd_actual = data.qvel[dof_adr]
+                
+                error = q_target - q_actual
+                error_d = qd_target - qd_actual
+                
+                ctrl = kp * error + kv * error_d
+                data.ctrl[jnt_idx] = ctrl
+            
+            mujoco.mj_step(model, data)
+            viewer.sync()
+            
+            # Log tracking error
+            errors = []
+            for jname, jnt_idx in joint_ids.items():
+                if jnt_idx >= model.nu:
+                    continue
+                qadr = model.jnt_qposadr[jnt_idx]
+                error = qpos_traj[step, qadr] - data.qpos[qadr]
+                errors.append(error ** 2)
+            
+            rms_error = np.sqrt(np.mean(errors))
+            max_ctrl = np.max(np.abs(data.ctrl[:model.nu]))
+            
+            tracking_errors.append(rms_error)
+            control_torques.append(max_ctrl)
+            times.append(elapsed)
+            
+            # Print progress
+            if step % 500 == 0:
+                print(f"  T={{elapsed:.2f}}s: RMS error={{rms_error:.4f}} rad, Max torque={{max_ctrl:.2f}} Nm")
+        
+        print("\\nSimulation complete!")
+
+except Exception as e:
+    print(f"ERROR: {{e}}")
+    import traceback
+    traceback.print_exc()
+
+# Analysis
+if len(tracking_errors) > 0:
+    tracking_errors = np.array(tracking_errors)
+    control_torques = np.array(control_torques)
+    times = np.array(times)
+    
+    avg_error = np.mean(tracking_errors)
+    max_error = np.max(tracking_errors)
+    avg_torque = np.mean(control_torques)
+    peak_torque = np.max(control_torques)
+    
+    print("\\n" + "="*70)
+    print("VALIDATION RESULTS")
+    print("="*70)
+    print(f"\\nTracking Performance:")
+    print(f"  Average RMS Error: {{avg_error:.6f}} rad ({{np.rad2deg(avg_error):.3f}} deg)")
+    print(f"  Maximum RMS Error: {{max_error:.6f}} rad ({{np.rad2deg(max_error):.3f}} deg)")
+    print(f"\\nTorque Usage:")
+    print(f"  Average Torque: {{avg_torque:.2f}} Nm")
+    print(f"  Peak Torque: {{peak_torque:.2f}} Nm")
+    print(f"  Computed Limit: {{np.max(adjusted_limits):.2f}} Nm")
+    print(f"  Usage: {{100 * peak_torque / np.max(adjusted_limits):.1f}}%")
+    
+    # Verdict
+    print("\\n" + "="*70)
+    if max_error < 0.2:  # ~11 degrees
+        print("✓ SUCCESS: Physics can track trajectory with computed torques!")
+        print("  → Motor matching should work")
+        print("  → Problem was likely in Mode 2 parameter tuning")
+    elif max_error < 0.5:  # ~28 degrees
+        print("⚠ PARTIAL: Tracking has some error but reasonable")
+        print("  → Try adjusting kp/kv gains")
+        print("  → Or increase safety margin")
+    else:
+        print("✗ FAILED: Cannot track trajectory even with computed torques")
+        print("  → Problem is in physics model or timestep")
+        print("  → Check: mass, inertia, timestep, solver settings")
+    print("="*70)
+    
+    # Plot results
+    if HAS_MATPLOTLIB:
+        fig, axes = plt.subplots(2, 1, figsize=(12, 8))
+        
+        axes[0].plot(times, np.rad2deg(tracking_errors), 'b-', linewidth=1.5, label='RMS Error')
+        axes[0].axhline(y=11.5, color='r', linestyle='--', label='Acceptable limit (11.5°)')
+        axes[0].set_xlabel('Time (s)')
+        axes[0].set_ylabel('RMS Tracking Error (degrees)')
+        axes[0].set_title('Tracking Performance (Mode 4: Inverse-to-Forward)')
+        axes[0].grid(True, alpha=0.3)
+        axes[0].legend()
+        
+        axes[1].plot(times, control_torques, 'g-', linewidth=1.5, label='Control Torque')
+        axes[1].axhline(y=np.max(adjusted_limits), color='r', linestyle='--', label='Computed Limit')
+        axes[1].set_xlabel('Time (s)')
+        axes[1].set_ylabel('Torque (Nm)')
+        axes[1].set_title('Torque Usage')
+        axes[1].grid(True, alpha=0.3)
+        axes[1].legend()
+        
+        plt.tight_layout()
+        plt.savefig('mode4_validation.png', dpi=150)
+        print("\\nPlot saved to: mode4_validation.png")
+        plt.show()
+
+print("\\nMode 4 validation complete.")
+'''
+
+
 def generate_validation_script(model_file: str, recording_data: dict) -> str:
     """Generate validation script with automatic parameter optimization"""
     rec_json = json.dumps(recording_data, indent=2)
@@ -1309,8 +1587,12 @@ echo ""
 echo "3. Fingertip Sensor Forces"
 echo "   - Contact force visualization"
 echo ""
+echo "4. Inverse-to-Forward Validation (NEW)"
+echo "   - Use Mode 1 torques as motor limits"
+echo "   - Test if physics can actually track trajectory"
+echo ""
 echo "========================================"
-read -p "Enter choice [0 to auto-optimize, 2 for manual tuning]: " choice
+read -p "Enter choice [0/1/2/3/4]: " choice
 
 MODE="inverse"
 SCRIPT="replay_with_torque.py"
@@ -1349,6 +1631,11 @@ elif [ "$choice" = "3" ]; then
     MODE="sensors"
     echo "Starting Sensor Analysis in mode: $MODE..."
     python3 $SCRIPT {default_rec_idx} --mode $MODE
+elif [ "$choice" = "4" ]; then
+    # Mode 4: Inverse-to-Forward validation
+    SCRIPT="inverse_to_forward_validation.py"
+    echo "Starting Inverse-to-Forward Validation..."
+    python3 $SCRIPT {default_rec_idx}
 else
     # Mode 1 (default) uses inverse dynamics
     echo "Starting Analysis in mode: $MODE..."
