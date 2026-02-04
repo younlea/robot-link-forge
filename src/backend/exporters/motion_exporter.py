@@ -1209,8 +1209,22 @@ try:
             if step >= n_steps:
                 step = n_steps - 1
             
-            # Apply computed forces directly to actuators
-            data.ctrl[:model.nu] = torque_history[step]
+            # CRITICAL: We have position actuators, not motor actuators!
+            # data.ctrl expects target positions, not forces
+            # But we want to apply forces directly from inverse dynamics
+            
+            # Workaround: Disable actuators and apply forces directly to qfrc_applied
+            data.ctrl[:] = 0.0  # Disable position control
+            
+            # Apply computed forces directly to joints
+            for jname, jid in joint_ids.items():
+                if jname in actuator_ids:
+                    aid = actuator_ids[jname]
+                    dof_adr = model.jnt_dofadr[jid]
+                    
+                    # Apply force directly to the DOF
+                    force = torque_history[step][aid]
+                    data.qfrc_applied[dof_adr] = force
             
             mujoco.mj_step(model, data)
             viewer.sync()
