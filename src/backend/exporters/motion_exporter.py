@@ -1250,8 +1250,14 @@ try:
             # data.ctrl expects target positions, not forces
             # But we want to apply forces directly from inverse dynamics
             
-            # Workaround: Disable actuators and apply forces directly to qfrc_applied
-            data.ctrl[:] = 0.0  # Disable position control
+            # Workaround: Set actuators to current position (neutralize them)
+            # If we set ctrl=0, actuators will pull joints toward zero!
+            for jname, jid in joint_ids.items():
+                if jname in actuator_ids:
+                    aid = actuator_ids[jname]
+                    qadr = model.jnt_qposadr[jid]
+                    data.ctrl[aid] = data.qpos[qadr]  # Hold current position
+            
             data.qfrc_applied[:] = 0.0  # CRITICAL: Clear previous forces!
             
             # Store applied forces for logging
