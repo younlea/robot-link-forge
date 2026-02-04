@@ -1000,11 +1000,9 @@ for step in range(n_steps):
     torques_actual = data.qfrc_inverse[:model.nu].copy()
     torque_history.append(torques_actual)
     
-    # Track max for statistics
-    torques = np.abs(torques_actual)
-    max_torques = np.maximum(max_torques, torques)
-    max_torques = np.maximum(max_torques, torques)
-    torque_history.append(torques.copy())
+    # Track max for statistics (do NOT append to torque_history again!)
+    torques_abs = np.abs(torques_actual)
+    max_torques = np.maximum(max_torques, torques_abs)
     
     if step % 500 == 0:
         print(f"  Step {{step}}/{{n_steps}}: Max torque so far = {{np.max(max_torques):.2f}} Nm")
