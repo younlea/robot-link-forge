@@ -1,8 +1,54 @@
-Step 6833000/6835001: Max torque so far = 38.40 Nm
-  Step 6833500/6835001: Max torque so far = 38.40 Nm
-  Step 6834000/6835001: Max torque so far = 38.40 Nm
-  Step 6834500/6835001: Max torque so far = 38.40 Nm
-  Step 6835000/6835001: Max torque so far = 38.40 Nm
+~/Downloads/direct_hand_parm$ ./run_torque_replay_0_recording_1768623534448.sh 
+Creating virtual environment...
+Installing dependencies (mujoco, matplotlib, numpy)...
+========================================
+  MuJoCo Motion Analysis Tool
+========================================
+
+Select Analysis Mode:
+
+0. Auto Parameter Optimization (NEW)
+   - Finds optimal motor parameters automatically
+   - Or diagnoses trajectory issues
+
+1. Joint Torque Visualization
+   - Theoretical torque (inverse dynamics)
+
+2. Motor Sizing Validation
+   - Set motor parameters and validate
+
+3. Fingertip Sensor Forces
+   - Contact force visualization
+
+4. Inverse-to-Forward Validation (NEW)
+   - Use Mode 1 torques as motor limits
+   - Test if physics can actually track trajectory
+
+========================================
+Enter choice [0/1/2/3/4]: 4
+Starting Inverse-to-Forward Validation...
+Model has 20 joints, 20 actuators
+Recording duration: 6.83s (6835ms)
+Found 20 joints in recording
+
+======================================================================
+PHASE 1: INVERSE DYNAMICS ANALYSIS
+======================================================================
+Calculating required torques for trajectory...
+  Step 0/6836: Max torque so far = 2.91 Nm
+  Step 500/6836: Max torque so far = 2.91 Nm
+  Step 1000/6836: Max torque so far = 2.92 Nm
+  Step 1500/6836: Max torque so far = 2.92 Nm
+  Step 2000/6836: Max torque so far = 12.76 Nm
+  Step 2500/6836: Max torque so far = 38.40 Nm
+  Step 3000/6836: Max torque so far = 38.40 Nm
+  Step 3500/6836: Max torque so far = 38.40 Nm
+  Step 4000/6836: Max torque so far = 38.40 Nm
+  Step 4500/6836: Max torque so far = 38.40 Nm
+  Step 5000/6836: Max torque so far = 38.40 Nm
+  Step 5500/6836: Max torque so far = 38.40 Nm
+  Step 6000/6836: Max torque so far = 38.40 Nm
+  Step 6500/6836: Max torque so far = 38.40 Nm
 
 Inverse Dynamics Results:
   Joint Name                    | Max Torque (Nm)
@@ -58,40 +104,33 @@ PHASE 2: FORWARD SIMULATION WITH COMPUTED LIMITS
   Actuator 18: forcelimit = ±20.74 Nm
   Actuator 19: forcelimit = ±10.10 Nm
 
-Control gains: kp=200.0, kv=20.0
+Control gains: kp=50.0, kv=10.0
+Note: Gains reduced to work within computed torque limits
 
 Starting forward simulation...
   T=0.00s: RMS error=0.0805 rad, Max torque=0.00 Nm
-  T=1.00s: RMS error=0.5289 rad, Max torque=5677.05 Nm
-  T=2.00s: RMS error=0.5857 rad, Max torque=5856.84 Nm
-  T=6.00s: RMS error=0.6156 rad, Max torque=5788.22 Nm
-  T=9.00s: RMS error=0.6767 rad, Max torque=5534.85 Nm
-  T=9.50s: RMS error=0.6649 rad, Max torque=5792.53 Nm
-  T=10.50s: RMS error=0.7100 rad, Max torque=5532.93 Nm
-  T=12.00s: RMS error=0.7244 rad, Max torque=5531.02 Nm
-  T=15.00s: RMS error=0.6943 rad, Max torque=5799.31 Nm
-  T=19.50s: RMS error=0.7018 rad, Max torque=5802.76 Nm
-  T=25.00s: RMS error=0.7083 rad, Max torque=5644.57 Nm
-  T=27.00s: RMS error=0.6811 rad, Max torque=5645.55 Nm
-  T=31.50s: RMS error=0.6724 rad, Max torque=5678.99 Nm
-  T=33.50s: RMS error=0.7017 rad, Max torque=5648.84 Nm
-  T=34.00s: RMS error=0.7003 rad, Max torque=5677.66 Nm
-  T=37.00s: RMS error=0.6997 rad, Max torque=5650.77 Nm
-  T=38.00s: RMS error=0.7042 rad, Max torque=5651.34 Nm
-  T=40.50s: RMS error=0.6781 rad, Max torque=5652.79 Nm
-  T=41.50s: RMS error=0.6797 rad, Max torque=5673.38 Nm
-  T=45.00s: RMS error=0.7026 rad, Max torque=5671.27 Nm
-  T=46.00s: RMS error=0.6637 rad, Max torque=5670.63 Nm
-  T=46.50s: RMS error=0.6907 rad, Max torque=5670.31 Nm
-  T=55.50s: RMS error=0.7002 rad, Max torque=5664.28 Nm
-  T=57.00s: RMS error=0.7013 rad, Max torque=5663.60 Nm
-  T=59.50s: RMS error=0.6628 rad, Max torque=5661.44 Nm
-  T=62.00s: RMS error=0.6863 rad, Max torque=5667.35 Nm
-  T=63.00s: RMS error=0.6854 rad, Max torque=5658.62 Nm
-  T=63.50s: RMS error=0.7104 rad, Max torque=5668.49 Nm
-  T=64.50s: RMS error=0.6836 rad, Max torque=5657.46 Nm
-  T=67.00s: RMS error=0.6699 rad, Max torque=5655.44 Nm
-  T=69.50s: RMS error=0.6782 rad, Max torque=5653.29 Nm
-  T=70.50s: RMS error=0.6915 rad, Max torque=5652.47 Nm
-  T=72.00s: RMS error=0.6837 rad, Max torque=5651.14 Nm
-  T=75.00s: RMS error=0.6799 rad, Max torque=5648.44 Nm
+  T=1.00s: RMS error=0.4839 rad, Max torque=46.08 Nm
+  T=1.50s: RMS error=0.5857 rad, Max torque=46.08 Nm
+  T=4.00s: RMS error=0.5448 rad, Max torque=46.08 Nm
+
+Simulation complete!
+
+======================================================================
+VALIDATION RESULTS
+======================================================================
+
+Tracking Performance:
+  Average RMS Error: 0.552695 rad (31.667 deg)
+  Maximum RMS Error: 0.700390 rad (40.129 deg)
+
+Torque Usage:
+  Average Torque: 46.04 Nm
+  Peak Torque: 46.08 Nm
+  Computed Limit: 46.08 Nm
+  Usage: 100.0%
+
+======================================================================
+✗ FAILED: Cannot track trajectory even with computed torques
+  → Problem is in physics model or timestep
+  → Check: mass, inertia, timestep, solver settings
+======================================================================
