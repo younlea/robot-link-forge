@@ -27,6 +27,11 @@ Select Analysis Mode:
 ========================================
 Enter choice [0/1/2/3/4]: 4
 Starting Inverse-to-Forward Validation...
+⚠️  WARNING: scipy not installed!
+   For smooth trajectories, install scipy:
+   pip install scipy
+   Using fallback linear interpolation (may cause torque spikes)
+
 Model has 20 joints, 20 actuators
 Recording duration: 6.83s (6835ms)
 Found 20 joints in recording
@@ -37,6 +42,26 @@ Found 20 joints in recording
   Last keyframe time: 6.835s
   Recording duration: 6.835s
   Keyframe times: 0.58s 2.09s 3.61s 5.05s 6.83s 
+  Warning: IndexFinger_1st_roll using linear interpolation (install scipy for better results)
+  Warning: RingFinger-2nd-pitch using linear interpolation (install scipy for better results)
+  Warning: MiddleFinger-1st-pitch using linear interpolation (install scipy for better results)
+  Warning: MiddleFinger-2nd-pitch using linear interpolation (install scipy for better results)
+  Warning: Thumb-2nd-pitch using linear interpolation (install scipy for better results)
+  Warning: Thumb-3rd-pitch using linear interpolation (install scipy for better results)
+  Warning: RingFinger-3rd-pitch using linear interpolation (install scipy for better results)
+  Warning: LittleFinger-3rd-pitch using linear interpolation (install scipy for better results)
+  Warning: LittleFinger-2nd-pitch using linear interpolation (install scipy for better results)
+  Warning: IndexFinger-1st-pitch using linear interpolation (install scipy for better results)
+  Warning: MiddleFinger-3rd-pitch using linear interpolation (install scipy for better results)
+  Warning: LittleFinger-1st_roll using linear interpolation (install scipy for better results)
+  Warning: IndexFinger-2nd-pitch using linear interpolation (install scipy for better results)
+  Warning: LittleFinger-1st-pitch using linear interpolation (install scipy for better results)
+  Warning: RingFinger-1st-pitch using linear interpolation (install scipy for better results)
+  Warning: thumb_1st_yaw using linear interpolation (install scipy for better results)
+  Warning: RingFinger-1st_roll using linear interpolation (install scipy for better results)
+  Warning: Thumb-1st-pitch using linear interpolation (install scipy for better results)
+  Warning: IndexFinger-3rd-pitch using linear interpolation (install scipy for better results)
+  Warning: MiddleFinger_1st_roll using linear interpolation (install scipy for better results)
 
 🔍 TRAJECTORY DIAGNOSTIC:
 Checking if trajectory actually changes over time...
@@ -46,18 +71,24 @@ Checking if trajectory actually changes over time...
     Step 2500: -1.1505 rad
     Step 5000: 0.0000 rad
     Range: 1.5708 rad
+    Vel range: -1.04 to 1.03 rad/s
+    Acc range: -49.44 to 98.62 rad/s²
   MiddleFinger-1st-pitch:
     Step 0:    0.0000 rad
     Step 500:  0.0000 rad
     Step 2500: 0.0000 rad
     Step 5000: -1.5140 rad
     Range: 1.5708 rad
+    Vel range: -1.09 to 0.88 rad/s
+    Acc range: -52.02 to 93.97 rad/s²
   Thumb-1st-pitch:
     Step 0:    0.0000 rad
     Step 500:  0.0000 rad
     Step 2500: -0.6891 rad
     Step 5000: -0.7526 rad
     Range: 0.9408 rad
+    Vel range: -0.62 to 0.62 rad/s
+    Acc range: -55.31 to 59.06 rad/s²
 
 ======================================================================
 PHASE 1: INVERSE DYNAMICS ANALYSIS
@@ -127,15 +158,15 @@ Calculating required torques for trajectory...
     IndexFinger-1st-pitch          DOF[13]:    +0.55 Nm
     IndexFinger-2nd-pitch          DOF[14]:    +2.92 Nm
     Thumb-1st-pitch                DOF[17]:    +0.27 Nm
-  Step 2500/6836: Max torque so far = 38.40 Nm
-  Step 3000/6836: Max torque so far = 38.40 Nm
-  Step 3500/6836: Max torque so far = 38.40 Nm
-  Step 4000/6836: Max torque so far = 38.40 Nm
-  Step 4500/6836: Max torque so far = 38.40 Nm
-  Step 5000/6836: Max torque so far = 38.40 Nm
-  Step 5500/6836: Max torque so far = 38.40 Nm
-  Step 6000/6836: Max torque so far = 38.40 Nm
-  Step 6500/6836: Max torque so far = 38.40 Nm
+  Step 2500/6836: Max torque so far = 35.76 Nm
+  Step 3000/6836: Max torque so far = 35.76 Nm
+  Step 3500/6836: Max torque so far = 35.76 Nm
+  Step 4000/6836: Max torque so far = 35.76 Nm
+  Step 4500/6836: Max torque so far = 35.76 Nm
+  Step 5000/6836: Max torque so far = 35.76 Nm
+  Step 5500/6836: Max torque so far = 35.76 Nm
+  Step 6000/6836: Max torque so far = 35.76 Nm
+  Step 6500/6836: Max torque so far = 35.76 Nm
 
 💾 Saving torque history to CSV...
   Saved 6836 steps × 20 joints to phase1_torque_history.csv
@@ -153,25 +184,25 @@ Inverse Dynamics Results:
   RingFinger-2nd-pitch           |     0.00
   RingFinger-3rd-pitch           |     0.00
   MiddleFinger_1st_roll          |     0.57
-  MiddleFinger-1st-pitch         |    31.93
-  MiddleFinger-2nd-pitch         |    15.32
-  MiddleFinger-3rd-pitch         |     3.84
+  MiddleFinger-1st-pitch         |    28.99
+  MiddleFinger-2nd-pitch         |    13.94
+  MiddleFinger-3rd-pitch         |     3.40
   IndexFinger_1st_roll           |     0.28
-  IndexFinger-1st-pitch          |    38.40
-  IndexFinger-2nd-pitch          |    15.61
-  IndexFinger-3rd-pitch          |     7.31
-  thumb_1st_yaw                  |     2.26
-  Thumb-1st-pitch                |    34.48
-  Thumb-2nd-pitch                |    17.28
-  Thumb-3rd-pitch                |     8.42
+  IndexFinger-1st-pitch          |    35.76
+  IndexFinger-2nd-pitch          |    14.39
+  IndexFinger-3rd-pitch          |     6.93
+  thumb_1st_yaw                  |     2.10
+  Thumb-1st-pitch                |    32.84
+  Thumb-2nd-pitch                |    16.51
+  Thumb-3rd-pitch                |     8.08
 
-  Overall Peak Torque: 38.40 Nm
-  Average Peak Torque: 8.79 Nm
+  Overall Peak Torque: 35.76 Nm
+  Average Peak Torque: 8.19 Nm
 
 Applying 2.0x safety margin...
   → Inverse dynamics only accounts for ideal motion
   → Forward simulation needs extra for friction, damping, numerical errors
-  Adjusted force limits: 17.57 Nm (avg), 76.79 Nm (max)
+  Adjusted force limits: 16.38 Nm (avg), 71.53 Nm (max)
 
 ======================================================================
 PHASE 2: FORWARD SIMULATION WITH COMPUTED TORQUES
@@ -218,34 +249,50 @@ Starting forward simulation...
     Worst errors: IndexFinger-2nd-pitch=18.3° (0.0Nm)  MiddleFinger-3rd-pitch=13.3° (0.0Nm)  IndexFinger-1st-pitch=2.8° (0.0Nm)  
 WARNING: Nan, Inf or huge value in QACC at DOF 9. The simulation is unstable. Time = 0.0070.
 
-  T=1.00s: RMS error=6.9059 rad, Max torque=0.00 Nm
-    Worst errors: MiddleFinger-1st-pitch=922.6° (0.0Nm)  MiddleFinger-2nd-pitch=618.8° (0.0Nm)  IndexFinger_1st_roll=560.8° (0.0Nm)  
+  T=0.50s: RMS error=6.8910 rad, Max torque=0.00 Nm
+    Worst errors: MiddleFinger-1st-pitch=922.6° (0.0Nm)  MiddleFinger-2nd-pitch=618.8° (0.0Nm)  IndexFinger_1st_roll=560.9° (0.0Nm)  
+  T=1.00s: RMS error=123.5766 rad, Max torque=0.00 Nm
+    Worst errors: RingFinger-1st_roll=31080.2° (0.0Nm)  MiddleFinger-2nd-pitch=4049.2° (0.0Nm)  RingFinger-1st-pitch=3129.3° (0.0Nm)  
+  T=1.50s: RMS error=6.4167 rad, Max torque=0.00 Nm
+    Worst errors: IndexFinger-2nd-pitch=746.1° (0.0Nm)  RingFinger-3rd-pitch=570.7° (0.0Nm)  LittleFinger-3rd-pitch=570.7° (0.0Nm)  
+  T=2.00s: RMS error=15.6103 rad, Max torque=0.00 Nm
+    Worst errors: MiddleFinger-2nd-pitch=2423.6° (0.0Nm)  RingFinger-1st_roll=2002.2° (0.0Nm)  RingFinger-1st-pitch=1358.4° (0.0Nm)  
   T=2.50s: RMS error=15.5534 rad, Max torque=0.00 Nm
     Worst errors: MiddleFinger-2nd-pitch=2423.6° (0.0Nm)  RingFinger-1st_roll=2002.2° (0.0Nm)  RingFinger-1st-pitch=1358.4° (0.0Nm)  
-  T=3.00s: RMS error=123.5845 rad, Max torque=0.00 Nm
-    Worst errors: RingFinger-1st_roll=31080.2° (0.0Nm)  MiddleFinger-2nd-pitch=4049.2° (0.0Nm)  RingFinger-1st-pitch=3129.3° (0.0Nm)  
-  T=4.00s: RMS error=6.8632 rad, Max torque=0.00 Nm
-    Worst errors: MiddleFinger-1st-pitch=897.6° (0.0Nm)  MiddleFinger-2nd-pitch=622.2° (0.0Nm)  IndexFinger_1st_roll=560.9° (0.0Nm)  
-  T=6.00s: RMS error=79.5865 rad, Max torque=0.00 Nm
-    Worst errors: RingFinger-2nd-pitch=14723.3° (0.0Nm)  MiddleFinger_1st_roll=11203.4° (0.0Nm)  MiddleFinger-1st-pitch=5160.1° (0.0Nm)  
+  T=3.00s: RMS error=3.6582 rad, Max torque=0.00 Nm
+    Worst errors: IndexFinger-2nd-pitch=576.2° (0.0Nm)  MiddleFinger-3rd-pitch=551.5° (0.0Nm)  IndexFinger-3rd-pitch=364.8° (0.0Nm)  
+  T=3.50s: RMS error=12.0977 rad, Max torque=0.00 Nm
+    Worst errors: MiddleFinger_1st_roll=2591.2° (0.0Nm)  MiddleFinger-2nd-pitch=1291.5° (0.0Nm)  IndexFinger-2nd-pitch=523.3° (0.0Nm)  
+  T=4.00s: RMS error=3.6939 rad, Max torque=0.00 Nm
+    Worst errors: IndexFinger-2nd-pitch=576.2° (0.0Nm)  MiddleFinger-3rd-pitch=551.5° (0.0Nm)  IndexFinger-3rd-pitch=364.8° (0.0Nm)  
+  T=4.50s: RMS error=6.8209 rad, Max torque=0.00 Nm
+    Worst errors: MiddleFinger-1st-pitch=866.4° (0.0Nm)  MiddleFinger-2nd-pitch=626.6° (0.0Nm)  IndexFinger_1st_roll=560.9° (0.0Nm)  
+  T=5.00s: RMS error=6.8887 rad, Max torque=0.00 Nm
+    Worst errors: IndexFinger-2nd-pitch=746.1° (0.0Nm)  Thumb-3rd-pitch=573.0° (0.0Nm)  RingFinger-3rd-pitch=570.7° (0.0Nm)  
+  T=5.50s: RMS error=19.0201 rad, Max torque=0.00 Nm
+    Worst errors: MiddleFinger_1st_roll=3129.6° (0.0Nm)  MiddleFinger-2nd-pitch=2411.6° (0.0Nm)  RingFinger-1st_roll=2008.6° (0.0Nm)  
+  T=6.00s: RMS error=12.2857 rad, Max torque=0.00 Nm
+    Worst errors: MiddleFinger_1st_roll=2643.7° (0.0Nm)  MiddleFinger-2nd-pitch=1297.5° (0.0Nm)  IndexFinger-2nd-pitch=523.8° (0.0Nm)  
+  T=6.50s: RMS error=12.2571 rad, Max torque=0.00 Nm
+    Worst errors: MiddleFinger_1st_roll=2642.4° (0.0Nm)  MiddleFinger-2nd-pitch=1294.0° (0.0Nm)  IndexFinger-2nd-pitch=523.8° (0.0Nm)  
 
 Simulation complete!
 
 💾 Saving Phase 2 control history to CSV...
-  Saved 151 samples (every 10 steps) to phase2_control_applied.csv
+  Saved 684 samples (every 10 steps) to phase2_control_applied.csv
 
 ======================================================================
 VALIDATION RESULTS
 ======================================================================
 
 Tracking Performance:
-  Average RMS Error: 54.548783 rad (3125.415 deg)
-  Maximum RMS Error: 2145.618505 rad (122934.885 deg)
+  Average RMS Error: 57.331805 rad (3284.870 deg)
+  Maximum RMS Error: 2783.600743 rad (159488.574 deg)
 
 Torque Usage:
   Average Torque: 0.00 Nm
   Peak Torque: 0.00 Nm
-  Computed Limit: 76.79 Nm
+  Computed Limit: 71.53 Nm
   Usage: 0.0%
 
 ======================================================================
