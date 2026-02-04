@@ -1080,6 +1080,33 @@ for step in range(n_steps):
 
 torque_history = np.array(torque_history)
 
+# Save torque_history to CSV for verification
+print("\\n💾 Saving torque history to CSV...")
+import csv
+with open('phase1_torque_history.csv', 'w', newline='') as f:
+    writer = csv.writer(f)
+    
+    # Header: time, then joint names
+    header = ['time_s', 'step']
+    joint_names_ordered = []
+    for i in range(model.nu):
+        # Find joint name for this actuator
+        for jname, aid in actuator_ids.items():
+            if aid == i:
+                joint_names_ordered.append(jname)
+                header.append(jname)
+                break
+    writer.writerow(header)
+    
+    # Data rows
+    for step in range(n_steps):
+        time_s = step * dt
+        row = [time_s, step] + torque_history[step].tolist()
+        writer.writerow(row)
+    
+print(f"  Saved {{n_steps}} steps × {{model.nu}} joints to phase1_torque_history.csv")
+print(f"  File size: ~{{n_steps * model.nu * 8 / 1024:.1f}} KB")
+
 print("\\nInverse Dynamics Results:")
 print("  Joint Name                    | Max Torque (Nm)")
 print("  " + "-"*60)
@@ -1232,6 +1259,44 @@ try:
                     print(f"    Saturated: {{', '.join(saturated_joints[:5])}}")
         
         print("\\nSimulation complete!")
+        
+        # Save Phase 2 applied control for comparison
+        print("\\n💾 Saving Phase 2 control history to CSV...")
+        with open('phase2_control_applied.csv', 'w', newline='') as f:
+            writer = csv.writer(f)
+            
+            # Header
+            header = ['time_s', 'step']
+            for jname in joint_names_ordered:
+                header.append(f"{{jname}}_target")
+                header.append(f"{{jname}}_actual") 
+                header.append(f"{{jname}}_error_deg")
+            writer.writerow(header)
+            
+            # Save every 10th step to reduce file size
+            for idx, t in enumerate(times):
+                step_idx = int(t / dt)
+                if step_idx >= n_steps:
+                    step_idx = n_steps - 1
+                    
+                row = [t, step_idx]
+                for jname in joint_names_ordered:
+                    if jname in joint_ids and jname in actuator_ids:
+                        jid = joint_ids[jname]
+                        aid = actuator_ids[jname]
+                        qadr = model.jnt_qposadr[jid]
+                        
+                        target = qpos_traj[step_idx, qadr]
+                        actual = data.qpos[qadr]  # Last known position
+                        error_deg = np.rad2deg(target - actual)
+                        
+                        row.extend([target, actual, error_deg])
+                    else:
+                        row.extend([0, 0, 0])
+                
+                writer.writerow(row)
+        
+        print(f"  Saved {{len(times)}} samples to phase2_control_applied.csv")
 
 except Exception as e:
     print(f"ERROR: {{e}}")
