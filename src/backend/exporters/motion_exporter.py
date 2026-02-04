@@ -2324,6 +2324,7 @@ try:
         print("Starting motor validation simulation...")
         start_time = time.time()
         last_print = 0
+        last_plot_update = 0
         first_step_debug = True
         
         while viewer.is_running():
@@ -2422,75 +2423,75 @@ try:
                         print(f"    expected_force = kp * error = {{model.actuator_gainprm[aid,0] * error:.4f}}\")
                 print()
             
-            # Collect analysis data
+            # Collect analysis data (ALWAYS, for plots)
             tracking_errors = []
             torques = []
             saturated_count = 0
+            row_data = [elapsed]
             
-            # Update UI and logging
+            for jname, jid in joint_ids.items():
+                qadr = model.jnt_qposadr[jid]
+                dof_adr = model.jnt_dofadr[jid]
+                
+                target_pos = qpos_traj[step_idx, qadr]
+                actual_pos = data.qpos[qadr]
+                error = target_pos - actual_pos
+                velocity = data.qvel[dof_adr]
+                
+            tracking_errors.append(error ** 2)
+                
+                # Get actuator force/torque
+                torque = 0.0
+                ctrl_signal = 0.0
+                is_saturated = 0
+                if jname in actuator_ids:
+                    aid = actuator_ids[jname]
+                    ctrl_signal = data.ctrl[aid]
+                    torque = data.actuator_force[aid]
+                    torques.append(abs(torque))
+                    
+                    # Check saturation
+                    if abs(torque) >= GLOBAL_MOTOR_PARAMS['forcelim'] * 0.95:
+                        is_saturated = 1
+                        saturated_count += 1
+                
+                row_data.extend([target_pos, actual_pos, error, velocity, torque, ctrl_signal, is_saturated])
+            
+            # Calculate metrics
+            rms_error = np.sqrt(np.mean(tracking_errors)) if tracking_errors else 0.0
+            max_torque = max(torques) if torques else 0.0
+            
+            row_data.extend([rms_error, max_torque, saturated_count])
+            
+            # Write CSV at 10Hz
             if now - last_print > 0.1:
-                # Collect detailed data for each joint
-                row_data = [elapsed]
-                
-                for jname, jid in joint_ids.items():
-                    qadr = model.jnt_qposadr[jid]
-                    dof_adr = model.jnt_dofadr[jid]
-                    
-                    target_pos = qpos_traj[step_idx, qadr]
-                    actual_pos = data.qpos[qadr]
-                    error = target_pos - actual_pos
-                    velocity = data.qvel[dof_adr]
-                    
-                    tracking_errors.append(error ** 2)
-                    
-                    # Get actuator force/torque
-                    torque = 0.0
-                    ctrl_signal = 0.0
-                    is_saturated = 0
-                    if jname in actuator_ids:
-                        aid = actuator_ids[jname]
-                        ctrl_signal = data.ctrl[aid]
-                        torque = data.actuator_force[aid]
-                        torques.append(abs(torque))
-                        
-                        # Check saturation
-                        if abs(torque) >= GLOBAL_MOTOR_PARAMS['forcelim'] * 0.95:
-                            is_saturated = 1
-                            saturated_count += 1
-                    
-                    row_data.extend([target_pos, actual_pos, error, velocity, torque, ctrl_signal, is_saturated])
-                
-                # Calculate metrics
-                rms_error = np.sqrt(np.mean(tracking_errors)) if tracking_errors else 0.0
-                max_torque = max(torques) if torques else 0.0
-                
-                row_data.extend([rms_error, max_torque, saturated_count])
                 writer.writerow(row_data)
-                
-                # Update real-time plots
-                if HAS_MATPLOTLIB:
-                    plot_history['time'].append(elapsed)
-                    plot_history['tracking_error'].append(rms_error)
-                    plot_history['max_torque'].append(max_torque)
-                    plot_history['saturated_count'] = saturated_count
-                    
-                    # Keep only last 50 data points for smooth plotting
-                    if len(plot_history['time']) > 500:
-                        plot_history['time'] = plot_history['time'][-500:]
-                        plot_history['tracking_error'] = plot_history['tracking_error'][-500:]
-                        plot_history['max_torque'] = plot_history['max_torque'][-500:]
-                    
-                    update_info_text()
-                    update_plots()
-                    
-                    try:
-                        fig.canvas.draw()
-                        fig.canvas.flush_events()
-                        plt.pause(0.001)  # Force UI update
-                    except Exception as e:
-                        print(f"Warning: Plot update failed: {{e}}")
-                
                 last_print = now
+            
+            # Update plots at 5Hz (smoother without performance hit)
+            if HAS_MATPLOTLIB and now - last_plot_update > 0.2:
+                plot_history['time'].append(elapsed)
+                plot_history['tracking_error'].append(rms_error)
+                plot_history['max_torque'].append(max_torque)
+                plot_history['saturated_count'] = saturated_count
+                
+                # Keep only last 500 data points for smooth plotting
+                if len(plot_history['time']) > 500:
+                    plot_history['time'] = plot_history['time'][-500:]
+                    plot_history['tracking_error'] = plot_history['tracking_error'][-500:]
+                    plot_history['max_torque'] = plot_history['max_torque'][-500:]
+                
+                update_info_text()
+                update_plots()
+                
+                try:
+                    fig.canvas.draw()
+                    fig.canvas.flush_events()
+                    plt.pause(0.001)  # Force UI update
+                except Exception as e:
+                    print(f"Warning: Plot update failed: {{e}}")
+                
+                last_plot_update = now
 
         print("Motor validation simulation completed successfully")
 except Exception as e:
