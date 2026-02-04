@@ -170,18 +170,18 @@ def generate_mjcf_xml(
                     mass = inertia_data["mass"]
                     com = inertia_data["center_of_mass"]
                     inertia_diag = inertia_data["inertia_diagonal"]
-                    
+
                     # CRITICAL: Ensure mass and inertia meet MuJoCo minimum requirements
                     # mjMINVAL is typically 1e-10, but we use safer minimums
                     MIN_MASS = 0.0001  # 0.1 gram minimum
                     MIN_INERTIA = 1e-8  # Minimum inertia value
-                    
+
                     if mass < MIN_MASS:
                         mass = MIN_MASS
-                    
+
                     # Ensure each inertia component is above minimum
                     inertia_diag = [max(i, MIN_INERTIA) for i in inertia_diag]
-                    
+
                     com_str = f"{com[0]:.6f} {com[1]:.6f} {com[2]:.6f}"
                     inertia_str = f"{inertia_diag[0]:.9f} {inertia_diag[1]:.9f} {inertia_diag[2]:.9f}"
                     xml.append(

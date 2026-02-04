@@ -107,18 +107,20 @@ def calculate_inertia_from_stl(
         # Ensure reasonable values
         if mass < 0.0001:  # Less than 0.1 gram
             mass = 0.001  # Default to 1 gram for very small parts
-        
+
         # CRITICAL: Validate and fix inertia to satisfy MuJoCo constraints
         # MuJoCo requires: Ixx + Iyy >= Izz, Iyy + Izz >= Ixx, Izz + Ixx >= Iyy
         inertia_diag = np.diag(inertia)
         ixx, iyy, izz = inertia_diag[0], inertia_diag[1], inertia_diag[2]
-        
+
         # Check triangle inequality
         needs_fix = False
         if ixx + iyy < izz or iyy + izz < ixx or izz + ixx < iyy:
             needs_fix = True
-            print(f"  WARNING: Inertia violates triangle inequality: [{ixx:.6f}, {iyy:.6f}, {izz:.6f}]")
-        
+            print(
+                f"  WARNING: Inertia violates triangle inequality: [{ixx:.6f}, {iyy:.6f}, {izz:.6f}]"
+            )
+
         if needs_fix or np.any(inertia_diag <= 0) or np.any(np.isnan(inertia_diag)):
             # Use simple box approximation instead
             # Get bounding box dimensions in mm
@@ -126,18 +128,18 @@ def calculate_inertia_from_stl(
             dx = (bounds[1][0] - bounds[0][0]) / 1000  # Convert to m
             dy = (bounds[1][1] - bounds[0][1]) / 1000
             dz = (bounds[1][2] - bounds[0][2]) / 1000
-            
+
             # Box inertia: I = m/12 * (b² + c²) for each axis
             ixx = mass * (dy**2 + dz**2) / 12
             iyy = mass * (dx**2 + dz**2) / 12
             izz = mass * (dx**2 + dy**2) / 12
-            
+
             # Ensure minimum values
             min_inertia = mass * 0.0001
             ixx = max(ixx, min_inertia)
             iyy = max(iyy, min_inertia)
             izz = max(izz, min_inertia)
-            
+
             inertia = np.diag([ixx, iyy, izz])
             print(f"  -> Fixed to box approximation: [{ixx:.6f}, {iyy:.6f}, {izz:.6f}]")
 
