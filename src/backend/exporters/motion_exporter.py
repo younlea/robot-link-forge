@@ -1268,7 +1268,24 @@ try:
                     data.qfrc_applied[dof_adr] = force
                     applied_forces[dof_adr] = force  # Save for logging
             
+            # DEBUG: Verify forces before physics step
+            if sim_step == 0 or sim_step == 500:
+                print(f"\\n🔍 DEBUG at step {{sim_step}}:")
+                print(f"  Max qfrc_applied before mj_step: {{np.max(np.abs(data.qfrc_applied)):.2f}} Nm")
+                print(f"  Max applied_forces: {{np.max(np.abs(applied_forces)):.2f}} Nm")
+                print(f"  Nonzero DOFs in qfrc_applied: {{np.count_nonzero(np.abs(data.qfrc_applied) > 0.01)}}/{{model.nv}}")
+                for jname, jid in list(joint_ids.items())[:5]:
+                    if jname in actuator_ids:
+                        dof_adr = model.jnt_dofadr[jid]
+                        aid = actuator_ids[jname]
+                        print(f"    {{jname:30s}}: applied={{data.qfrc_applied[dof_adr]:+8.2f}} Nm, from history={{torque_history[sim_step][aid]:+8.2f}} Nm")
+            
             mujoco.mj_step(model, data)
+            
+            # DEBUG: Check if mj_step cleared forces
+            if sim_step == 0 or sim_step == 500:
+                print(f"  Max qfrc_applied AFTER mj_step: {{np.max(np.abs(data.qfrc_applied)):.2f}} Nm")
+                print(f"  → MuJoCo cleared forces: {{np.max(np.abs(data.qfrc_applied)) < 0.001}}\\n")
             viewer.sync()
             
             # Calculate elapsed time for logging
