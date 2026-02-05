@@ -1837,13 +1837,8 @@ with open('phase2_control_applied.csv', 'w', newline='') as f:
             row.append(entry.get(f'{{jname}}_force', 0))
             row.append(entry.get(f'{{jname}}_error', 0))
         writer.writerow(row)
-    
-print(f"  Saved {{len(phase2_log)}} samples (every 10 steps) to phase2_control_applied.csv")
 
-except Exception as e:
-    print(f"ERROR: {{e}}")
-    import traceback
-    traceback.print_exc()
+print(f"  Saved {{len(phase2_log)}} samples (every 10 steps) to phase2_control_applied.csv")
 
 # Analysis
 if len(tracking_errors) > 0:
