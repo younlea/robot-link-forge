@@ -1198,9 +1198,6 @@ print("  Let position actuators (kp=200, kd=20) drive joints")
 print("  This tests: Can the robot track with strong control?")
 print("\\nNote: This is NOT pure force feedforward")
 print("  Using PD position control for stability")
-print("  data.ctrl = torque_history[step]")
-print("  (Direct application of inverse dynamics forces)")
-print("\\nThis tests: Can the actuators track trajectory with computed forces?")
 
 # Reset simulation - set initial positions
 data.qpos[:] = qpos_traj[0]
