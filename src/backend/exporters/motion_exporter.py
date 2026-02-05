@@ -1532,7 +1532,7 @@ try:
             
             rms_error = np.sqrt(np.mean(errors))
             # Max position command (not force)
-            max_ctrl = np.max(np.abs(data.ctrl[:model.nu]))
+            max_ctrl = np.max(np.abs(data.ctrl[:model.nu])) if model.nu > 0 else 0.0
             
             tracking_errors.append(rms_error)
             control_torques.append(max_ctrl)  # Store for plot (but it's position not torque)
