@@ -3,8 +3,8 @@
 Mode 4: Inverse-to-Forward Validation
 Uses inverse dynamics torques as motor limits to test forward tracking
 
-Script Version: 20260206_083240
-Generated: 2026-02-06 08:32:40
+Script Version: 20260206_084036
+Generated: 2026-02-06 08:40:36
 """
 import time
 import mujoco
@@ -13,8 +13,8 @@ import numpy as np
 import json
 
 # Version info
-SCRIPT_VERSION = "20260206_083240"
-SCRIPT_DATE = "2026-02-06 08:32:40"
+SCRIPT_VERSION = "20260206_084036"
+SCRIPT_DATE = "2026-02-06 08:40:36"
 
 print("="*70)
 print(f"MODE 4 SCRIPT VERSION: {SCRIPT_VERSION}")
@@ -87,126 +87,126 @@ recording_data = {
     {
       "timestamp": 580,
       "joints": {
-        "LittleFinger-1st-pitch": 0,
-        "LittleFinger-2nd-pitch": 0,
-        "LittleFinger-1st_roll": 0,
-        "thumb_1st_yaw": 0,
-        "IndexFinger_1st_roll": 0,
-        "Thumb-1st-pitch": 0,
-        "MiddleFinger-3rd-pitch": 0,
-        "RingFinger-1st_roll": 0,
-        "RingFinger-3rd-pitch": 0,
-        "RingFinger-1st-pitch": 0,
-        "IndexFinger-1st-pitch": 0,
-        "RingFinger-2nd-pitch": 0,
-        "MiddleFinger-1st-pitch": 0,
-        "Thumb-2nd-pitch": 0,
+        "MiddleFinger-2nd-pitch": 0,
         "LittleFinger-3rd-pitch": 0,
-        "MiddleFinger_1st_roll": 0,
-        "IndexFinger-3rd-pitch": 0,
-        "IndexFinger-2nd-pitch": 0,
+        "IndexFinger_1st_roll": 0,
+        "RingFinger-2nd-pitch": 0,
         "Thumb-3rd-pitch": 0,
-        "MiddleFinger-2nd-pitch": 0
+        "RingFinger-3rd-pitch": 0,
+        "MiddleFinger_1st_roll": 0,
+        "Thumb-2nd-pitch": 0,
+        "IndexFinger-2nd-pitch": 0,
+        "LittleFinger-1st-pitch": 0,
+        "RingFinger-1st-pitch": 0,
+        "RingFinger-1st_roll": 0,
+        "Thumb-1st-pitch": 0,
+        "LittleFinger-2nd-pitch": 0,
+        "MiddleFinger-3rd-pitch": 0,
+        "IndexFinger-3rd-pitch": 0,
+        "LittleFinger-1st_roll": 0,
+        "IndexFinger-1st-pitch": 0,
+        "thumb_1st_yaw": 0,
+        "MiddleFinger-1st-pitch": 0
       }
     },
     {
       "timestamp": 2093,
       "joints": {
-        "LittleFinger-1st-pitch": 0,
-        "LittleFinger-2nd-pitch": 0,
-        "LittleFinger-1st_roll": 0,
-        "thumb_1st_yaw": 0,
-        "IndexFinger_1st_roll": 0,
-        "Thumb-1st-pitch": -0.940796326794897,
-        "MiddleFinger-3rd-pitch": 0,
-        "RingFinger-1st_roll": 0,
-        "RingFinger-3rd-pitch": 0,
-        "RingFinger-1st-pitch": 0,
-        "IndexFinger-1st-pitch": -1.5707963267949,
-        "RingFinger-2nd-pitch": 0,
-        "MiddleFinger-1st-pitch": 0,
-        "Thumb-2nd-pitch": 0,
+        "MiddleFinger-2nd-pitch": 0,
         "LittleFinger-3rd-pitch": 0,
-        "MiddleFinger_1st_roll": 0,
-        "IndexFinger-3rd-pitch": 0,
-        "IndexFinger-2nd-pitch": 0,
+        "IndexFinger_1st_roll": 0,
+        "RingFinger-2nd-pitch": 0,
         "Thumb-3rd-pitch": 0,
-        "MiddleFinger-2nd-pitch": 0
+        "RingFinger-3rd-pitch": 0,
+        "MiddleFinger_1st_roll": 0,
+        "Thumb-2nd-pitch": 0,
+        "IndexFinger-2nd-pitch": 0,
+        "LittleFinger-1st-pitch": 0,
+        "RingFinger-1st-pitch": 0,
+        "RingFinger-1st_roll": 0,
+        "Thumb-1st-pitch": -0.940796326794897,
+        "LittleFinger-2nd-pitch": 0,
+        "MiddleFinger-3rd-pitch": 0,
+        "IndexFinger-3rd-pitch": 0,
+        "LittleFinger-1st_roll": 0,
+        "IndexFinger-1st-pitch": -1.5707963267949,
+        "thumb_1st_yaw": 0,
+        "MiddleFinger-1st-pitch": 0
       }
     },
     {
       "timestamp": 3614,
       "joints": {
-        "LittleFinger-1st-pitch": 0,
-        "LittleFinger-2nd-pitch": 0,
-        "LittleFinger-1st_roll": 0,
-        "thumb_1st_yaw": 0,
-        "IndexFinger_1st_roll": 0,
-        "Thumb-1st-pitch": 0,
-        "MiddleFinger-3rd-pitch": 0,
-        "RingFinger-1st_roll": 0,
-        "RingFinger-3rd-pitch": 0,
-        "RingFinger-1st-pitch": 0,
-        "IndexFinger-1st-pitch": 0,
-        "RingFinger-2nd-pitch": 0,
-        "MiddleFinger-1st-pitch": 0,
-        "Thumb-2nd-pitch": 0,
+        "MiddleFinger-2nd-pitch": 0,
         "LittleFinger-3rd-pitch": 0,
-        "MiddleFinger_1st_roll": 0,
-        "IndexFinger-3rd-pitch": 0,
-        "IndexFinger-2nd-pitch": 0,
+        "IndexFinger_1st_roll": 0,
+        "RingFinger-2nd-pitch": 0,
         "Thumb-3rd-pitch": 0,
-        "MiddleFinger-2nd-pitch": 0
+        "RingFinger-3rd-pitch": 0,
+        "MiddleFinger_1st_roll": 0,
+        "Thumb-2nd-pitch": 0,
+        "IndexFinger-2nd-pitch": 0,
+        "LittleFinger-1st-pitch": 0,
+        "RingFinger-1st-pitch": 0,
+        "RingFinger-1st_roll": 0,
+        "Thumb-1st-pitch": 0,
+        "LittleFinger-2nd-pitch": 0,
+        "MiddleFinger-3rd-pitch": 0,
+        "IndexFinger-3rd-pitch": 0,
+        "LittleFinger-1st_roll": 0,
+        "IndexFinger-1st-pitch": 0,
+        "thumb_1st_yaw": 0,
+        "MiddleFinger-1st-pitch": 0
       }
     },
     {
       "timestamp": 5052,
       "joints": {
-        "LittleFinger-1st-pitch": 0,
-        "LittleFinger-2nd-pitch": 0,
-        "LittleFinger-1st_roll": 0,
-        "thumb_1st_yaw": -0.393598775598299,
-        "IndexFinger_1st_roll": 0,
-        "Thumb-1st-pitch": -0.780796326794897,
-        "MiddleFinger-3rd-pitch": 0,
-        "RingFinger-1st_roll": 0,
-        "RingFinger-3rd-pitch": 0,
-        "RingFinger-1st-pitch": 0,
-        "IndexFinger-1st-pitch": 0,
-        "RingFinger-2nd-pitch": 0,
-        "MiddleFinger-1st-pitch": -1.5707963267949,
-        "Thumb-2nd-pitch": 0,
+        "MiddleFinger-2nd-pitch": -0.220796326794897,
         "LittleFinger-3rd-pitch": 0,
-        "MiddleFinger_1st_roll": 0.0254670748005671,
-        "IndexFinger-3rd-pitch": 0,
-        "IndexFinger-2nd-pitch": 0,
+        "IndexFinger_1st_roll": 0,
+        "RingFinger-2nd-pitch": 0,
         "Thumb-3rd-pitch": 0,
-        "MiddleFinger-2nd-pitch": -0.220796326794897
+        "RingFinger-3rd-pitch": 0,
+        "MiddleFinger_1st_roll": 0.0254670748005671,
+        "Thumb-2nd-pitch": 0,
+        "IndexFinger-2nd-pitch": 0,
+        "LittleFinger-1st-pitch": 0,
+        "RingFinger-1st-pitch": 0,
+        "RingFinger-1st_roll": 0,
+        "Thumb-1st-pitch": -0.780796326794897,
+        "LittleFinger-2nd-pitch": 0,
+        "MiddleFinger-3rd-pitch": 0,
+        "IndexFinger-3rd-pitch": 0,
+        "LittleFinger-1st_roll": 0,
+        "IndexFinger-1st-pitch": 0,
+        "thumb_1st_yaw": -0.393598775598299,
+        "MiddleFinger-1st-pitch": -1.5707963267949
       }
     },
     {
       "timestamp": 6835,
       "joints": {
-        "LittleFinger-1st-pitch": 0,
-        "LittleFinger-2nd-pitch": 0,
-        "LittleFinger-1st_roll": 0,
-        "thumb_1st_yaw": 0,
-        "IndexFinger_1st_roll": 0,
-        "Thumb-1st-pitch": 0,
-        "MiddleFinger-3rd-pitch": 0,
-        "RingFinger-1st_roll": 0,
-        "RingFinger-3rd-pitch": 0,
-        "RingFinger-1st-pitch": 0,
-        "IndexFinger-1st-pitch": 0,
-        "RingFinger-2nd-pitch": 0,
-        "MiddleFinger-1st-pitch": 0,
-        "Thumb-2nd-pitch": 0,
+        "MiddleFinger-2nd-pitch": 0,
         "LittleFinger-3rd-pitch": 0,
-        "MiddleFinger_1st_roll": 0,
-        "IndexFinger-3rd-pitch": 0,
-        "IndexFinger-2nd-pitch": 0,
+        "IndexFinger_1st_roll": 0,
+        "RingFinger-2nd-pitch": 0,
         "Thumb-3rd-pitch": 0,
-        "MiddleFinger-2nd-pitch": 0
+        "RingFinger-3rd-pitch": 0,
+        "MiddleFinger_1st_roll": 0,
+        "Thumb-2nd-pitch": 0,
+        "IndexFinger-2nd-pitch": 0,
+        "LittleFinger-1st-pitch": 0,
+        "RingFinger-1st-pitch": 0,
+        "RingFinger-1st_roll": 0,
+        "Thumb-1st-pitch": 0,
+        "LittleFinger-2nd-pitch": 0,
+        "MiddleFinger-3rd-pitch": 0,
+        "IndexFinger-3rd-pitch": 0,
+        "LittleFinger-1st_roll": 0,
+        "IndexFinger-1st-pitch": 0,
+        "thumb_1st_yaw": 0,
+        "MiddleFinger-1st-pitch": 0
       }
     }
   ]
@@ -1017,9 +1017,6 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     
     plt.close(fig_interactive)
 
-# Final summary and cleanup
-if HAS_MATPLOTLIB and len(all_torque_data) > 0:
-
 # Save Phase 2 applied control for comparison (last run only)
 print("")
 print("💾 Saving Phase 2 control history to CSV...")
@@ -1040,14 +1037,14 @@ with open('phase2_control_applied.csv', 'w', newline='') as f:
     # Write logged data
     for entry in phase2_log:
         row = [entry['time'], entry['step']]
-                for jname in joint_names_ordered:
-                    row.append(entry.get(f'{jname}_target', 0))
-                    row.append(entry.get(f'{jname}_actual', 0))
-                    row.append(entry.get(f'{jname}_force', 0))
-                    row.append(entry.get(f'{jname}_error', 0))
-                writer.writerow(row)
-        
-        print(f"  Saved {len(phase2_log)} samples (every 10 steps) to phase2_control_applied.csv")
+        for jname in joint_names_ordered:
+            row.append(entry.get(f'{jname}_target', 0))
+            row.append(entry.get(f'{jname}_actual', 0))
+            row.append(entry.get(f'{jname}_force', 0))
+            row.append(entry.get(f'{jname}_error', 0))
+        writer.writerow(row)
+    
+print(f"  Saved {len(phase2_log)} samples (every 10 steps) to phase2_control_applied.csv")
 
 except Exception as e:
     print(f"ERROR: {e}")
