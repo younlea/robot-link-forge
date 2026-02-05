@@ -901,18 +901,21 @@ if __name__ == '__main__':
 """
 
 
-def generate_inverse_to_forward_validation_script(model_file: str, recording_data: dict) -> str:
+def generate_inverse_to_forward_validation_script(
+    model_file: str, recording_data: dict
+) -> str:
     """Generate Mode 4: Inverse-to-Forward Validation Script
-    
+
     Phase 1: Run inverse dynamics to find required torques
     Phase 2: Use those torques as motor limits and test forward tracking
     """
     rec_json = json.dumps(recording_data, indent=2)
-    
+
     # Version info for debugging
     from datetime import datetime
+
     script_version = datetime.now().strftime("%Y%m%d_%H%M%S")
-    
+
     return f'''#!/usr/bin/env python3
 """
 Mode 4: Inverse-to-Forward Validation
@@ -1217,13 +1220,23 @@ mujoco.mj_resetData(model, data)
 # Initialize from trajectory start (valid configuration)
 data.qpos[:] = qpos_traj[0]
 data.qvel[:] = qvel_traj[0]
-data.ctrl[:] = 0.0  # Disable position actuators
+
+# CRITICAL: Disable ALL actuators for pure torque control
+# Setting ctrl=0 is not enough - actuators still apply forces!
+# We need to disable actuator gains
+print("  Disabling position actuators (using ONLY qfrc_applied torque control)")
+data.ctrl[:] = 0.0  # Zero control signal
+# Disable actuator by zeroing out actuation
+for i in range(model.nu):
+    data.act[i] = 0.0  # Zero activation state
+
 data.qfrc_applied[:] = 0.0
 
 # Compute forward kinematics for initial state
 mujoco.mj_forward(model, data)
 
 print(f"  Initial pose from trajectory: {{data.qpos[:5]}}")
+print(f"  Actuators disabled, using pure torque control")
 print(f"  This should be stable (no constraint violations)")
 
 # Check initial position (should be zero mismatch since we set it directly)
@@ -1325,10 +1338,33 @@ try:
             # REAL PHYSICS SIMULATION with torque control
             # This is what we want to test for Mode 2 development!
             
-            # Apply torques from inverse dynamics (Phase 1)
-            # Use qfrc_applied to directly apply generalized forces
+            # Apply torques from inverse dynamics (Phase 1) WITH PD feedback
+            # Pure feedforward is unstable - add stabilizing feedback
             if sim_step < len(torque_history):
-                data.qfrc_applied[:] = torque_history[sim_step]
+                # Feedforward torque from inverse dynamics
+                ff_torque = torque_history[sim_step]
+                
+                # PD feedback for stabilization
+                # This helps track the trajectory when feedforward is not perfect
+                kp = 100.0  # Proportional gain (stiffness)
+                kd = 10.0   # Derivative gain (damping)
+                
+                # Compute feedback torque for each DOF
+                fb_torque = np.zeros(model.nv)
+                for jname, jid in joint_ids.items():
+                    if jname in actuator_ids:
+                        dof_adr = model.jnt_dofadr[jid]
+                        qadr = model.jnt_qposadr[jid]
+                        
+                        # Position and velocity errors
+                        pos_error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
+                        vel_error = qvel_traj[sim_step, dof_adr] - data.qvel[dof_adr]
+                        
+                        # PD control
+                        fb_torque[dof_adr] = kp * pos_error + kd * vel_error
+                
+                # Total torque = feedforward + feedback
+                data.qfrc_applied[:] = ff_torque + fb_torque
             else:
                 data.qfrc_applied[:] = 0.0
             

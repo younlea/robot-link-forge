@@ -81,16 +81,20 @@ def generate_mjcf_xml(
     xml.append(
         '  <option timestep="0.001" iterations="100" solver="Newton" tolerance="1e-10" gravity="0 0 -9.81"/>'
     )
-    
+
     # CRITICAL: Contact settings to prevent adjacent link collisions
     # Adjacent links in kinematic chain should not collide with each other
-    xml.append('  <contact>')
-    xml.append('    <!-- Exclude parent-child and sibling body pairs from collision detection -->')
-    xml.append('    <!-- Parent-child: joints in kinematic chain -->')
-    xml.append('    <!-- Siblings: multiple joints from same parent (e.g. finger yaw+pitch) -->')
+    xml.append("  <contact>")
+    xml.append(
+        "    <!-- Exclude parent-child and sibling body pairs from collision detection -->"
+    )
+    xml.append("    <!-- Parent-child: joints in kinematic chain -->")
+    xml.append(
+        "    <!-- Siblings: multiple joints from same parent (e.g. finger yaw+pitch) -->"
+    )
     # Will be populated after build_body() collects pairs
-    xml.append('  </contact>')
-    
+    xml.append("  </contact>")
+
     # Placeholder for contact exclusions - will be inserted later
     contact_section_index = len(xml) - 1
 
@@ -123,7 +127,10 @@ def generate_mjcf_xml(
     parent_child_pairs = []  # Track parent-child body pairs for collision exclusion
 
     def build_body(
-        link_id: str, parent_joint_id: Optional[str] = None, indent_level: int = 2, parent_body_name: Optional[str] = None
+        link_id: str,
+        parent_joint_id: Optional[str] = None,
+        indent_level: int = 2,
+        parent_body_name: Optional[str] = None,
     ):
         indent = "  " * indent_level
         link = robot.links.get(link_id)
@@ -758,21 +765,27 @@ def generate_mjcf_xml(
             if child_joint and child_joint.childLinkId:
                 child_link = robot.links.get(child_joint.childLinkId)
                 if child_link:
-                    child_body_name = unique_link_names.get(child_joint.childLinkId, child_link.name)
+                    child_body_name = unique_link_names.get(
+                        child_joint.childLinkId, child_link.name
+                    )
                     child_body_names.append(child_body_name)
-        
+
         # Add sibling pairs (children of same parent) for collision exclusion
         # This handles cases like finger first joint with yaw+pitch at same location
         if len(child_body_names) >= 2:
             for i in range(len(child_body_names)):
                 for j in range(i + 1, len(child_body_names)):
-                    parent_child_pairs.append((child_body_names[i], child_body_names[j]))
-        
+                    parent_child_pairs.append(
+                        (child_body_names[i], child_body_names[j])
+                    )
+
         # Build child bodies recursively
         for child_joint_id in link.childJoints:
             child_joint = robot.joints.get(child_joint_id)
             if child_joint and child_joint.childLinkId:
-                build_body(child_joint.childLinkId, child_joint_id, indent_level + 1, body_name)
+                build_body(
+                    child_joint.childLinkId, child_joint_id, indent_level + 1, body_name
+                )
 
         xml.append(f"{indent}</body>")
 
@@ -782,22 +795,24 @@ def generate_mjcf_xml(
 
     xml.append("    </body>  <!-- End fixed_world -->")
     xml.append("  </worldbody>")
-    
+
     # Insert contact exclusions now that we have all parent-child and sibling pairs
     contact_exclusions = []
     for body1, body2 in parent_child_pairs:
         contact_exclusions.append(f'    <exclude body1="{body1}" body2="{body2}"/>')
-    
+
     # Insert before closing </contact>
     if contact_exclusions:
         # Find contact section and insert exclusions
         for i, line in enumerate(xml):
-            if line.strip() == '</contact>':
+            if line.strip() == "</contact>":
                 # Insert all exclusions before this line
                 for exclusion in contact_exclusions:
                     xml.insert(i, exclusion)
                 break
-        print(f"✓ Added {len(contact_exclusions)} collision exclusions (parent-child + siblings)")
+        print(
+            f"✓ Added {len(contact_exclusions)} collision exclusions (parent-child + siblings)"
+        )
         print(f"  Sample exclusions:")
         for excl in contact_exclusions[:5]:  # Show first 5
             print(f"    {excl.strip()}")
