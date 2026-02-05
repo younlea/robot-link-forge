@@ -1196,164 +1196,79 @@ print(f"  → Forward simulation needs extra for friction, damping, numerical er
 print(f"  Adjusted force limits: {{np.mean(adjusted_limits):.2f}} Nm (avg), {{np.max(adjusted_limits):.2f}} Nm (max)")
 
 print("\\n" + "="*70)
-print("PHASE 2: KINEMATIC REPLAY WITH PD CONTROL")
+print("PHASE 2: FORWARD SIMULATION WITH TORQUE CONTROL")
 print("="*70)
 
-print("\\nUsing position control (not force control):")
-print("  Set data.ctrl to target positions from trajectory")
-print("  Let position actuators (kp=200, kd=20) drive joints")
-print("  This tests: Can the robot track with strong control?")
-print("\\nNote: This is NOT pure force feedforward")
-print("  Using PD position control for stability")
+print("\\nUsing DIRECT TORQUE control (not position control):")
+print("  Apply torques from Phase 1 inverse dynamics")
+print("  Use data.qfrc_applied (generalized forces)")
+print("  This is pure feedforward torque control")
+print("\\nNote: Position actuators in MJCF are IGNORED")
+print("  We bypass actuators and apply forces directly")
 
-# Reset simulation - set initial positions
-data.qpos[:] = qpos_traj[0]
-data.qvel[:] = 0.0
-data.qacc[:] = 0.0
-
-# Set control targets to initial positions (not zero!)
-for jname, jid in joint_ids.items():
-    if jname in actuator_ids:
-        aid = actuator_ids[jname]
-        qadr = model.jnt_qposadr[jid]
-        data.ctrl[aid] = qpos_traj[0, qadr]
-
-# DEBUGGING MODE: Run only 500 steps and check each step
-# User observed: joints explode from step 0
-print("\\n" + "=" * 70)
-print("DEBUG MODE: Running first 500 steps only (no trajectory motion)")
-print("Checking physics stability step-by-step...")
-print("=" * 70)
-
-# Step 1: Check initial state right after reset
-print("\\n📍 STEP 0: Initial state after mj_resetData")
+# CRITICAL FIX: Don't initialize to qpos_traj[0]
+# With torque control, we start from model's natural pose
+# Reset simulation - let model settle to natural pose first
+print("\\n📍 Initialization for torque control:")
+print("  Starting from model's default pose (no forced positions)")
 mujoco.mj_resetData(model, data)
 
-print(f"  model.qpos0 (first 5): {{model.qpos0[:5]}}")
-print(f"  data.qpos (first 5): {{data.qpos[:5]}}")
-print(f"  data.ctrl (first 5): {{data.ctrl[:5]}}")
-print(f"  data.qvel (first 5): {{data.qvel[:5]}}")
-
-# Check for any NaN/Inf already
-if np.any(np.isnan(data.qpos)) or np.any(np.isinf(data.qpos)):
-    print("  ⚠️  WARNING: NaN/Inf detected in qpos immediately after reset!")
-if np.any(np.isnan(data.ctrl)) or np.any(np.isinf(data.ctrl)):
-    print("  ⚠️  WARNING: NaN/Inf detected in ctrl immediately after reset!")
-
-# CRITICAL ISSUE: Both model.qpos0 AND qpos_traj[0] are [0,0,0...]
-# This causes instant physics explosion (collision, constraint violation)
-print(f"\\n📍 Analyzing initialization options:")
-print(f"  Option A: model.qpos0 → {{model.qpos0[:5]}}")
-print(f"  Option B: qpos_traj[0] → {{qpos_traj[0, :5]}}")
-
-# Check if trajectory is all zeros
-if np.allclose(qpos_traj[0], 0.0, atol=0.01):
-    print(f"  ⚠️  WARNING: qpos_traj[0] is all zeros! Recording started at invalid pose.")
-    
-    # Try to find first non-zero frame
-    first_valid_frame = -1
-    for frame_idx in range(min(100, len(qpos_traj))):
-        if not np.allclose(qpos_traj[frame_idx], 0.0, atol=0.01):
-            first_valid_frame = frame_idx
-            break
-    
-    if first_valid_frame > 0:
-        print(f"  Found first valid frame at index {{first_valid_frame}}: {{qpos_traj[first_valid_frame, :5]}}")
-        init_qpos = qpos_traj[first_valid_frame]
-    else:
-        print(f"  ⚠️  All frames are zero! Using small random values to avoid collision")
-        # Use small random values to avoid exact collision geometry
-        init_qpos = np.random.uniform(-0.1, 0.1, size=model.nq)
-else:
-    print(f"  Using qpos_traj[0] (non-zero)")
-    init_qpos = qpos_traj[0]
-
-# CRITICAL: Set qpos directly and use mj_forward (kinematic, no dynamics)
-# This bypasses actuator dynamics and avoids constraint explosions
-print(f"\\n📍 Strategy: Kinematic initialization (no actuator dynamics)")
-print(f"  Setting data.qpos directly to: {{init_qpos[:5]}}")
-data.qpos[:] = init_qpos
-data.qvel[:] = 0.0
-data.ctrl[:] = init_qpos[:model.nu]
-
-# Use mj_forward to compute derived quantities WITHOUT stepping dynamics
-mujoco.mj_forward(model, data)
-print(f"  After mj_forward (kinematic only):")
-print(f"    data.qpos (first 5): {{data.qpos[:5]}}")
-print(f"    data.ctrl (first 5): {{data.ctrl[:5]}}")
-
-# Step 3: Run step-by-step and check for explosions
-print("\\n📍 Running 500 steps with detailed logging...")
-explosion_step = -1
-for i in range(500):
-    mujoco.mj_step(model, data)
-    
-    # Check every 10 steps
-    if i % 10 == 0 or i < 5:
-        max_qpos = np.max(np.abs(data.qpos))
-        max_qvel = np.max(np.abs(data.qvel))
-        max_qacc = np.max(np.abs(data.qacc))
-        
-        if i < 5 or i % 50 == 0:
-            print(f"  Step {{i:3d}}: max|qpos|={{max_qpos:7.3f}}, max|qvel|={{max_qvel:7.3f}}, max|qacc|={{max_qacc:8.3f}}")
-        
-        # Detect explosion
-        if np.any(np.isnan(data.qpos)) or np.any(np.isinf(data.qpos)) or max_qpos > 100:
-            explosion_step = i
-            print(f"\\n💥 EXPLOSION DETECTED at step {{i}}!")
-            print(f"  max|qpos|={{max_qpos}}, max|qvel|={{max_qvel}}, max|qacc|={{max_qacc}}")
-            
-            # Find which joint exploded
-            for jname, jid in joint_ids.items():
-                qadr = model.jnt_qposadr[jid]
-                if abs(data.qpos[qadr]) > 10 or np.isnan(data.qpos[qadr]) or np.isinf(data.qpos[qadr]):
-                    print(f"    💥 {{jname:30s}}: qpos={{data.qpos[qadr]:+10.4f}}, qvel={{data.qvel[qadr]:+10.4f}}")
-            break
-
-if explosion_step == -1:
-    print("\\n✅ 500 steps completed without explosion")
-    print(f"  Final max|qpos|={{np.max(np.abs(data.qpos)):.3f}}")
-    
-    # Save natural equilibrium as starting point
-    natural_qpos = data.qpos.copy()
-    print(f"\\n  Natural equilibrium found (all 20 joints):")
-    for jname, jid in joint_ids.items():
-        qadr = model.jnt_qposadr[jid]
-        print(f"    {{jname:30s}}: {{natural_qpos[qadr]:+7.4f}} rad ({{np.rad2deg(natural_qpos[qadr]):+7.2f}}°)")
-else:
-    print(f"\\n❌ Physics exploded at step {{explosion_step}}")
-    print("   Problem: Model is fundamentally unstable!")
-    print("   Possible causes:")
-    print("     1. Joint limits violated")
-    print("     2. Actuator gains too high")
-    print("     3. Model geometry/mass issues")
-    print("     4. Constraints causing conflict")
-    natural_qpos = model.qpos0.copy()
-
-print("\\n" + "=" * 70)
-print("DEBUG MODE COMPLETE - Exiting early for analysis")
-print("=" * 70)
-import sys
-sys.exit(0)
-
-# OLD CODE BELOW (unreachable in debug mode)
-# Step 2: Gradually blend from natural pose to trajectory start
-print("  Phase 2: Gradually move to trajectory start (1500 steps)")
-for i in range(1500):
-    blend = min(1.0, i / 1000.0)  # 0→1 over first 1000 steps
-    for jname, jid in joint_ids.items():
-        if jname in actuator_ids:
-            aid = actuator_ids[jname]
-            qadr = model.jnt_qposadr[jid]
-            target = (1 - blend) * natural_qpos[qadr] + blend * qpos_traj[0, qadr]
-            data.ctrl[aid] = target
+# Let physics settle for a moment (no forces applied)
+print("  Letting model settle to equilibrium (100 steps, no forces)...")
+for i in range(100):
+    data.qfrc_applied[:] = 0.0  # No external forces
+    data.ctrl[:] = 0.0  # No actuator commands
     mujoco.mj_step(model, data)
 
-# Check initial position mismatch (potential oscillation cause)
-print("\\n=== Initial Position Mismatch Check ===")
+print(f"  Equilibrium reached. Sample positions: {{data.qpos[:5]}}")
+
+# Check initial position mismatch (for logging only)
+print("\\n=== Initial Position vs Trajectory Start ===")
 init_errors = []
 for jname, jnt_idx in joint_ids.items():
     if jnt_idx >= model.nu:
+        continue
+    qadr = model.jnt_qposadr[jnt_idx]
+    actual_pos = data.qpos[qadr]
+    target_pos = qpos_traj[0, qadr]
+    error = target_pos - actual_pos
+    init_errors.append(error ** 2)
+    
+    if abs(error) > 0.1:  # > 5.7 degrees
+        print(f"  {{jname:20s}}: actual={{actual_pos:+7.4f}}, traj_start={{target_pos:+7.4f}}, diff={{error:+7.4f}} ({{np.rad2deg(error):+6.2f}}°)")
+
+init_rms = np.sqrt(np.mean(init_errors))
+print(f"\\nInitial mismatch RMS: {{init_rms:.4f}} rad ({{np.rad2deg(init_rms):.2f}}°)")
+print("Note: With torque control, initial mismatch is okay")
+print("=" * 50)
+
+# Tracking data
+tracking_errors = []
+control_torques = []
+times = []
+
+# Phase 2 data logging (save every step for CSV)
+phase2_log = []  # Will store: [time, step, target_pos, actual_pos, applied_force] per joint
+
+print("\\nStarting forward simulation with TORQUE CONTROL...")
+
+# DEBUG: Check torque_history contents
+print("\\n🔍 TORQUE HISTORY DIAGNOSTIC:")
+print(f"  torque_history shape: {{torque_history.shape}}")
+print(f"  Expected: ({{n_steps}}, {{model.nu}})")
+print("\\n  Sample torques at key steps:")
+for sample_step in [0, 500, 2500, 5000]:
+    if sample_step < len(torque_history):
+        max_t = np.max(np.abs(torque_history[sample_step]))
+        nonzero = np.count_nonzero(np.abs(torque_history[sample_step]) > 0.01)
+        print(f"    Step {{sample_step}}: max={{max_t:.2f}} Nm, nonzero={{nonzero}}/{{model.nu}}")
+        # Show which joints have significant torque
+        for jname, jid in joint_ids.items():
+            if jname in actuator_ids:
+                aid = actuator_ids[jname]
+                t = torque_history[sample_step][aid]
+                if abs(t) > 0.1:  # Only show significant torques
+                    print(f"      {{jname:30s}}: {{t:+8.2f}} Nm")
         continue
     qadr = model.jnt_qposadr[jnt_idx]
     actual_pos = data.qpos[qadr]
@@ -1423,32 +1338,38 @@ try:
             # Use simulation steps, not real time!
             # Real time can be too fast and skip steps
             
-            # Use position control instead of force control
-            # Position actuators work much better for tracking
+            # TORQUE CONTROL: Apply forces from inverse dynamics
+            # Bypass position actuators completely
+            data.ctrl[:] = 0.0  # Disable position actuators
+            
+            # Apply torques directly via qfrc_applied
             for jname, jid in joint_ids.items():
                 if jname in actuator_ids:
                     aid = actuator_ids[jname]
-                    qadr = model.jnt_qposadr[jid]
-                    # Set target position from trajectory
-                    data.ctrl[aid] = qpos_traj[sim_step, qadr]
+                    dof_adr = model.jnt_dofadr[jid]
+                    # Use torque from Phase 1 inverse dynamics
+                    torque = torque_history[sim_step][aid]
+                    data.qfrc_applied[dof_adr] = torque
             
-            # Don't use qfrc_applied - let actuators do the work
-            # Store applied forces for logging (from actuator dynamics)
-            applied_forces = np.zeros(model.nv)
+            # Store applied forces for logging
+            applied_forces = data.qfrc_applied.copy()
             
-            # DEBUG: Verify positions before physics step
+            # DEBUG: Verify torques before physics step
             if sim_step == 0 or sim_step == 500:
                 print(f"\\n🔍 DEBUG at step {{sim_step}}:")
-                print(f"  Using position control (not force)")
-                print(f"  Nonzero position commands: {{np.count_nonzero(np.abs(data.ctrl) > 0.01)}}/{{model.nu}}")
+                print(f"  Using TORQUE control (not position)")
+                nonzero_torques = np.count_nonzero(np.abs(data.qfrc_applied) > 0.01)
+                print(f"  Nonzero torques: {{nonzero_torques}}/{{model.nv}}")
+                max_torque = np.max(np.abs(data.qfrc_applied))
+                print(f"  Max torque: {{max_torque:.2f}} Nm")
                 for jname, jid in list(joint_ids.items())[:5]:
                     if jname in actuator_ids:
+                        dof_adr = model.jnt_dofadr[jid]
                         qadr = model.jnt_qposadr[jid]
-                        aid = actuator_ids[jname]
-                        target = qpos_traj[sim_step, qadr]
-                        current = data.qpos[qadr]
-                        ctrl = data.ctrl[aid]
-                        print(f"    {{jname:30s}}: target={{target:+8.4f}}, current={{current:+8.4f}}, ctrl={{ctrl:+8.4f}} rad")
+                        target_pos = qpos_traj[sim_step, qadr]
+                        current_pos = data.qpos[qadr]
+                        torque = data.qfrc_applied[dof_adr]
+                        print(f"    {{jname:30s}}: target_pos={{target_pos:+8.4f}}, current={{current_pos:+8.4f}}, torque={{torque:+8.4f}} Nm")
             
             mujoco.mj_step(model, data)
             
@@ -1579,9 +1500,9 @@ if len(tracking_errors) > 0:
     print(f"\\nTracking Performance:")
     print(f"  Average RMS Error: {{avg_error:.6f}} rad ({{np.rad2deg(avg_error):.3f}} deg)")
     print(f"  Maximum RMS Error: {{max_error:.6f}} rad ({{np.rad2deg(max_error):.3f}} deg)")
-    print(f"\\nPosition Control (PD kp=200, kd=20):")
-    print(f"  Average Command: {{avg_torque:.2f}} rad")
-    print(f"  Peak Command: {{peak_torque:.2f}} rad")
+    print(f"\\nTorque Control (Direct Force Application):")
+    print(f"  Average Torque: {{avg_torque:.2f}} Nm")
+    print(f"  Peak Torque: {{peak_torque:.2f}} Nm")
     
     # Verdict
     print("\\n" + "="*70)
