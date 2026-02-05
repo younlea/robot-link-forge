@@ -1021,8 +1021,15 @@ for jname in recorded_joints:
     # Build time array starting from 0
     times = [0.0] + [kf["timestamp"]/1000.0 for kf in keyframes]
     
-    # Get initial position (first keyframe value)
-    first_pos = keyframes[0]["joints"].get(jname, 0.0)
+    # Get initial position from model's default qpos (not recording's first keyframe)
+    # Recording often starts at 0, which causes physics instability
+    model_default_pos = model.qpos0[qadr] if qadr < len(model.qpos0) else 0.0
+    first_pos = keyframes[0]["joints"].get(jname, model_default_pos)
+    
+    # If recording starts at 0, use model default instead
+    if abs(first_pos) < 0.001:  # Close to zero
+        first_pos = model_default_pos
+    
     positions = [first_pos] + [kf["joints"].get(jname, first_pos) for kf in keyframes]
     
     t_interp = np.linspace(0, duration, n_steps)
