@@ -1172,10 +1172,15 @@ print(f"  → Forward simulation needs extra for friction, damping, numerical er
 print(f"  Adjusted force limits: {{np.mean(adjusted_limits):.2f}} Nm (avg), {{np.max(adjusted_limits):.2f}} Nm (max)")
 
 print("\\n" + "="*70)
-print("PHASE 2: FORWARD SIMULATION WITH COMPUTED TORQUES")
+print("PHASE 2: KINEMATIC REPLAY WITH PD CONTROL")
 print("="*70)
 
-print("\\nUsing pure feedforward control:")
+print("\\nUsing position control (not force control):")
+print("  Set data.ctrl to target positions from trajectory")
+print("  Let position actuators (kp=200, kd=20) drive joints")
+print("  This tests: Can the robot track with strong control?")
+print("\\nNote: This is NOT pure force feedforward")
+print("  Using PD position control for stability")
 print("  data.ctrl = torque_history[step]")
 print("  (Direct application of inverse dynamics forces)")
 print("\\nThis tests: Can the actuators track trajectory with computed forces?")
@@ -1246,52 +1251,34 @@ try:
             # Use simulation steps, not real time!
             # Real time can be too fast and skip steps
             
-            # CRITICAL: We have position actuators, not motor actuators!
-            # data.ctrl expects target positions, not forces
-            # But we want to apply forces directly from inverse dynamics
-            
-            # Workaround: Set actuators to current position (neutralize them)
-            # If we set ctrl=0, actuators will pull joints toward zero!
+            # Use position control instead of force control
+            # Position actuators work much better for tracking
             for jname, jid in joint_ids.items():
                 if jname in actuator_ids:
                     aid = actuator_ids[jname]
                     qadr = model.jnt_qposadr[jid]
-                    data.ctrl[aid] = data.qpos[qadr]  # Hold current position
+                    # Set target position from trajectory
+                    data.ctrl[aid] = qpos_traj[sim_step, qadr]
             
-            data.qfrc_applied[:] = 0.0  # CRITICAL: Clear previous forces!
-            
-            # Store applied forces for logging
+            # Don't use qfrc_applied - let actuators do the work
+            # Store applied forces for logging (from actuator dynamics)
             applied_forces = np.zeros(model.nv)
             
-            # Apply computed forces directly to joints
-            for jname, jid in joint_ids.items():
-                if jname in actuator_ids:
-                    aid = actuator_ids[jname]
-                    dof_adr = model.jnt_dofadr[jid]
-                    
-                    # Apply force directly to the DOF
-                    force = torque_history[sim_step][aid]
-                    data.qfrc_applied[dof_adr] = force
-                    applied_forces[dof_adr] = force  # Save for logging
-            
-            # DEBUG: Verify forces before physics step
+            # DEBUG: Verify positions before physics step
             if sim_step == 0 or sim_step == 500:
                 print(f"\\n🔍 DEBUG at step {{sim_step}}:")
-                print(f"  Max qfrc_applied before mj_step: {{np.max(np.abs(data.qfrc_applied)):.2f}} Nm")
-                print(f"  Max applied_forces: {{np.max(np.abs(applied_forces)):.2f}} Nm")
-                print(f"  Nonzero DOFs in qfrc_applied: {{np.count_nonzero(np.abs(data.qfrc_applied) > 0.01)}}/{{model.nv}}")
+                print(f"  Using position control (not force)")
+                print(f"  Nonzero position commands: {{np.count_nonzero(np.abs(data.ctrl) > 0.01)}}/{{model.nu}}")
                 for jname, jid in list(joint_ids.items())[:5]:
                     if jname in actuator_ids:
-                        dof_adr = model.jnt_dofadr[jid]
+                        qadr = model.jnt_qposadr[jid]
                         aid = actuator_ids[jname]
-                        print(f"    {{jname:30s}}: applied={{data.qfrc_applied[dof_adr]:+8.2f}} Nm, from history={{torque_history[sim_step][aid]:+8.2f}} Nm")
+                        target = qpos_traj[sim_step, qadr]
+                        current = data.qpos[qadr]
+                        ctrl = data.ctrl[aid]
+                        print(f"    {{jname:30s}}: target={{target:+8.4f}}, current={{current:+8.4f}}, ctrl={{ctrl:+8.4f}} rad")
             
             mujoco.mj_step(model, data)
-            
-            # DEBUG: Check if mj_step cleared forces
-            if sim_step == 0 or sim_step == 500:
-                print(f"  Max qfrc_applied AFTER mj_step: {{np.max(np.abs(data.qfrc_applied)):.2f}} Nm")
-                print(f"  → MuJoCo cleared forces: {{np.max(np.abs(data.qfrc_applied)) < 0.001}}\\n")
             viewer.sync()
             
             # Calculate elapsed time for logging
@@ -1307,27 +1294,26 @@ try:
                 error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
                 errors.append(error ** 2)
                 
-                # Get applied force value (not ctrl which is 0)
-                force_val = 0.0
-                if jname in actuator_ids:
-                    dof_adr = model.jnt_dofadr[jnt_idx]
-                    force_val = applied_forces[dof_adr]
-                
-                error_details.append((jname, abs(error), abs(force_val)))
-                
-                # Check if force limit exceeded
+                # Get position command value
+                ctrl_val = 0.0
                 if jname in actuator_ids:
                     aid = actuator_ids[jname]
-                    limit = adjusted_limits[aid]
-                    if abs(force_val) >= limit * 0.99:
+                    ctrl_val = data.ctrl[aid]
+                
+                error_details.append((jname, abs(error), abs(ctrl_val)))
+                
+                # Check if position command is large
+                if jname in actuator_ids:
+                    aid = actuator_ids[jname]
+                    if abs(ctrl_val) > 1.57:  # > 90 degrees
                         saturated_joints.append(jname)
             
             rms_error = np.sqrt(np.mean(errors))
-            # Use qfrc_applied instead of data.ctrl (which is set to 0)
-            max_force = np.max(np.abs(applied_forces))
+            # Max position command (not force)
+            max_ctrl = np.max(np.abs(data.ctrl[:model.nu]))
             
             tracking_errors.append(rms_error)
-            control_torques.append(max_force)
+            control_torques.append(max_ctrl)  # Store for plot (but it's position not torque)
             times.append(elapsed)
             
             # Save Phase 2 data every 10 steps (reduce file size)
@@ -1338,17 +1324,14 @@ try:
                         jid = joint_ids[jname]
                         aid = actuator_ids[jname]
                         qadr = model.jnt_qposadr[jid]
-                        dof_adr = model.jnt_dofadr[jid]
                         
                         target = qpos_traj[sim_step, qadr]
                         actual = data.qpos[qadr]
-                        # Use the force we intended to apply (from torque_history)
-                        # NOT data.qfrc_applied which may be modified by mj_step
-                        intended_force = torque_history[sim_step][aid]
+                        ctrl_cmd = data.ctrl[aid]  # Position command
                         
                         log_entry[f'{{jname}}_target'] = target
                         log_entry[f'{{jname}}_actual'] = actual
-                        log_entry[f'{{jname}}_force'] = intended_force
+                        log_entry[f'{{jname}}_ctrl'] = ctrl_cmd
                         log_entry[f'{{jname}}_error'] = target - actual
                 
                 phase2_log.append(log_entry)
@@ -1359,13 +1342,13 @@ try:
                 error_details.sort(key=lambda x: x[1], reverse=True)
                 worst_joints = error_details[:3]
                 
-                print(f"  T={{elapsed:.2f}}s: RMS error={{rms_error:.4f}} rad, Max force={{max_force:.2f}} Nm")
+                print(f"  T={{elapsed:.2f}}s: RMS error={{rms_error:.4f}} rad ({{np.rad2deg(rms_error):.1f}}°), Max cmd={{max_ctrl:.2f}} rad")
                 print(f"    Worst errors: ", end="")
                 for jname, err, ctrl in worst_joints:
-                    print(f"{{jname}}={{np.rad2deg(err):.1f}}° ({{ctrl:.1f}}Nm)  ", end="")
+                    print(f"{{jname}}={{np.rad2deg(err):.1f}}° (cmd={{ctrl:.2f}}rad)  ", end="")
                 print()
                 if saturated_joints:
-                    print(f"    Saturated: {{', '.join(saturated_joints[:5])}}")
+                    print(f"    Large commands: {{', '.join(saturated_joints[:5])}}")
             
             sim_step += 1  # Increment simulation step
         
@@ -1421,26 +1404,24 @@ if len(tracking_errors) > 0:
     print(f"\\nTracking Performance:")
     print(f"  Average RMS Error: {{avg_error:.6f}} rad ({{np.rad2deg(avg_error):.3f}} deg)")
     print(f"  Maximum RMS Error: {{max_error:.6f}} rad ({{np.rad2deg(max_error):.3f}} deg)")
-    print(f"\\nTorque Usage:")
-    print(f"  Average Torque: {{avg_torque:.2f}} Nm")
-    print(f"  Peak Torque: {{peak_torque:.2f}} Nm")
-    print(f"  Computed Limit: {{np.max(adjusted_limits):.2f}} Nm")
-    print(f"  Usage: {{100 * peak_torque / np.max(adjusted_limits):.1f}}%")
+    print(f"\\nPosition Control (PD kp=200, kd=20):")
+    print(f"  Average Command: {{avg_torque:.2f}} rad")
+    print(f"  Peak Command: {{peak_torque:.2f}} rad")
     
     # Verdict
     print("\\n" + "="*70)
-    if max_error < 0.2:  # ~11 degrees
-        print("✓ SUCCESS: Physics can track trajectory with computed torques!")
-        print("  → Motor matching should work")
-        print("  → Problem was likely in Mode 2 parameter tuning")
-    elif max_error < 0.5:  # ~28 degrees
-        print("⚠ PARTIAL: Tracking has some error but reasonable")
-        print("  → Try adjusting kp/kv gains")
-        print("  → Or increase safety margin")
+    if max_error < 0.02:  # ~1 degree
+        print("✓ SUCCESS: Position control tracks trajectory accurately!")
+        print("  → Robot can physically perform this motion")
+        print("  → Use these PD gains (kp=200, kd=20) for control")
+    elif max_error < 0.1:  # ~5 degrees
+        print("⚠ PARTIAL: Some tracking error but acceptable")
+        print("  → Try increasing kp (stiffness)")
+        print("  → Or check for collisions/joint limits")
     else:
-        print("✗ FAILED: Cannot track trajectory even with computed torques")
-        print("  → Problem is in physics model or timestep")
-        print("  → Check: mass, inertia, timestep, solver settings")
+        print("✗ FAILED: Large tracking errors even with position control")
+        print("  → Trajectory may be too fast for physics timestep")
+        print("  → Or robot model has issues (mass/inertia/constraints)")
     print("="*70)
     
     # Plot results
@@ -1451,15 +1432,14 @@ if len(tracking_errors) > 0:
         axes[0].axhline(y=11.5, color='r', linestyle='--', label='Acceptable limit (11.5°)')
         axes[0].set_xlabel('Time (s)')
         axes[0].set_ylabel('RMS Tracking Error (degrees)')
-        axes[0].set_title('Tracking Performance (Mode 4: Inverse-to-Forward)')
+        axes[0].set_title('Tracking Performance (Mode 4: Position Control)')
         axes[0].grid(True, alpha=0.3)
         axes[0].legend()
         
-        axes[1].plot(times, control_torques, 'g-', linewidth=1.5, label='Control Torque')
-        axes[1].axhline(y=np.max(adjusted_limits), color='r', linestyle='--', label='Computed Limit')
+        axes[1].plot(times, control_torques, 'b-', linewidth=1.5, label='Max Position Command')
         axes[1].set_xlabel('Time (s)')
-        axes[1].set_ylabel('Torque (Nm)')
-        axes[1].set_title('Torque Usage')
+        axes[1].set_ylabel('Position Command (rad)')
+        axes[1].set_title('Position Commands (not torque)')
         axes[1].grid(True, alpha=0.3)
         axes[1].legend()
         
