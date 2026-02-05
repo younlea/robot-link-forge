@@ -1327,6 +1327,37 @@ times = []
 # Phase 2 data logging (save every step for CSV)
 phase2_log = []  # Will store: [time, step, target_pos, actual_pos, applied_force] per joint
 
+# Setup real-time 3D torque visualization
+if HAS_MATPLOTLIB:
+    import matplotlib
+    matplotlib.use('TkAgg')  # Use interactive backend
+    from mpl_toolkits.mplot3d import Axes3D
+    
+    fig = plt.figure(figsize=(12, 8))
+    ax = fig.add_subplot(111, projection='3d')
+    plt.ion()  # Interactive mode
+    plt.show(block=False)
+    
+    # Prepare joint list for visualization (limit to main joints for clarity)
+    vis_joints = []
+    vis_joint_indices = []
+    for jname, jid in joint_ids.items():
+        if 'pitch' in jname.lower() or 'roll' in jname.lower() or 'yaw' in jname.lower():
+            vis_joints.append(jname)
+            vis_joint_indices.append(model.jnt_dofadr[jid])
+    
+    # Initialize torque history for plotting (circular buffer)
+    plot_window = 100  # Show last 100 steps
+    torque_plot_buffer = np.zeros((plot_window, len(vis_joints)))
+    time_plot_buffer = np.zeros(plot_window)
+    plot_step_counter = 0
+    
+    print(f"📊 Real-time 3D torque visualization enabled")
+    print(f"   Tracking {{len(vis_joints)}} joints")
+else:
+    fig = None
+    ax = None
+
 print("")
 print("Starting forward simulation with TORQUE CONTROL...")
 
@@ -1531,33 +1562,74 @@ try:
                         saturated_joints.append(jname)
             
             rms_error = np.sqrt(np.mean(errors))
-            # Max position command (not force)
-            max_ctrl = np.max(np.abs(data.ctrl[:model.nu])) if model.nu > 0 else 0.0
+            # Track ACTUAL applied torque (not actuator control which is 0)
+            max_applied_torque = np.max(np.abs(data.qfrc_applied))
             
             tracking_errors.append(rms_error)
-            control_torques.append(max_ctrl)  # Store for plot (but it's position not torque)
+            control_torques.append(max_applied_torque)  # Store actual torque magnitude
             times.append(elapsed)
             
             # Save Phase 2 data every 10 steps (reduce file size)
             if sim_step % 10 == 0:
                 log_entry = {{'time': elapsed, 'step': sim_step}}
                 for jname in joint_ids.keys():
-                    if jname in actuator_ids:
-                        jid = joint_ids[jname]
-                        aid = actuator_ids[jname]
-                        qadr = model.jnt_qposadr[jid]
-                        dof_adr = model.jnt_dofadr[jid]
-                        
-                        target = qpos_traj[sim_step, qadr]
-                        actual = data.qpos[qadr]
-                        applied_torque = applied_forces[dof_adr]  # Torque in Nm, not rad!
-                        
-                        log_entry[f'{{jname}}_target'] = target
-                        log_entry[f'{{jname}}_actual'] = actual
-                        log_entry[f'{{jname}}_force'] = applied_torque  # This is Nm, not rad
-                        log_entry[f'{{jname}}_error'] = target - actual
+                    jid = joint_ids[jname]
+                    qadr = model.jnt_qposadr[jid]
+                    dof_adr = model.jnt_dofadr[jid]
+                    
+                    target = qpos_traj[sim_step, qadr]
+                    actual = data.qpos[qadr]
+                    applied_torque = applied_forces[dof_adr]  # Torque in Nm, not rad!
+                    
+                    log_entry[f'{{jname}}_target'] = target
+                    log_entry[f'{{jname}}_actual'] = actual
+                    log_entry[f'{{jname}}_force'] = applied_torque  # This is Nm, not rad
+                    log_entry[f'{{jname}}_error'] = target - actual
                 
                 phase2_log.append(log_entry)
+                
+                # Update 3D torque plot
+                if HAS_MATPLOTLIB and fig is not None:
+                    # Add current torques to circular buffer
+                    buffer_idx = plot_step_counter % plot_window
+                    time_plot_buffer[buffer_idx] = elapsed
+                    for i, dof_idx in enumerate(vis_joint_indices):
+                        torque_plot_buffer[buffer_idx, i] = data.qfrc_applied[dof_idx]
+                    plot_step_counter += 1
+                    
+                    # Update plot every 50 steps (0.5s)
+                    if plot_step_counter % 5 == 0:
+                        ax.cla()
+                        
+                        # Determine how much data to plot
+                        n_points = min(plot_step_counter, plot_window)
+                        
+                        # Create meshgrid for 3D surface
+                        if n_points > 1:
+                            X = np.arange(len(vis_joints))  # Joint index
+                            Y = time_plot_buffer[:n_points]  # Time
+                            X, Y = np.meshgrid(X, Y)
+                            Z = torque_plot_buffer[:n_points, :]  # Torque values
+                            
+                            # Plot 3D surface
+                            surf = ax.plot_surface(X, Y, Z, cmap='coolwarm', alpha=0.8, 
+                                                 linewidth=0, antialiased=True)
+                            
+                            ax.set_xlabel('Joint Index')
+                            ax.set_ylabel('Time (s)')
+                            ax.set_zlabel('Torque (Nm)')
+                            ax.set_title('Real-time Joint Torques (3D)')
+                            
+                            # Set joint names as x-tick labels (rotate for readability)
+                            ax.set_xticks(np.arange(len(vis_joints)))
+                            ax.set_xticklabels([j[:15] for j in vis_joints], rotation=45, ha='right')
+                            
+                            # Adjust z-axis limits for better visualization
+                            max_torque_plot = np.max(np.abs(Z))
+                            ax.set_zlim(-max_torque_plot*1.2, max_torque_plot*1.2)
+                            
+                            plt.draw()
+                            plt.pause(0.001)  # Small pause to update display
             
             # Print progress with diagnostics
             if sim_step % 500 == 0:
@@ -1565,10 +1637,10 @@ try:
                 error_details.sort(key=lambda x: x[1], reverse=True)
                 worst_joints = error_details[:3]
                 
-                print(f"  T={{elapsed:.2f}}s: RMS error={{rms_error:.4f}} rad ({{np.rad2deg(rms_error):.1f}}°), Max cmd={{max_ctrl:.2f}} rad")
+                print(f"  T={{elapsed:.2f}}s: RMS error={{rms_error:.4f}} rad ({{np.rad2deg(rms_error):.1f}}°), Max torque={{max_applied_torque:.2f}} Nm")
                 print(f"    Worst errors: ", end="")
                 for jname, err, ctrl in worst_joints:
-                    print(f"{{jname}}={{np.rad2deg(err):.1f}}° (cmd={{ctrl:.2f}}rad)  ", end="")
+                    print(f"{{jname}}={{np.rad2deg(err):.1f}}°  ", end="")
                 print()
                 if saturated_joints:
                     print(f"    Large commands: {{', '.join(saturated_joints[:5])}}")
@@ -1577,6 +1649,13 @@ try:
         
         print("")
         print("Simulation complete!")
+        
+        # Close 3D plot
+        if HAS_MATPLOTLIB and fig is not None:
+            plt.ioff()
+            print("")
+            print("📊 Keeping 3D torque plot open. Close window to continue...")
+            plt.show()  # Keep plot open until user closes
         
         # Save Phase 2 applied control for comparison
         print("")
