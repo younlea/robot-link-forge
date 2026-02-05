@@ -1026,6 +1026,7 @@ for jname in recorded_joints:
         q_smooth = np.convolve(q_interp, np.ones(window)/window, mode='same')
         qvel_interp = np.gradient(q_smooth, dt)
         qacc_interp = np.gradient(qvel_interp, dt)
+        q_interp = q_smooth  # Use smoothed version for position
     
     qpos_traj[:, qadr] = q_interp
     qvel_traj[:, dof_adr] = qvel_interp
@@ -1185,17 +1186,28 @@ print("  data.ctrl = torque_history[step]")
 print("  (Direct application of inverse dynamics forces)")
 print("\\nThis tests: Can the actuators track trajectory with computed forces?")
 
-# Reset simulation - DO NOT stabilize with torques!
-# Inverse dynamics torques are for MOTION, not for holding still
+# Reset simulation - set initial positions
 data.qpos[:] = qpos_traj[0]
 data.qvel[:] = 0.0
 data.qacc[:] = 0.0
-data.ctrl[:] = 0.0  # Zero control initially
 
-# Just let physics settle without control
+# Set control targets to initial positions (not zero!)
+for jname, jid in joint_ids.items():
+    if jname in actuator_ids:
+        aid = actuator_ids[jname]
+        qadr = model.jnt_qposadr[jid]
+        data.ctrl[aid] = qpos_traj[0, qadr]
+
+# Let physics settle WITH position control
 print("\\nLetting physics settle at initial pose...")
-for i in range(50):
-    mujoco.mj_forward(model, data)
+for i in range(100):
+    # Keep setting control to initial position
+    for jname, jid in joint_ids.items():
+        if jname in actuator_ids:
+            aid = actuator_ids[jname]
+            qadr = model.jnt_qposadr[jid]
+            data.ctrl[aid] = qpos_traj[0, qadr]
+    mujoco.mj_step(model, data)
 
 # Check initial error
 init_errors = []
