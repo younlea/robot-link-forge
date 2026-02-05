@@ -444,7 +444,7 @@ timestamps = []
 sensor_indices_by_finger = collections.defaultdict(list)
 # Ensure order: Thumb, Index, Middle, Ring, Little, Other
 finger_categories = ['Thumb', 'Index', 'Middle', 'Ring', 'Little', 'Other']
-active_fingers = {{'Thumb': False, 'Index': True, 'Middle': False, 'Ring': False, 'Little': False, 'Other': False}}
+active_fingers = {{{{'Thumb': False, 'Index': True, 'Middle': False, 'Ring': False, 'Little': False, 'Other': False}}}}
 
 # Helper to parse grid position from name (e.g., _sensor_3_2 -> row 3, col 2)
 def parse_grid_pos(name):
@@ -1224,18 +1224,9 @@ with open('phase1_torque_history.csv', 'w', newline='') as f:
             torque = torque_history[step_idx][dof_adr]
             row.append(torque)
         writer.writerow(row)
-    
+
 print(f"  Saved {{len(torque_history)}} steps × {{len(joint_ids)}} joints to phase1_torque_history.csv")
 print(f"  File size: ~{{len(torque_history) * len(joint_ids) * 8 / 1024:.1f}} KB")
-    
-    # Data rows
-    for step in range(n_steps):
-        time_s = step * dt
-        row = [time_s, step] + torque_history[step].tolist()
-        writer.writerow(row)
-    
-print(f"  Saved {{n_steps}} steps × {{model.nu}} joints to phase1_torque_history.csv")
-print(f"  File size: ~{{n_steps * model.nu * 8 / 1024:.1f}} KB")
 
 print("")
 print("Inverse Dynamics Results:")
