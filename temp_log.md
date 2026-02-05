@@ -28,8 +28,8 @@ Select Analysis Mode:
 Enter choice [0/1/2/3/4]: 4
 Starting Inverse-to-Forward Validation...
 ======================================================================
-MODE 4 SCRIPT VERSION: 20260205_172853
-Generated: 2026-02-05 17:28:53
+MODE 4 SCRIPT VERSION: 20260205_185755
+Generated: 2026-02-05 18:57:55
 ======================================================================
 
 Model has 20 joints, 20 actuators
@@ -299,12 +299,118 @@ Starting forward simulation...
     LittleFinger-2nd-pitch        : pos= +0.000 (target= +0.000, err= +0.000), vel= +0.000, torque=  -0.00 Nm
   T=0.00s: RMS error=0.0890 rad (5.1°), Max cmd=0.00 rad
     Worst errors: IndexFinger-2nd-pitch=18.3° (cmd=0.00rad)  MiddleFinger-3rd-pitch=13.3° (cmd=0.00rad)  IndexFinger-1st-pitch=2.8° (cmd=0.00rad)  
-WARNING: Nan, Inf or huge value in QACC at DOF 10. The simulation is unstable. Time = 0.0050.
+WARNING: Nan, Inf or huge value in QACC at DOF 16. The simulation is unstable. Time = 0.0070.
 
 
 🔍 PHYSICS DEBUG at step 500:
   Using REAL PHYSICS (mj_step) with torque control
-  Applied torques: 14/20, Max: 3254.23 Nm
+  Applied torques: 20/20, Max: 7317.60 Nm
+  ⚠️ WARNING: High velocity detected: 71727.01
+
+  💥 COLLISION DEBUG:
+     Active contacts: 0
+     ✅ No collisions (collision exclusions working)
+
+  Joint States:
+    LittleFinger-1st_roll         : pos=+12.996 (target= +0.000, err=-12.996), vel=+1515.849, torque=-164.57 Nm
+    LittleFinger-1st-pitch        : pos= -3.457 (target= +0.000, err= +3.457), vel=+9294.616, torque=-926.01 Nm
+    LittleFinger-2nd-pitch        : pos=-13.779 (target= +0.000, err=+13.779), vel=-16368.512, torque=+1650.63 Nm
+  T=0.50s: RMS error=25.3084 rad (1450.1°), Max cmd=0.00 rad
+    Worst errors: Thumb-2nd-pitch=4499.3° (cmd=0.00rad)  Thumb-1st-pitch=3643.2° (cmd=0.00rad)  thumb_1st_yaw=2339.0° (cmd=0.00rad)  
+
+⚠️ COLLISION WARNING at step 600:
+   1 active contacts detected
+      middle_finger-3rd-end <-> thumb-3rd-end, penetration: 89.51mm
+
+🔍 PHYSICS DEBUG at step 1000:
+  Using REAL PHYSICS (mj_step) with torque control
+  Applied torques: 20/20, Max: 1319.79 Nm
+  ⚠️ WARNING: High velocity detected: 12956.54
+
+  💥 COLLISION DEBUG:
+     Active contacts: 0
+     ✅ No collisions (collision exclusions working)
+
+  Joint States:
+    LittleFinger-1st_roll         : pos= -2.261 (target= +0.000, err= +2.261), vel=+5436.065, torque=-541.34 Nm
+    LittleFinger-1st-pitch        : pos= +0.032 (target= +0.000, err= -0.032), vel=-5641.289, torque=+564.09 Nm
+    LittleFinger-2nd-pitch        : pos= +3.207 (target= +0.000, err= -3.207), vel=+5254.859, torque=-528.69 Nm
+  T=1.00s: RMS error=8.6074 rad (493.2°), Max cmd=0.00 rad
+    Worst errors: MiddleFinger-2nd-pitch=1651.1° (cmd=0.00rad)  MiddleFinger-1st-pitch=853.8° (cmd=0.00rad)  RingFinger-1st-pitch=600.2° (cmd=0.00rad)  
+  T=1.50s: RMS error=22.4015 rad (1283.5°), Max cmd=0.00 rad
+    Worst errors: Thumb-2nd-pitch=4203.6° (cmd=0.00rad)  thumb_1st_yaw=2317.1° (cmd=0.00rad)  Thumb-1st-pitch=1719.1° (cmd=0.00rad)  
+
+⚠️ COLLISION WARNING at step 1900:
+   3 active contacts detected
+      world <-> thumb-3rd-end, penetration: 156.22mm
+      world <-> thumb-3rd-end, penetration: 156.21mm
+      world <-> thumb-3rd-end, penetration: 155.45mm
+
+🔍 PHYSICS DEBUG at step 2000:
+  Using REAL PHYSICS (mj_step) with torque control
+  Applied torques: 20/20, Max: 1953.49 Nm
+  ⚠️ WARNING: High velocity detected: 19470.82
+
+  💥 COLLISION DEBUG:
+     Active contacts: 0
+     ✅ No collisions (collision exclusions working)
+
+  Joint States:
+    LittleFinger-1st_roll         : pos= +2.418 (target= +0.000, err= -2.418), vel=+4678.800, torque=-470.29 Nm
+    LittleFinger-1st-pitch        : pos= -4.690 (target= +0.000, err= +4.690), vel=-4722.191, torque=+476.90 Nm
+    LittleFinger-2nd-pitch        : pos= -1.379 (target= +0.000, err= +1.379), vel=-4585.626, torque=+459.94 Nm
+  T=2.00s: RMS error=18.7069 rad (1071.8°), Max cmd=0.00 rad
+    Worst errors: thumb_1st_yaw=3170.3° (cmd=0.00rad)  Thumb-2nd-pitch=2348.9° (cmd=0.00rad)  MiddleFinger-2nd-pitch=1891.9° (cmd=0.00rad)  
+
+⚠️ COLLISION WARNING at step 2400:
+   1 active contacts detected
+      little_finger-3rd-end <-> middle_finger-3rd-end, penetration: 33.98mm
+  T=2.50s: RMS error=6.3249 rad (362.4°), Max cmd=0.00 rad
+    Worst errors: IndexFinger-2nd-pitch=718.4° (cmd=0.00rad)  RingFinger-3rd-pitch=570.7° (cmd=0.00rad)  LittleFinger-3rd-pitch=570.7° (cmd=0.00rad)  
+
+🔍 PHYSICS DEBUG at step 3000:
+  Using REAL PHYSICS (mj_step) with torque control
+  Applied torques: 20/20, Max: 2346.10 Nm
+  ⚠️ WARNING: High velocity detected: 22874.06
+
+  💥 COLLISION DEBUG:
+     Active contacts: 0
+     ✅ No collisions (collision exclusions working)
+
+  Joint States:
+    LittleFinger-1st_roll         : pos= -7.697 (target= +0.000, err= +7.697), vel=-3745.629, torque=+382.27 Nm
+    LittleFinger-1st-pitch        : pos= +5.673 (target= +0.000, err= -5.673), vel=+2708.776, torque=-276.56 Nm
+    LittleFinger-2nd-pitch        : pos= -2.048 (target= +0.000, err= +2.048), vel=-10163.737, torque=+1018.42 Nm
+  T=3.00s: RMS error=19.3785 rad (1110.3°), Max cmd=0.00 rad
+    Worst errors: MiddleFinger_1st_roll=4689.4° (cmd=0.00rad)  MiddleFinger-2nd-pitch=1438.8° (cmd=0.00rad)  MiddleFinger-1st-pitch=413.2° (cmd=0.00rad)  
+
+⚠️ COLLISION WARNING at step 3300:
+   1 active contacts detected
+      little_finger-3rd-end <-> middle_finger-3rd-end, penetration: 3.68mm
+  T=3.50s: RMS error=6.3481 rad (363.7°), Max cmd=0.00 rad
+    Worst errors: IndexFinger-2nd-pitch=718.3° (cmd=0.00rad)  RingFinger-3rd-pitch=570.7° (cmd=0.00rad)  LittleFinger-3rd-pitch=570.7° (cmd=0.00rad)  
+
+🔍 PHYSICS DEBUG at step 4000:
+  Using REAL PHYSICS (mj_step) with torque control
+  Applied torques: 20/20, Max: 7041.26 Nm
+  ⚠️ WARNING: High velocity detected: 70135.88
+
+  💥 COLLISION DEBUG:
+     Active contacts: 0
+     ✅ No collisions (collision exclusions working)
+
+  Joint States:
+    LittleFinger-1st_roll         : pos= +2.339 (target= +0.000, err= -2.339), vel=-2737.837, torque=+271.45 Nm
+    LittleFinger-1st-pitch        : pos=+13.146 (target= +0.000, err=-13.146), vel=-1000.357, torque= +86.88 Nm
+    LittleFinger-2nd-pitch        : pos=-10.082 (target= +0.000, err=+10.082), vel=-4957.951, torque=+505.88 Nm
+  T=4.00s: RMS error=62.5971 rad (3586.5°), Max cmd=0.00 rad
+    Worst errors: RingFinger-1st_roll=11147.3° (cmd=0.00rad)  IndexFinger-2nd-pitch=6050.1° (cmd=0.00rad)  IndexFinger-1st-pitch=5851.8° (cmd=0.00rad)  
+  T=4.50s: RMS error=20.1725 rad (1155.8°), Max cmd=0.00 rad
+    Worst errors: MiddleFinger-2nd-pitch=4266.3° (cmd=0.00rad)  MiddleFinger_1st_roll=1959.3° (cmd=0.00rad)  MiddleFinger-1st-pitch=1325.8° (cmd=0.00rad)  
+
+🔍 PHYSICS DEBUG at step 5000:
+  Using REAL PHYSICS (mj_step) with torque control
+  Applied torques: 11/20, Max: 35.43 Nm
   ⚠️ WARNING: High velocity detected: 321.91
 
   💥 COLLISION DEBUG:
@@ -312,119 +418,35 @@ WARNING: Nan, Inf or huge value in QACC at DOF 10. The simulation is unstable. T
      ✅ No collisions (collision exclusions working)
 
   Joint States:
-    LittleFinger-1st_roll         : pos= -0.000 (target= +0.000, err= +0.000), vel= -0.002, torque=  +0.03 Nm
-    LittleFinger-1st-pitch        : pos= +0.000 (target= +0.000, err= -0.000), vel= +0.001, torque=  -0.02 Nm
-    LittleFinger-2nd-pitch        : pos= +0.000 (target= +0.000, err= -0.000), vel= +0.000, torque=  -0.01 Nm
-  T=0.50s: RMS error=4.2265 rad (242.2°), Max cmd=0.00 rad
-    Worst errors: IndexFinger-2nd-pitch=693.2° (cmd=0.00rad)  MiddleFinger-3rd-pitch=641.2° (cmd=0.00rad)  IndexFinger-3rd-pitch=364.8° (cmd=0.00rad)  
-
-🔍 PHYSICS DEBUG at step 1000:
-  Using REAL PHYSICS (mj_step) with torque control
-  Applied torques: 20/20, Max: 5668749.37 Nm
-  ⚠️ WARNING: High velocity detected: 561949.07
-
-  💥 COLLISION DEBUG:
-     Active contacts: 0
-     ✅ No collisions (collision exclusions working)
-
-  Joint States:
-    LittleFinger-1st_roll         : pos= +2.914 (target= +0.000, err= -2.914), vel=+6933.464, torque=-69625.99 Nm
-    LittleFinger-1st-pitch        : pos= +4.562 (target= +0.000, err= -4.562), vel=+1545.720, torque=-15913.40 Nm
-    LittleFinger-2nd-pitch        : pos=-50.210 (target= +0.000, err=+50.210), vel=-58342.577, torque=+588446.79 Nm
-  T=1.00s: RMS error=0.1410 rad (8.1°), Max cmd=0.00 rad
-    Worst errors: IndexFinger-1st-pitch=24.5° (cmd=0.00rad)  IndexFinger-2nd-pitch=18.4° (cmd=0.00rad)  Thumb-1st-pitch=13.7° (cmd=0.00rad)  
-  T=1.50s: RMS error=0.3049 rad (17.5°), Max cmd=0.00 rad
-    Worst errors: IndexFinger-1st-pitch=64.1° (cmd=0.00rad)  Thumb-1st-pitch=38.3° (cmd=0.00rad)  IndexFinger-2nd-pitch=18.4° (cmd=0.00rad)  
-
-🔍 PHYSICS DEBUG at step 2000:
-  Using REAL PHYSICS (mj_step) with torque control
-  Applied torques: 20/20, Max: 125513.50 Nm
-  ⚠️ WARNING: High velocity detected: 12429.31
-
-  💥 COLLISION DEBUG:
-     Active contacts: 0
-     ✅ No collisions (collision exclusions working)
-
-  Joint States:
-    LittleFinger-1st_roll         : pos= +0.026 (target= +0.000, err= -0.026), vel=+25.732, torque=-259.89 Nm
-    LittleFinger-1st-pitch        : pos= -0.020 (target= +0.000, err= +0.020), vel=-19.848, torque=+200.46 Nm
-    LittleFinger-2nd-pitch        : pos= -0.005 (target= +0.000, err= +0.005), vel= -5.285, torque= +53.38 Nm
-  T=2.00s: RMS error=25.4231 rad (1456.6°), Max cmd=0.00 rad
-    Worst errors: IndexFinger-2nd-pitch=3976.7° (cmd=0.00rad)  MiddleFinger-3rd-pitch=3911.6° (cmd=0.00rad)  IndexFinger-3rd-pitch=2366.6° (cmd=0.00rad)  
-  T=2.50s: RMS error=4.1468 rad (237.6°), Max cmd=0.00 rad
-    Worst errors: IndexFinger-2nd-pitch=693.8° (cmd=0.00rad)  MiddleFinger-3rd-pitch=641.2° (cmd=0.00rad)  IndexFinger-3rd-pitch=364.8° (cmd=0.00rad)  
-
-🔍 PHYSICS DEBUG at step 3000:
-  Using REAL PHYSICS (mj_step) with torque control
-  Applied torques: 20/20, Max: 821459.99 Nm
-  ⚠️ WARNING: High velocity detected: 81452.22
-
-  💥 COLLISION DEBUG:
-     Active contacts: 0
-     ✅ No collisions (collision exclusions working)
-
-  Joint States:
-    LittleFinger-1st_roll         : pos= -4.020 (target= +0.000, err= +4.020), vel=-4045.627, torque=+40858.27 Nm
-    LittleFinger-1st-pitch        : pos= +3.016 (target= +0.000, err= -3.016), vel=+3036.030, torque=-30661.93 Nm
-    LittleFinger-2nd-pitch        : pos= +8.132 (target= +0.000, err= -8.132), vel=+8137.599, torque=-82189.22 Nm
-  T=3.00s: RMS error=162.3513 rad (9302.0°), Max cmd=0.00 rad
-    Worst errors: IndexFinger-2nd-pitch=28433.4° (cmd=0.00rad)  MiddleFinger-3rd-pitch=23855.5° (cmd=0.00rad)  IndexFinger-3rd-pitch=12928.6° (cmd=0.00rad)  
-  T=3.50s: RMS error=25.2309 rad (1445.6°), Max cmd=0.00 rad
-    Worst errors: IndexFinger-2nd-pitch=3968.5° (cmd=0.00rad)  MiddleFinger-3rd-pitch=3911.6° (cmd=0.00rad)  IndexFinger-3rd-pitch=2366.0° (cmd=0.00rad)  
-
-🔍 PHYSICS DEBUG at step 4000:
-  Using REAL PHYSICS (mj_step) with torque control
-  Applied torques: 20/20, Max: 5314027.64 Nm
-  ⚠️ WARNING: High velocity detected: 526826.72
-
-  💥 COLLISION DEBUG:
-     Active contacts: 0
-     ✅ No collisions (collision exclusions working)
-
-  Joint States:
-    LittleFinger-1st_roll         : pos= +2.914 (target= +0.000, err= -2.914), vel=+6933.464, torque=-69625.99 Nm
-    LittleFinger-1st-pitch        : pos= +4.562 (target= +0.000, err= -4.562), vel=+1545.720, torque=-15913.40 Nm
-    LittleFinger-2nd-pitch        : pos=-50.210 (target= +0.000, err=+50.210), vel=-58342.577, torque=+588446.79 Nm
-  T=4.00s: RMS error=653.4087 rad (37437.6°), Max cmd=0.00 rad
-    Worst errors: MiddleFinger-3rd-pitch=143718.2° (cmd=0.00rad)  IndexFinger-1st-pitch=46066.3° (cmd=0.00rad)  IndexFinger-2nd-pitch=44433.9° (cmd=0.00rad)  
-  T=4.50s: RMS error=4.2208 rad (241.8°), Max cmd=0.00 rad
-    Worst errors: IndexFinger-2nd-pitch=693.0° (cmd=0.00rad)  MiddleFinger-3rd-pitch=641.2° (cmd=0.00rad)  IndexFinger-3rd-pitch=364.8° (cmd=0.00rad)  
-
-🔍 PHYSICS DEBUG at step 5000:
-  Using REAL PHYSICS (mj_step) with torque control
-  Applied torques: 20/20, Max: 125406.88 Nm
-  ⚠️ WARNING: High velocity detected: 12420.00
-
-  💥 COLLISION DEBUG:
-     Active contacts: 0
-     ✅ No collisions (collision exclusions working)
-
-  Joint States:
-    LittleFinger-1st_roll         : pos= +0.026 (target= +0.000, err= -0.026), vel=+25.732, torque=-259.89 Nm
-    LittleFinger-1st-pitch        : pos= -0.020 (target= +0.000, err= +0.020), vel=-19.848, torque=+200.46 Nm
-    LittleFinger-2nd-pitch        : pos= -0.005 (target= +0.000, err= +0.005), vel= -5.285, torque= +53.38 Nm
-  T=5.00s: RMS error=25.3836 rad (1454.4°), Max cmd=0.00 rad
-    Worst errors: IndexFinger-2nd-pitch=3968.6° (cmd=0.00rad)  MiddleFinger-3rd-pitch=3911.1° (cmd=0.00rad)  IndexFinger-3rd-pitch=2366.0° (cmd=0.00rad)  
-  T=5.50s: RMS error=25.2820 rad (1448.5°), Max cmd=0.00 rad
-    Worst errors: IndexFinger-2nd-pitch=3969.0° (cmd=0.00rad)  MiddleFinger-3rd-pitch=3911.6° (cmd=0.00rad)  IndexFinger-3rd-pitch=2366.0° (cmd=0.00rad)  
+    LittleFinger-1st_roll         : pos= -0.000 (target= +0.000, err= +0.000), vel= -0.002, torque=  +0.01 Nm
+    LittleFinger-1st-pitch        : pos= +0.000 (target= +0.000, err= -0.000), vel= +0.001, torque=  -0.01 Nm
+    LittleFinger-2nd-pitch        : pos= +0.000 (target= +0.000, err= -0.000), vel= +0.000, torque=  -0.00 Nm
+  T=5.00s: RMS error=3.6930 rad (211.6°), Max cmd=0.00 rad
+    Worst errors: IndexFinger-2nd-pitch=577.4° (cmd=0.00rad)  MiddleFinger-3rd-pitch=552.3° (cmd=0.00rad)  IndexFinger-3rd-pitch=364.8° (cmd=0.00rad)  
+  T=5.50s: RMS error=3.6878 rad (211.3°), Max cmd=0.00 rad
+    Worst errors: IndexFinger-2nd-pitch=577.4° (cmd=0.00rad)  MiddleFinger-3rd-pitch=552.4° (cmd=0.00rad)  IndexFinger-3rd-pitch=364.8° (cmd=0.00rad)  
 
 🔍 PHYSICS DEBUG at step 6000:
   Using REAL PHYSICS (mj_step) with torque control
-  Applied torques: 20/20, Max: 125409.87 Nm
-  ⚠️ WARNING: High velocity detected: 12420.29
+  Applied torques: 19/20, Max: 1047.03 Nm
+  ⚠️ WARNING: High velocity detected: 10398.67
 
   💥 COLLISION DEBUG:
      Active contacts: 0
      ✅ No collisions (collision exclusions working)
 
   Joint States:
-    LittleFinger-1st_roll         : pos= +0.026 (target= +0.000, err= -0.026), vel=+25.732, torque=-259.89 Nm
-    LittleFinger-1st-pitch        : pos= -0.020 (target= +0.000, err= +0.020), vel=-19.848, torque=+200.46 Nm
-    LittleFinger-2nd-pitch        : pos= -0.005 (target= +0.000, err= +0.005), vel= -5.285, torque= +53.38 Nm
-  T=6.00s: RMS error=25.2617 rad (1447.4°), Max cmd=0.00 rad
-    Worst errors: IndexFinger-2nd-pitch=3968.8° (cmd=0.00rad)  MiddleFinger-3rd-pitch=3911.6° (cmd=0.00rad)  IndexFinger-3rd-pitch=2366.0° (cmd=0.00rad)  
-  T=6.50s: RMS error=25.2422 rad (1446.3°), Max cmd=0.00 rad
-    Worst errors: IndexFinger-2nd-pitch=3968.5° (cmd=0.00rad)  MiddleFinger-3rd-pitch=3911.6° (cmd=0.00rad)  IndexFinger-3rd-pitch=2366.0° (cmd=0.00rad)  
+    LittleFinger-1st_roll         : pos= +0.026 (target= +0.000, err= -0.026), vel=+25.727, torque=  -2.59 Nm
+    LittleFinger-1st-pitch        : pos= -0.020 (target= +0.000, err= +0.020), vel=-19.844, torque=  +2.00 Nm
+    LittleFinger-2nd-pitch        : pos= -0.005 (target= +0.000, err= +0.005), vel= -5.284, torque=  +0.53 Nm
+  T=6.00s: RMS error=6.3838 rad (365.8°), Max cmd=0.00 rad
+    Worst errors: IndexFinger-2nd-pitch=718.3° (cmd=0.00rad)  RingFinger-3rd-pitch=570.7° (cmd=0.00rad)  LittleFinger-3rd-pitch=570.7° (cmd=0.00rad)  
+
+⚠️ COLLISION WARNING at step 6100:
+   1 active contacts detected
+      middle_finger-3rd-end <-> index_finger-3rd-end, penetration: 20.51mm
+  T=6.50s: RMS error=7.1370 rad (408.9°), Max cmd=0.00 rad
+    Worst errors: MiddleFinger-1st-pitch=1031.7° (cmd=0.00rad)  MiddleFinger-2nd-pitch=641.0° (cmd=0.00rad)  IndexFinger_1st_roll=508.4° (cmd=0.00rad)  
 
 Simulation complete!
 
@@ -436,8 +458,8 @@ VALIDATION RESULTS
 ======================================================================
 
 Tracking Performance:
-  Average RMS Error: 156.231689 rad (8951.416 deg)
-  Maximum RMS Error: 2546.089310 rad (145880.172 deg)
+  Average RMS Error: 58.114143 rad (3329.695 deg)
+  Maximum RMS Error: 2196.915509 rad (125873.987 deg)
 
 Torque Control (Direct Force Application):
   Average Torque: 0.00 Nm
@@ -448,4 +470,10 @@ Torque Control (Direct Force Application):
   → Trajectory may be too fast for physics timestep
   → Or robot model has issues (mass/inertia/constraints)
 ======================================================================
-
+Traceback (most recent call last):
+  File "/home/younleakim/Downloads/direct_hand_parm/inverse_to_forward_validation.py", line 857, in <module>
+    forces = [abs(step_data[i]) for i in range(4, len(step_data), 3)]  # Every 3rd element starting from index 4
+  File "/home/younleakim/Downloads/direct_hand_parm/inverse_to_forward_validation.py", line 857, in <listcomp>
+    forces = [abs(step_data[i]) for i in range(4, len(step_data), 3)]  # Every 3rd element starting from index 4
+KeyError: 4
+younleakim@younleakim-400TEA-400SEA:~/Downloads/direct_hand_parm$ 
