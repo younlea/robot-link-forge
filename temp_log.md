@@ -1,4 +1,5 @@
 ~/Downloads/direct_hand_parm$ ./run_torque_replay_0_recording_1768623534448.sh 
+Creating virtual environment...
 Installing dependencies (mujoco, matplotlib, numpy, scipy)...
 ========================================
   MuJoCo Motion Analysis Tool
@@ -27,8 +28,8 @@ Select Analysis Mode:
 Enter choice [0/1/2/3/4]: 4
 Starting Inverse-to-Forward Validation...
 ======================================================================
-MODE 4 SCRIPT VERSION: 20260205_152111
-Generated: 2026-02-05 15:21:11
+MODE 4 SCRIPT VERSION: 20260205_153959
+Generated: 2026-02-05 15:39:59
 ======================================================================
 
 Model has 20 joints, 20 actuators
@@ -197,57 +198,87 @@ Using position control (not force control):
 Note: This is NOT pure force feedforward
   Using PD position control for stability
 
-Letting physics settle at initial pose...
-  Phase 1: Force positions directly (500 steps)
-  Phase 2: Let actuators stabilize (1500 steps)
+Letting physics settle to natural equilibrium...
+  Strategy: Start from model default, then gradually move to trajectory start
+  Phase 1: Find natural equilibrium (500 steps)
 WARNING: Nan, Inf or huge value in QACC at DOF 4. The simulation is unstable. Time = 0.0080.
 
+  Natural equilibrium found (sample joints):
+    LittleFinger-1st_roll         : -7.7006 rad
+    LittleFinger-1st-pitch        :  5.6847 rad
+    LittleFinger-2nd-pitch        : -1.5617 rad
+    LittleFinger-3rd-pitch        :  7.2628 rad
+    RingFinger-1st_roll           : -7.4050 rad
+  Phase 2: Gradually move to trajectory start (1500 steps)
 
 === Initial Position Mismatch Check ===
-  LittleFinger-1st_roll: actual=-7.7006 rad, target= 0.0000 rad, diff= 7.7006 rad (441.21°)
+  LittleFinger-1st_roll: actual=-0.1417 rad, target= 0.0000 rad, diff= 0.1417 rad (  8.12°)
     ⚠️  WARNING: Large mismatch detected!
-  LittleFinger-1st-pitch: actual= 5.6847 rad, target= 0.0000 rad, diff=-5.6847 rad (-325.71°)
+  LittleFinger-1st-pitch: actual=-4.8029 rad, target= 0.0000 rad, diff= 4.8029 rad (275.18°)
     ⚠️  WARNING: Large mismatch detected!
-  LittleFinger-2nd-pitch: actual=-1.5617 rad, target= 0.0000 rad, diff= 1.5617 rad ( 89.48°)
+  LittleFinger-2nd-pitch: actual= 2.0072 rad, target= 0.0000 rad, diff=-2.0072 rad (-115.00°)
     ⚠️  WARNING: Large mismatch detected!
-  LittleFinger-3rd-pitch: actual= 7.2628 rad, target= 0.0000 rad, diff=-7.2628 rad (-416.13°)
+  LittleFinger-3rd-pitch: actual= 2.8257 rad, target= 0.0000 rad, diff=-2.8257 rad (-161.90°)
     ⚠️  WARNING: Large mismatch detected!
-  RingFinger-1st_roll : actual=-7.4050 rad, target= 0.0000 rad, diff= 7.4050 rad (424.27°)
+  RingFinger-1st_roll : actual=-108.7317 rad, target= 0.0000 rad, diff=108.7317 rad (6229.87°)
     ⚠️  WARNING: Large mismatch detected!
-  RingFinger-1st-pitch: actual= 4.9199 rad, target= 0.0000 rad, diff=-4.9199 rad (-281.89°)
+  RingFinger-1st-pitch: actual=121.5716 rad, target= 0.0000 rad, diff=-121.5716 rad (-6965.54°)
     ⚠️  WARNING: Large mismatch detected!
-  RingFinger-2nd-pitch: actual=-2.2647 rad, target= 0.0000 rad, diff= 2.2647 rad (129.76°)
+  RingFinger-2nd-pitch: actual=-726.5491 rad, target= 0.0000 rad, diff=726.5491 rad (41628.20°)
     ⚠️  WARNING: Large mismatch detected!
-  RingFinger-3rd-pitch: actual= 7.4581 rad, target= 0.0000 rad, diff=-7.4581 rad (-427.32°)
+  RingFinger-3rd-pitch: actual= 2.8802 rad, target= 0.0000 rad, diff=-2.8802 rad (-165.02°)
     ⚠️  WARNING: Large mismatch detected!
-  MiddleFinger_1st_roll: actual=-2.7191 rad, target= 0.0000 rad, diff= 2.7191 rad (155.80°)
+  MiddleFinger_1st_roll: actual=20.6665 rad, target= 0.0000 rad, diff=-20.6665 rad (-1184.10°)
     ⚠️  WARNING: Large mismatch detected!
-  MiddleFinger-1st-pitch: actual=-16.1055 rad, target= 0.0000 rad, diff=16.1055 rad (922.77°)
+  MiddleFinger-1st-pitch: actual=89.3207 rad, target= 0.0000 rad, diff=-89.3207 rad (-5117.70°)
     ⚠️  WARNING: Large mismatch detected!
-  MiddleFinger-2nd-pitch: actual=10.8001 rad, target= 0.0000 rad, diff=-10.8001 rad (-618.80°)
+  MiddleFinger-2nd-pitch: actual=136.9829 rad, target= 0.0000 rad, diff=-136.9829 rad (-7848.54°)
     ⚠️  WARNING: Large mismatch detected!
-  MiddleFinger-3rd-pitch: actual= 3.7384 rad, target= 0.0000 rad, diff=-3.7384 rad (-214.19°)
+  MiddleFinger-3rd-pitch: actual=-96.5996 rad, target= 0.0000 rad, diff=96.5996 rad (5534.75°)
     ⚠️  WARNING: Large mismatch detected!
-  IndexFinger_1st_roll: actual= 9.7001 rad, target= 0.0000 rad, diff=-9.7001 rad (-555.77°)
+  IndexFinger_1st_roll: actual=-2.6776 rad, target= 0.0000 rad, diff= 2.6776 rad (153.42°)
     ⚠️  WARNING: Large mismatch detected!
-  IndexFinger-1st-pitch: actual= 1.6082 rad, target= 0.0000 rad, diff=-1.6082 rad (-92.14°)
+  IndexFinger-1st-pitch: actual= 8.5666 rad, target= 0.0000 rad, diff=-8.5666 rad (-490.83°)
     ⚠️  WARNING: Large mismatch detected!
-  IndexFinger-2nd-pitch: actual= 1.4952 rad, target= 0.0000 rad, diff=-1.4952 rad (-85.67°)
+  IndexFinger-2nd-pitch: actual=-0.3708 rad, target= 0.0000 rad, diff= 0.3708 rad ( 21.25°)
     ⚠️  WARNING: Large mismatch detected!
-  IndexFinger-3rd-pitch: actual=-7.7715 rad, target= 0.0000 rad, diff= 7.7715 rad (445.27°)
+  IndexFinger-3rd-pitch: actual=-1.7622 rad, target= 0.0000 rad, diff= 1.7622 rad (100.97°)
     ⚠️  WARNING: Large mismatch detected!
-  thumb_1st_yaw       : actual= 2.3389 rad, target= 0.0000 rad, diff=-2.3389 rad (-134.01°)
+  thumb_1st_yaw       : actual= 3.3446 rad, target= 0.0000 rad, diff=-3.3446 rad (-191.63°)
     ⚠️  WARNING: Large mismatch detected!
-  Thumb-1st-pitch     : actual= 4.5560 rad, target= 0.0000 rad, diff=-4.5560 rad (-261.04°)
+  Thumb-1st-pitch     : actual= 1.2405 rad, target= 0.0000 rad, diff=-1.2405 rad (-71.07°)
     ⚠️  WARNING: Large mismatch detected!
-  Thumb-2nd-pitch     : actual= 1.3905 rad, target= 0.0000 rad, diff=-1.3905 rad (-79.67°)
+  Thumb-2nd-pitch     : actual=-9.7045 rad, target= 0.0000 rad, diff= 9.7045 rad (556.03°)
     ⚠️  WARNING: Large mismatch detected!
-  Thumb-3rd-pitch     : actual= 8.7764 rad, target= 0.0000 rad, diff=-8.7764 rad (-502.85°)
+  Thumb-3rd-pitch     : actual=-1.3545 rad, target= 0.0000 rad, diff= 1.3545 rad ( 77.61°)
     ⚠️  WARNING: Large mismatch detected!
 
-Initial RMS error after stabilization: 6.8865 rad (394.57°)
+Initial RMS error after stabilization: 171.9321 rad (9850.98°)
 ==================================================
   ⚠️  Large initial error! Physics may be unstable or gains too weak
+
+=== Initializing ctrl to current actual positions ===
+  LittleFinger-1st_roll: ctrl initialized to -0.1417 rad
+  LittleFinger-1st-pitch: ctrl initialized to -4.8029 rad
+  LittleFinger-2nd-pitch: ctrl initialized to 2.0072 rad
+  LittleFinger-3rd-pitch: ctrl initialized to 2.8257 rad
+  RingFinger-1st_roll : ctrl initialized to -108.7317 rad
+  RingFinger-1st-pitch: ctrl initialized to 121.5716 rad
+  RingFinger-2nd-pitch: ctrl initialized to -726.5491 rad
+  RingFinger-3rd-pitch: ctrl initialized to 2.8802 rad
+  MiddleFinger_1st_roll: ctrl initialized to 20.6665 rad
+  MiddleFinger-1st-pitch: ctrl initialized to 89.3207 rad
+  MiddleFinger-2nd-pitch: ctrl initialized to 136.9829 rad
+  MiddleFinger-3rd-pitch: ctrl initialized to -96.5996 rad
+  IndexFinger_1st_roll: ctrl initialized to -2.6776 rad
+  IndexFinger-1st-pitch: ctrl initialized to 8.5666 rad
+  IndexFinger-2nd-pitch: ctrl initialized to -0.3708 rad
+  IndexFinger-3rd-pitch: ctrl initialized to -1.7622 rad
+  thumb_1st_yaw       : ctrl initialized to 3.3446 rad
+  Thumb-1st-pitch     : ctrl initialized to 1.2405 rad
+  Thumb-2nd-pitch     : ctrl initialized to -9.7045 rad
+  Thumb-3rd-pitch     : ctrl initialized to -1.3545 rad
+==================================================
 
 Starting forward simulation...
 
@@ -287,13 +318,13 @@ Starting forward simulation...
 🔍 DEBUG at step 0:
   Using position control (not force)
   Nonzero position commands: 0/20
-    LittleFinger-1st_roll         : target= +0.0000, current= -7.7006, ctrl= +0.0000 rad
-    LittleFinger-1st-pitch        : target= +0.0000, current= +5.6847, ctrl= +0.0000 rad
-    LittleFinger-2nd-pitch        : target= +0.0000, current= -1.5617, ctrl= +0.0000 rad
-    LittleFinger-3rd-pitch        : target= +0.0000, current= +7.2628, ctrl= +0.0000 rad
-    RingFinger-1st_roll           : target= +0.0000, current= -7.4050, ctrl= +0.0000 rad
-  T=0.00s: RMS error=12.1461 rad (695.9°), Max cmd=0.00 rad
-    Worst errors: MiddleFinger_1st_roll=2609.1° (cmd=0.00rad)  MiddleFinger-2nd-pitch=1291.6° (cmd=0.00rad)  IndexFinger-2nd-pitch=507.8° (cmd=0.00rad)  
+    LittleFinger-1st_roll         : target= +0.0000, current= -0.1417, ctrl= +0.0000 rad
+    LittleFinger-1st-pitch        : target= +0.0000, current= -4.8029, ctrl= +0.0000 rad
+    LittleFinger-2nd-pitch        : target= +0.0000, current= +2.0072, ctrl= +0.0000 rad
+    LittleFinger-3rd-pitch        : target= +0.0000, current= +2.8257, ctrl= +0.0000 rad
+    RingFinger-1st_roll           : target= +0.0000, current=-108.7317, ctrl= +0.0000 rad
+  T=0.00s: RMS error=0.0895 rad (5.1°), Max cmd=0.00 rad
+    Worst errors: IndexFinger-2nd-pitch=18.4° (cmd=0.00rad)  MiddleFinger-3rd-pitch=13.3° (cmd=0.00rad)  IndexFinger-1st-pitch=2.8° (cmd=0.00rad)  
 
 🔍 DEBUG at step 500:
   Using position control (not force)
@@ -340,7 +371,7 @@ VALIDATION RESULTS
 ======================================================================
 
 Tracking Performance:
-  Average RMS Error: 85.956991 rad (4924.973 deg)
+  Average RMS Error: 86.568374 rad (4960.002 deg)
   Maximum RMS Error: 2366.778219 rad (135606.403 deg)
 
 Position Control (PD kp=200, kd=20):
@@ -352,4 +383,3 @@ Position Control (PD kp=200, kd=20):
   → Trajectory may be too fast for physics timestep
   → Or robot model has issues (mass/inertia/constraints)
 ======================================================================
-
