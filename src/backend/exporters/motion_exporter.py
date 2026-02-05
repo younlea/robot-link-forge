@@ -1325,7 +1325,10 @@ try:
                         print(f"    {{jname:30s}}: target={{target:+8.4f}}, current={{current:+8.4f}}, ctrl={{ctrl:+8.4f}} rad")
             
             mujoco.mj_step(model, data)
-            viewer.sync()
+            
+            # Sync viewer every 10 steps for faster playback (100Hz physics -> 10Hz rendering)
+            if sim_step % 10 == 0:
+                viewer.sync()
             
             # Calculate elapsed time for logging
             elapsed = sim_step * dt
