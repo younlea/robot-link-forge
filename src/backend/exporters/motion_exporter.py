@@ -1223,12 +1223,11 @@ data.qvel[:] = qvel_traj[0]
 
 # CRITICAL: Disable ALL actuators for pure torque control
 # Setting ctrl=0 is not enough - actuators still apply forces!
-# We need to disable actuator gains
 print("  Disabling position actuators (using ONLY qfrc_applied torque control)")
 data.ctrl[:] = 0.0  # Zero control signal
-# Disable actuator by zeroing out actuation
-for i in range(model.nu):
-    data.act[i] = 0.0  # Zero activation state
+
+# Note: data.act is for muscle actuators only, size is 0 for position actuators
+# So we skip zeroing data.act
 
 data.qfrc_applied[:] = 0.0
 
