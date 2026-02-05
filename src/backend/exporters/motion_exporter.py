@@ -1811,9 +1811,6 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     
     plt.close(fig_interactive)
 
-# Final summary and cleanup
-if HAS_MATPLOTLIB and len(all_torque_data) > 0:
-
 # Save Phase 2 applied control for comparison (last run only)
 print("")
 print("💾 Saving Phase 2 control history to CSV...")
@@ -1834,14 +1831,14 @@ with open('phase2_control_applied.csv', 'w', newline='') as f:
     # Write logged data
     for entry in phase2_log:
         row = [entry['time'], entry['step']]
-                for jname in joint_names_ordered:
-                    row.append(entry.get(f'{{jname}}_target', 0))
-                    row.append(entry.get(f'{{jname}}_actual', 0))
-                    row.append(entry.get(f'{{jname}}_force', 0))
-                    row.append(entry.get(f'{{jname}}_error', 0))
-                writer.writerow(row)
-        
-        print(f"  Saved {{len(phase2_log)}} samples (every 10 steps) to phase2_control_applied.csv")
+        for jname in joint_names_ordered:
+            row.append(entry.get(f'{{jname}}_target', 0))
+            row.append(entry.get(f'{{jname}}_actual', 0))
+            row.append(entry.get(f'{{jname}}_force', 0))
+            row.append(entry.get(f'{{jname}}_error', 0))
+        writer.writerow(row)
+    
+print(f"  Saved {{len(phase2_log)}} samples (every 10 steps) to phase2_control_applied.csv")
 
 except Exception as e:
     print(f"ERROR: {{e}}")
