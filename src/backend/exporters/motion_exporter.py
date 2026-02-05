@@ -909,16 +909,33 @@ def generate_inverse_to_forward_validation_script(model_file: str, recording_dat
     """
     rec_json = json.dumps(recording_data, indent=2)
     
+    # Version info for debugging
+    from datetime import datetime
+    script_version = datetime.now().strftime("%Y%m%d_%H%M%S")
+    
     return f'''#!/usr/bin/env python3
 """
 Mode 4: Inverse-to-Forward Validation
 Uses inverse dynamics torques as motor limits to test forward tracking
+
+Script Version: {script_version}
+Generated: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """
 import time
 import mujoco
 import mujoco.viewer
 import numpy as np
 import json
+
+# Version info
+SCRIPT_VERSION = "{script_version}"
+SCRIPT_DATE = "{datetime.now().strftime("%Y-%m-%d %H:%M:%S")}"
+
+print("="*70)
+print(f"MODE 4 SCRIPT VERSION: {{SCRIPT_VERSION}}")
+print(f"Generated: {{SCRIPT_DATE}}")
+print("="*70)
+print()
 
 try:
     from scipy.interpolate import CubicSpline
