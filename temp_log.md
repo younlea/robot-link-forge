@@ -28,8 +28,8 @@ Select Analysis Mode:
 Enter choice [0/1/2/3/4]: 4
 Starting Inverse-to-Forward Validation...
 ======================================================================
-MODE 4 SCRIPT VERSION: 20260205_163211
-Generated: 2026-02-05 16:32:11
+MODE 4 SCRIPT VERSION: 20260205_163836
+Generated: 2026-02-05 16:38:36
 ======================================================================
 
 Model has 20 joints, 20 actuators
@@ -199,35 +199,13 @@ Note: Position actuators in MJCF are IGNORED
   We bypass actuators and apply forces directly
 
 📍 Initialization for torque control:
-  Starting from model's default pose (no forced positions)
-  Letting model settle to equilibrium (100 steps, no forces)...
-WARNING: Nan, Inf or huge value in QACC at DOF 4. The simulation is unstable. Time = 0.0080.
+  SKIPPING physics settle (causes instability)
+  Setting initial pose kinematically to trajectory start
+  Initial pose set (kinematic, no physics). Sample: [0. 0. 0. 0. 0.]
 
-  Equilibrium reached. Sample positions: [-7.70061794  5.68466627 -1.56167053  7.26282187 -7.40498405]
+=== Initial Position Check ===
 
-=== Initial Position vs Trajectory Start ===
-  LittleFinger-1st_roll: actual=-7.7006, traj_start=+0.0000, diff=+7.7006 (+441.21°)
-  LittleFinger-1st-pitch: actual=+5.6847, traj_start=+0.0000, diff=-5.6847 (-325.71°)
-  LittleFinger-2nd-pitch: actual=-1.5617, traj_start=+0.0000, diff=+1.5617 (+89.48°)
-  LittleFinger-3rd-pitch: actual=+7.2628, traj_start=+0.0000, diff=-7.2628 (-416.13°)
-  RingFinger-1st_roll : actual=-7.4050, traj_start=+0.0000, diff=+7.4050 (+424.27°)
-  RingFinger-1st-pitch: actual=+4.9199, traj_start=+0.0000, diff=-4.9199 (-281.89°)
-  RingFinger-2nd-pitch: actual=-2.2647, traj_start=+0.0000, diff=+2.2647 (+129.76°)
-  RingFinger-3rd-pitch: actual=+7.4581, traj_start=+0.0000, diff=-7.4581 (-427.32°)
-  MiddleFinger_1st_roll: actual=-2.7191, traj_start=+0.0000, diff=+2.7191 (+155.80°)
-  MiddleFinger-1st-pitch: actual=-16.1055, traj_start=+0.0000, diff=+16.1055 (+922.77°)
-  MiddleFinger-2nd-pitch: actual=+10.8001, traj_start=+0.0000, diff=-10.8001 (-618.80°)
-  MiddleFinger-3rd-pitch: actual=+3.7384, traj_start=+0.0000, diff=-3.7384 (-214.19°)
-  IndexFinger_1st_roll: actual=+9.7001, traj_start=+0.0000, diff=-9.7001 (-555.77°)
-  IndexFinger-1st-pitch: actual=+1.6082, traj_start=+0.0000, diff=-1.6082 (-92.14°)
-  IndexFinger-2nd-pitch: actual=+1.4952, traj_start=+0.0000, diff=-1.4952 (-85.67°)
-  IndexFinger-3rd-pitch: actual=-7.7715, traj_start=+0.0000, diff=+7.7715 (+445.27°)
-  thumb_1st_yaw       : actual=+2.3389, traj_start=+0.0000, diff=-2.3389 (-134.01°)
-  Thumb-1st-pitch     : actual=+4.5560, traj_start=+0.0000, diff=-4.5560 (-261.04°)
-  Thumb-2nd-pitch     : actual=+1.3905, traj_start=+0.0000, diff=-1.3905 (-79.67°)
-  Thumb-3rd-pitch     : actual=+8.7764, traj_start=+0.0000, diff=-8.7764 (-502.85°)
-
-Initial mismatch RMS: 6.8865 rad (394.57°)
+Initial mismatch RMS: 0.0000 rad (0.00°)
 Note: With torque control, initial mismatch is okay
 ==================================================
 
@@ -266,31 +244,7 @@ Starting forward simulation with TORQUE CONTROL...
       Thumb-2nd-pitch               :    -8.23 Nm
       Thumb-3rd-pitch               :    -4.02 Nm
 
-Initial RMS error after stabilization: 6.8865 rad (394.57°)
-==================================================
-  ⚠️  Large initial error! Physics may be unstable or gains too weak
-
-=== Initializing ctrl to current actual positions ===
-  LittleFinger-1st_roll: ctrl initialized to -7.7006 rad
-  LittleFinger-1st-pitch: ctrl initialized to 5.6847 rad
-  LittleFinger-2nd-pitch: ctrl initialized to -1.5617 rad
-  LittleFinger-3rd-pitch: ctrl initialized to 7.2628 rad
-  RingFinger-1st_roll : ctrl initialized to -7.4050 rad
-  RingFinger-1st-pitch: ctrl initialized to 4.9199 rad
-  RingFinger-2nd-pitch: ctrl initialized to -2.2647 rad
-  RingFinger-3rd-pitch: ctrl initialized to 7.4581 rad
-  MiddleFinger_1st_roll: ctrl initialized to -2.7191 rad
-  MiddleFinger-1st-pitch: ctrl initialized to -16.1055 rad
-  MiddleFinger-2nd-pitch: ctrl initialized to 10.8001 rad
-  MiddleFinger-3rd-pitch: ctrl initialized to 3.7384 rad
-  IndexFinger_1st_roll: ctrl initialized to 9.7001 rad
-  IndexFinger-1st-pitch: ctrl initialized to 1.6082 rad
-  IndexFinger-2nd-pitch: ctrl initialized to 1.4952 rad
-  IndexFinger-3rd-pitch: ctrl initialized to -7.7715 rad
-  thumb_1st_yaw       : ctrl initialized to 2.3389 rad
-  Thumb-1st-pitch     : ctrl initialized to 4.5560 rad
-  Thumb-2nd-pitch     : ctrl initialized to 1.3905 rad
-  Thumb-3rd-pitch     : ctrl initialized to 8.7764 rad
+Initial position set. RMS: 0.0000 rad (should be ~0)
 ==================================================
 
 Starting forward simulation...
@@ -332,13 +286,15 @@ Starting forward simulation...
   Using TORQUE control (not position)
   Nonzero torques: 3/20
   Max torque: 2.91 Nm
-    LittleFinger-1st_roll         : target_pos= +0.0000, current= -7.7006, torque= +0.0071 Nm
-    LittleFinger-1st-pitch        : target_pos= +0.0000, current= +5.6847, torque= -0.0057 Nm
-    LittleFinger-2nd-pitch        : target_pos= +0.0000, current= -1.5617, torque= -0.0013 Nm
-    LittleFinger-3rd-pitch        : target_pos= +0.0000, current= +7.2628, torque= -0.0005 Nm
-    RingFinger-1st_roll           : target_pos= +0.0000, current= -7.4050, torque= +0.0038 Nm
-  T=0.00s: RMS error=12.1461 rad (695.9°), Max cmd=0.00 rad
-    Worst errors: MiddleFinger_1st_roll=2609.1° (cmd=0.00rad)  MiddleFinger-2nd-pitch=1291.6° (cmd=0.00rad)  IndexFinger-2nd-pitch=507.8° (cmd=0.00rad)  
+    LittleFinger-1st_roll         : target_pos= +0.0000, current= +0.0000, torque= +0.0071 Nm
+    LittleFinger-1st-pitch        : target_pos= +0.0000, current= +0.0000, torque= -0.0057 Nm
+    LittleFinger-2nd-pitch        : target_pos= +0.0000, current= +0.0000, torque= -0.0013 Nm
+    LittleFinger-3rd-pitch        : target_pos= +0.0000, current= +0.0000, torque= -0.0005 Nm
+    RingFinger-1st_roll           : target_pos= +0.0000, current= +0.0000, torque= +0.0038 Nm
+  T=0.00s: RMS error=0.0890 rad (5.1°), Max cmd=0.00 rad
+    Worst errors: IndexFinger-2nd-pitch=18.3° (cmd=0.00rad)  MiddleFinger-3rd-pitch=13.3° (cmd=0.00rad)  IndexFinger-1st-pitch=2.8° (cmd=0.00rad)  
+WARNING: Nan, Inf or huge value in QACC at DOF 8. The simulation is unstable. Time = 0.0070.
+
 
 🔍 DEBUG at step 500:
   Using TORQUE control (not position)
@@ -386,7 +342,7 @@ VALIDATION RESULTS
 ======================================================================
 
 Tracking Performance:
-  Average RMS Error: 92.380891 rad (5293.035 deg)
+  Average RMS Error: 92.106474 rad (5277.312 deg)
   Maximum RMS Error: 2364.727128 rad (135488.884 deg)
 
 Torque Control (Direct Force Application):
@@ -399,3 +355,4 @@ Torque Control (Direct Force Application):
   → Or robot model has issues (mass/inertia/constraints)
 ======================================================================
 
+Plot saved to: mode4_validation.png
