@@ -1,5 +1,4 @@
 ~/Downloads/direct_hand_parm$ ./run_torque_replay_0_recording_1768623534448.sh 
-Creating virtual environment...
 Installing dependencies (mujoco, matplotlib, numpy, scipy)...
 ========================================
   MuJoCo Motion Analysis Tool
@@ -28,8 +27,8 @@ Select Analysis Mode:
 Enter choice [0/1/2/3/4]: 4
 Starting Inverse-to-Forward Validation...
 ======================================================================
-MODE 4 SCRIPT VERSION: 20260205_140811
-Generated: 2026-02-05 14:08:11
+MODE 4 SCRIPT VERSION: 20260205_152111
+Generated: 2026-02-05 15:21:11
 ======================================================================
 
 Model has 20 joints, 20 actuators
@@ -199,29 +198,55 @@ Note: This is NOT pure force feedforward
   Using PD position control for stability
 
 Letting physics settle at initial pose...
+  Phase 1: Force positions directly (500 steps)
+  Phase 2: Let actuators stabilize (1500 steps)
 WARNING: Nan, Inf or huge value in QACC at DOF 4. The simulation is unstable. Time = 0.0080.
 
-  Warning: LittleFinger-1st_roll has 441.2° initial error
-  Warning: LittleFinger-1st-pitch has 325.7° initial error
-  Warning: LittleFinger-2nd-pitch has 89.5° initial error
-  Warning: LittleFinger-3rd-pitch has 416.1° initial error
-  Warning: RingFinger-1st_roll has 424.3° initial error
-  Warning: RingFinger-1st-pitch has 281.9° initial error
-  Warning: RingFinger-2nd-pitch has 129.8° initial error
-  Warning: RingFinger-3rd-pitch has 427.3° initial error
-  Warning: MiddleFinger_1st_roll has 155.8° initial error
-  Warning: MiddleFinger-1st-pitch has 922.8° initial error
-  Warning: MiddleFinger-2nd-pitch has 618.8° initial error
-  Warning: MiddleFinger-3rd-pitch has 214.2° initial error
-  Warning: IndexFinger_1st_roll has 555.8° initial error
-  Warning: IndexFinger-1st-pitch has 92.1° initial error
-  Warning: IndexFinger-2nd-pitch has 85.7° initial error
-  Warning: IndexFinger-3rd-pitch has 445.3° initial error
-  Warning: thumb_1st_yaw has 134.0° initial error
-  Warning: Thumb-1st-pitch has 261.0° initial error
-  Warning: Thumb-2nd-pitch has 79.7° initial error
-  Warning: Thumb-3rd-pitch has 502.9° initial error
+
+=== Initial Position Mismatch Check ===
+  LittleFinger-1st_roll: actual=-7.7006 rad, target= 0.0000 rad, diff= 7.7006 rad (441.21°)
+    ⚠️  WARNING: Large mismatch detected!
+  LittleFinger-1st-pitch: actual= 5.6847 rad, target= 0.0000 rad, diff=-5.6847 rad (-325.71°)
+    ⚠️  WARNING: Large mismatch detected!
+  LittleFinger-2nd-pitch: actual=-1.5617 rad, target= 0.0000 rad, diff= 1.5617 rad ( 89.48°)
+    ⚠️  WARNING: Large mismatch detected!
+  LittleFinger-3rd-pitch: actual= 7.2628 rad, target= 0.0000 rad, diff=-7.2628 rad (-416.13°)
+    ⚠️  WARNING: Large mismatch detected!
+  RingFinger-1st_roll : actual=-7.4050 rad, target= 0.0000 rad, diff= 7.4050 rad (424.27°)
+    ⚠️  WARNING: Large mismatch detected!
+  RingFinger-1st-pitch: actual= 4.9199 rad, target= 0.0000 rad, diff=-4.9199 rad (-281.89°)
+    ⚠️  WARNING: Large mismatch detected!
+  RingFinger-2nd-pitch: actual=-2.2647 rad, target= 0.0000 rad, diff= 2.2647 rad (129.76°)
+    ⚠️  WARNING: Large mismatch detected!
+  RingFinger-3rd-pitch: actual= 7.4581 rad, target= 0.0000 rad, diff=-7.4581 rad (-427.32°)
+    ⚠️  WARNING: Large mismatch detected!
+  MiddleFinger_1st_roll: actual=-2.7191 rad, target= 0.0000 rad, diff= 2.7191 rad (155.80°)
+    ⚠️  WARNING: Large mismatch detected!
+  MiddleFinger-1st-pitch: actual=-16.1055 rad, target= 0.0000 rad, diff=16.1055 rad (922.77°)
+    ⚠️  WARNING: Large mismatch detected!
+  MiddleFinger-2nd-pitch: actual=10.8001 rad, target= 0.0000 rad, diff=-10.8001 rad (-618.80°)
+    ⚠️  WARNING: Large mismatch detected!
+  MiddleFinger-3rd-pitch: actual= 3.7384 rad, target= 0.0000 rad, diff=-3.7384 rad (-214.19°)
+    ⚠️  WARNING: Large mismatch detected!
+  IndexFinger_1st_roll: actual= 9.7001 rad, target= 0.0000 rad, diff=-9.7001 rad (-555.77°)
+    ⚠️  WARNING: Large mismatch detected!
+  IndexFinger-1st-pitch: actual= 1.6082 rad, target= 0.0000 rad, diff=-1.6082 rad (-92.14°)
+    ⚠️  WARNING: Large mismatch detected!
+  IndexFinger-2nd-pitch: actual= 1.4952 rad, target= 0.0000 rad, diff=-1.4952 rad (-85.67°)
+    ⚠️  WARNING: Large mismatch detected!
+  IndexFinger-3rd-pitch: actual=-7.7715 rad, target= 0.0000 rad, diff= 7.7715 rad (445.27°)
+    ⚠️  WARNING: Large mismatch detected!
+  thumb_1st_yaw       : actual= 2.3389 rad, target= 0.0000 rad, diff=-2.3389 rad (-134.01°)
+    ⚠️  WARNING: Large mismatch detected!
+  Thumb-1st-pitch     : actual= 4.5560 rad, target= 0.0000 rad, diff=-4.5560 rad (-261.04°)
+    ⚠️  WARNING: Large mismatch detected!
+  Thumb-2nd-pitch     : actual= 1.3905 rad, target= 0.0000 rad, diff=-1.3905 rad (-79.67°)
+    ⚠️  WARNING: Large mismatch detected!
+  Thumb-3rd-pitch     : actual= 8.7764 rad, target= 0.0000 rad, diff=-8.7764 rad (-502.85°)
+    ⚠️  WARNING: Large mismatch detected!
+
 Initial RMS error after stabilization: 6.8865 rad (394.57°)
+==================================================
   ⚠️  Large initial error! Physics may be unstable or gains too weak
 
 Starting forward simulation...
@@ -328,4 +353,3 @@ Position Control (PD kp=200, kd=20):
   → Or robot model has issues (mass/inertia/constraints)
 ======================================================================
 
-Plot saved to: mode4_validation.png
