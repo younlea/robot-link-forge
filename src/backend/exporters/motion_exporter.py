@@ -957,9 +957,43 @@ except ImportError:
     HAS_MATPLOTLIB = False
     print("Warning: matplotlib not available")
 
-# Load model
-model = mujoco.MjModel.from_xml_path("{model_file}")
+# CRITICAL: Remove actuators from MJCF for pure torque control
+# Position actuators have builtin PD controllers that interfere with qfrc_applied
+print("\\n" + "="*70)
+print("PREPARING MODEL FOR PURE TORQUE CONTROL")
+print("="*70)
+print("Removing position actuators from MJCF...")
+print("  This allows pure qfrc_applied control without actuator interference")
+
+# Read and modify MJCF
+with open("{model_file}", 'r') as f:
+    mjcf_content = f.read()
+
+# Remove <actuator> section entirely
+import re
+# Find and remove everything between <actuator> and </actuator>
+mjcf_modified = re.sub(r'<actuator>.*?</actuator>', '', mjcf_content, flags=re.DOTALL)
+
+# Save modified MJCF temporarily
+import tempfile
+import os
+temp_mjcf = tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False, dir=os.path.dirname("{model_file}"))
+temp_mjcf.write(mjcf_modified)
+temp_mjcf_path = temp_mjcf.name
+temp_mjcf.close()
+
+print(f"  Created temporary MJCF without actuators: {{os.path.basename(temp_mjcf_path)}}")
+
+# Load model from modified MJCF
+model = mujoco.MjModel.from_xml_path(temp_mjcf_path)
 data = mujoco.MjData(model)
+
+print(f"  Model loaded: {{model.nu}} actuators (should be 0), {{model.nv}} DOFs")
+if model.nu > 0:
+    print("  ⚠️ WARNING: Model still has actuators! Actuator removal may have failed.")
+else:
+    print("  ✅ SUCCESS: Pure torque control model (no actuators)")
+print("="*70)
 
 # Load recording
 recording_data = {rec_json}
@@ -973,15 +1007,20 @@ for i in range(model.njnt):
     if jnt_name:
         joint_ids[jnt_name] = i
 
-# Build actuator mapping (CRITICAL for Mode 4)
+# Build actuator mapping (should be empty now since we removed actuators)
 actuator_ids = {{}}
-for i in range(model.nu):
-    act_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
-    if act_name:
-        # Actuator names usually end with "_act", strip to get joint name
-        joint_name = act_name.replace("_act", "")
-        if joint_name in joint_ids:
-            actuator_ids[joint_name] = i
+if model.nu > 0:
+    print("⚠️ Model still has actuators, building mapping...")
+    for i in range(model.nu):
+        act_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
+        if act_name:
+            # Actuator names usually end with "_act", strip to get joint name
+            joint_name = act_name.replace("_act", "")
+            if joint_name in joint_ids:
+                actuator_ids[joint_name] = i
+else:
+    # No actuators - this is what we want for pure torque control
+    print("✅ No actuators in model (pure torque control mode)")
 
 print(f"Model has {{model.njnt}} joints, {{model.nu}} actuators")
 print(f"Recording duration: {{duration:.2f}}s ({{recording_data['duration']:.0f}}ms)")
@@ -1638,10 +1677,10 @@ if len(tracking_errors) > 0:
         # Extract max absolute torque at each time step from phase2 log
         max_applied_torques = []
         for step_data in phase2_log:
-            if len(step_data) > 4:
-                # step_data format: [time, step, joint_data...]
-                # Extract all forces from this step
-                forces = [abs(step_data[i]) for i in range(4, len(step_data), 3)]  # Every 3rd element starting from index 4
+            # step_data is a dictionary with keys like 'time', 'step', 'jointname_force', etc.
+            if isinstance(step_data, dict):
+                # Extract all force values (keys ending with '_force')
+                forces = [abs(v) for k, v in step_data.items() if k.endswith('_force')]
                 if forces:
                     max_applied_torques.append(max(forces))
                 else:
@@ -1649,17 +1688,26 @@ if len(tracking_errors) > 0:
             else:
                 max_applied_torques.append(0.0)
         
-        if max_applied_torques:
-            axes[1].plot(times[:len(max_applied_torques)], max_applied_torques, 'g-', linewidth=1.5, label='Max Applied Torque')
+        if max_applied_torques and len(max_applied_torques) > 0:
+            plot_times = times[:len(max_applied_torques)]
+            axes[1].plot(plot_times, max_applied_torques, 'g-', linewidth=1.5, label='Max Applied Torque')
             axes[1].set_xlabel('Time (s)')
             axes[1].set_ylabel('Torque (Nm)')
             axes[1].set_title('Applied Torques (Feedforward + PD Feedback)')
             axes[1].grid(True, alpha=0.3)
             axes[1].legend()
             # Use log scale if torques explode
-            if max(max_applied_torques) > 1000:
+            if len(max_applied_torques) > 0 and max(max_applied_torques) > 1000:
                 axes[1].set_yscale('log')
                 axes[1].set_ylabel('Torque (Nm) - Log Scale')
+        else:
+            # Fallback: just show zeros
+            axes[1].plot(times, [0]*len(times), 'g-', linewidth=1.5, label='No torque data')
+            axes[1].set_xlabel('Time (s)')
+            axes[1].set_ylabel('Torque (Nm)')
+            axes[1].set_title('Applied Torques (No Data)')
+            axes[1].grid(True, alpha=0.3)
+            axes[1].legend()
         
         # Plot 3: Max Joint Velocity
         # This shows if system is diverging
@@ -1680,6 +1728,13 @@ if len(tracking_errors) > 0:
         plt.savefig('mode4_validation.png', dpi=150)
         print("\\nPlot saved to: mode4_validation.png")
         plt.show()
+
+# Cleanup temporary MJCF file
+try:
+    os.remove(temp_mjcf_path)
+    print(f"\\nCleaned up temporary file: {{os.path.basename(temp_mjcf_path)}}")
+except:
+    pass
 
 print("\\nMode 4 validation complete.")
 '''
