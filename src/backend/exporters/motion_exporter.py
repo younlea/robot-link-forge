@@ -1218,29 +1218,36 @@ for jname, jid in joint_ids.items():
         qadr = model.jnt_qposadr[jid]
         data.ctrl[aid] = qpos_traj[0, qadr]
 
-# Let physics settle WITH position control
-# Use many steps and force positions initially for stability
-print("\\nLetting physics settle at initial pose...")
-print("  Phase 1: Force positions directly (500 steps)")
-for i in range(500):
-    # Force positions for first 500 steps
-    data.qpos[:] = qpos_traj[0]
-    data.qvel[:] = 0.0
-    for jname, jid in joint_ids.items():
-        if jname in actuator_ids:
-            aid = actuator_ids[jname]
-            qadr = model.jnt_qposadr[jid]
-            data.ctrl[aid] = qpos_traj[0, qadr]
-    mujoco.mj_forward(model, data)
+# CRITICAL FIX: Recording starts at qpos=0, which is physically unstable
+# DON'T force trajectory start pose - find natural equilibrium first
+print("\\nLetting physics settle to natural equilibrium...")
+print("  Strategy: Start from model default, then gradually move to trajectory start")
 
-print("  Phase 2: Let actuators stabilize (1500 steps)")
+# Step 1: Let model settle to its natural pose (no forcing)
+print("  Phase 1: Find natural equilibrium (500 steps)")
+mujoco.mj_resetData(model, data)
+data.ctrl[:] = model.qpos0[:model.nu]  # Start ctrl at model defaults
+for i in range(500):
+    mujoco.mj_step(model, data)
+
+# Save natural equilibrium as starting point
+natural_qpos = data.qpos.copy()
+print(f"  Natural equilibrium found (sample joints):")
+for jname in list(joint_ids.keys())[:5]:
+    jid = joint_ids[jname]
+    qadr = model.jnt_qposadr[jid]
+    print(f"    {{jname:30s}}: {{natural_qpos[qadr]:7.4f}} rad")
+
+# Step 2: Gradually blend from natural pose to trajectory start
+print("  Phase 2: Gradually move to trajectory start (1500 steps)")
 for i in range(1500):
-    # Now let actuators work
+    blend = min(1.0, i / 1000.0)  # 0→1 over first 1000 steps
     for jname, jid in joint_ids.items():
         if jname in actuator_ids:
             aid = actuator_ids[jname]
             qadr = model.jnt_qposadr[jid]
-            data.ctrl[aid] = qpos_traj[0, qadr]
+            target = (1 - blend) * natural_qpos[qadr] + blend * qpos_traj[0, qadr]
+            data.ctrl[aid] = target
     mujoco.mj_step(model, data)
 
 # Check initial position mismatch (potential oscillation cause)
@@ -1267,6 +1274,18 @@ print("=" * 50)
 
 if init_rms > 0.2:
     print("  ⚠️  Large initial error! Physics may be unstable or gains too weak")
+
+# CRITICAL FIX: Initialize ctrl to ACTUAL current position, not target trajectory
+# This prevents large initial jump/oscillation
+print("\\n=== Initializing ctrl to current actual positions ===")
+for jname, jid in joint_ids.items():
+    if jname in actuator_ids:
+        aid = actuator_ids[jname]
+        qadr = model.jnt_qposadr[jid]
+        actual_pos = data.qpos[qadr]
+        data.ctrl[aid] = actual_pos
+        print(f"  {{jname:20s}}: ctrl initialized to {{actual_pos:.4f}} rad")
+print("=" * 50)
 
 # Tracking data
 tracking_errors = []
