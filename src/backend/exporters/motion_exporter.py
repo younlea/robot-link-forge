@@ -785,7 +785,7 @@ pip install --upgrade pip > /dev/null 2>&1
 # Pin matplotlib to <=3.7.3 to avoid issues with removed APIs (e.g. initializers)
 # Pin numpy < 2 to avoid breaking changes
 echo "Installing dependencies..."
-pip install mujoco "matplotlib<=3.7.3" "numpy<2" > /dev/null 2>&1
+pip install mujoco "matplotlib<=3.7.3" "numpy<2" scipy > /dev/null 2>&1
 
 # 4. Run the interactive script
 echo "Running interactive viewer..."
@@ -925,10 +925,9 @@ try:
     HAS_SCIPY = True
 except ImportError:
     HAS_SCIPY = False
-    print("⚠️  WARNING: scipy not installed!")
-    print("   For smooth trajectories, install scipy:")
-    print("   pip install scipy")
-    print("   Using fallback linear interpolation (may cause torque spikes)")
+    # scipy is installed by setup script, this shouldn't happen
+    print("⚠️  WARNING: scipy import failed!")
+    print("   Using fallback linear interpolation (may cause instability)")
     print()
 
 try:
@@ -1849,8 +1848,8 @@ pip install --upgrade pip > /dev/null 2>&1
 
 # Install required packages
 # Pin matplotlib to <=3.7.3
-echo "Installing dependencies (mujoco, matplotlib, numpy)..."
-pip install mujoco "matplotlib<=3.7.3" "numpy<2" > /dev/null 2>&1
+echo "Installing dependencies (mujoco, matplotlib, numpy, scipy)..."
+pip install mujoco "matplotlib<=3.7.3" "numpy<2" scipy > /dev/null 2>&1
 
 # 4. Interactive Mode Selection
 echo "========================================"
