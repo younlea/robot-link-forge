@@ -1206,24 +1206,28 @@ print("  This is pure feedforward torque control")
 print("\\nNote: Position actuators in MJCF are IGNORED")
 print("  We bypass actuators and apply forces directly")
 
-# CRITICAL FIX: Don't initialize to qpos_traj[0]
-# With torque control, we start from model's natural pose
-# Reset simulation - let model settle to natural pose first
+# CRITICAL: With torque control, DON'T let physics settle
+# model.qpos0=[0,0,0] is unstable, gravity causes explosion
+# Instead: Start KINEMATICALLY at trajectory first frame
 print("\\n📍 Initialization for torque control:")
-print("  Starting from model's default pose (no forced positions)")
+print("  SKIPPING physics settle (causes instability)")
+print("  Setting initial pose kinematically to trajectory start")
 mujoco.mj_resetData(model, data)
 
-# Let physics settle for a moment (no forces applied)
-print("  Letting model settle to equilibrium (100 steps, no forces)...")
-for i in range(100):
-    data.qfrc_applied[:] = 0.0  # No external forces
-    data.ctrl[:] = 0.0  # No actuator commands
-    mujoco.mj_step(model, data)
+# Set to trajectory first frame KINEMATICALLY (no dynamics)
+# Even though trajectory starts at [0,0,0], we set it without running physics
+data.qpos[:] = qpos_traj[0]
+data.qvel[:] = 0.0
+data.ctrl[:] = 0.0  # Disable actuators
+data.qfrc_applied[:] = 0.0
 
-print(f"  Equilibrium reached. Sample positions: {{data.qpos[:5]}}")
+# Compute kinematics (no dynamics, just geometry)
+mujoco.mj_forward(model, data)
 
-# Check initial position mismatch (for logging only)
-print("\\n=== Initial Position vs Trajectory Start ===")
+print(f"  Initial pose set (kinematic, no physics). Sample: {{data.qpos[:5]}}")
+
+# Check initial position (should be zero mismatch since we set it directly)
+print("\\n=== Initial Position Check ===")
 init_errors = []
 for jname, jnt_idx in joint_ids.items():
     if jnt_idx >= model.nu:
@@ -1276,29 +1280,12 @@ for sample_step in [0, 500, 2500, 5000]:
     error = target_pos - actual_pos
     init_errors.append(error ** 2)
     
-    # Print detailed mismatch for each joint
-    print(f"  {{jname:20s}}: actual={{actual_pos:7.4f}} rad, target={{target_pos:7.4f}} rad, diff={{error:7.4f}} rad ({{np.rad2deg(error):6.2f}}°)")
-    
-    if abs(error) > 0.1:  # > 5.7 degrees
-        print(f"    ⚠️  WARNING: Large mismatch detected!")
+    # Should be zero since we set kinematically
+    if abs(error) > 0.001:  # > 0.06 degrees
+        print(f"  {{jname:20s}}: actual={{actual_pos:+7.4f}}, target={{target_pos:+7.4f}}, diff={{error:+7.4f}}")
 
 init_rms = np.sqrt(np.mean(init_errors))
-print(f"\\nInitial RMS error after stabilization: {{init_rms:.4f}} rad ({{np.rad2deg(init_rms):.2f}}°)")
-print("=" * 50)
-
-if init_rms > 0.2:
-    print("  ⚠️  Large initial error! Physics may be unstable or gains too weak")
-
-# CRITICAL FIX: Initialize ctrl to ACTUAL current position, not target trajectory
-# This prevents large initial jump/oscillation
-print("\\n=== Initializing ctrl to current actual positions ===")
-for jname, jid in joint_ids.items():
-    if jname in actuator_ids:
-        aid = actuator_ids[jname]
-        qadr = model.jnt_qposadr[jid]
-        actual_pos = data.qpos[qadr]
-        data.ctrl[aid] = actual_pos
-        print(f"  {{jname:20s}}: ctrl initialized to {{actual_pos:.4f}} rad")
+print(f"\\nInitial position set. RMS: {{init_rms:.4f}} rad (should be ~0)")
 print("=" * 50)
 
 # Tracking data
