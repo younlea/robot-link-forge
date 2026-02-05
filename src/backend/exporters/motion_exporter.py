@@ -369,7 +369,8 @@ with mujoco.viewer.launch_passive(model, data) as viewer:
 
 # --- Plotting Sensor Data ---
 if HAS_MATPLOTLIB and sensor_history:
-    print("\\nGenerating sensor plot...")
+    print("")
+    print("Generating sensor plot...")
     hist_arr = np.array(sensor_history)
     
     plt.figure(figsize=(10, 6))
@@ -425,7 +426,8 @@ print(f"Loading model: {{MODEL_XML}}")
 model = mujoco.MjModel.from_xml_path(MODEL_XML)
 data = mujoco.MjData(model)
 
-print("\\n=== Interactive Mode ===")
+print("")
+print("=== Interactive Mode ===")
 print("Use the MuJoCo viewer controls to move joints.")
 print("Right window: Real-time 3D Sensor Visualizer.")
 print("Select FINGERS to view their sensor grids.")
@@ -829,17 +831,21 @@ def analyze_motor_validation(csv_file='motor_validation_log.csv'):
     # Thermal load (simplified RMS torque)
     thermal_rms = np.sqrt(np.mean(max_torque ** 2))
     
-    print("\\n" + "="*60)
+    print("")
+    print("="*60)
     print("MOTOR VALIDATION ANALYSIS REPORT")
     print("="*60)
-    print(f"\\nTracking Performance:")
+    print("")
+    print("Tracking Performance:")
     print(f"  Average RMS Error: {{avg_rms_error:.6f}} rad ({{np.rad2deg(avg_rms_error):.3f}} deg)")
     print(f"  Maximum RMS Error: {{max_rms_error:.6f}} rad ({{np.rad2deg(max_rms_error):.3f}} deg)")
-    print(f"\\nTorque Analysis:")
+    print("")
+    print("Torque Analysis:")
     print(f"  Average Torque: {{avg_torque:.2f}} Nm")
     print(f"  Peak Torque: {{peak_torque:.2f}} Nm")
     print(f"  RMS Thermal Load: {{thermal_rms:.2f}} Nm")
-    print(f"\\nSaturation:")
+    print("")
+    print("Saturation:")
     print(f"  Saturation Events: {{saturation_events}} / {{len(time)}} samples ({{saturation_pct:.1f}}%)")
     
     if saturation_pct > 10:
@@ -849,7 +855,8 @@ def analyze_motor_validation(csv_file='motor_validation_log.csv'):
     else:
         print(f"  [OK] No saturation detected.")
     
-    print("\\n" + "="*60)
+    print("")
+    print("="*60)
     
     # Generate plots
     fig, axes = plt.subplots(3, 1, figsize=(12, 10))
@@ -959,7 +966,8 @@ except ImportError:
 
 # CRITICAL: Remove actuators from MJCF for pure torque control
 # Position actuators have builtin PD controllers that interfere with qfrc_applied
-print("\\n" + "="*70)
+print("")
+print("="*70)
 print("PREPARING MODEL FOR PURE TORQUE CONTROL")
 print("="*70)
 print("Removing position actuators from MJCF...")
@@ -1037,7 +1045,8 @@ recorded_joints = list(keyframes[0]["joints"].keys()) if keyframes else []
 print(f"Found {{len(recorded_joints)}} joints in recording")
 
 # DEBUG: Check keyframe timing
-print("\\n🔍 KEYFRAME TIMING:")
+print("")
+print("🔍 KEYFRAME TIMING:")
 print(f"  Number of keyframes: {{len(keyframes)}}")
 if len(keyframes) > 0:
     print(f"  First keyframe time: {{keyframes[0]['timestamp']/1000.0:.3f}}s")
@@ -1098,7 +1107,8 @@ for jname in recorded_joints:
     qacc_traj[:, dof_adr] = qacc_interp
 
 # DEBUG: Check trajectory variation
-print("\\n🔍 TRAJECTORY DIAGNOSTIC:")
+print("")
+print("🔍 TRAJECTORY DIAGNOSTIC:")
 print("Checking if trajectory actually changes over time...")
 for jname in ['IndexFinger-1st-pitch', 'MiddleFinger-1st-pitch', 'Thumb-1st-pitch']:
     if jname in joint_ids:
@@ -1114,21 +1124,25 @@ for jname in ['IndexFinger-1st-pitch', 'MiddleFinger-1st-pitch', 'Thumb-1st-pitc
         print(f"    Vel range: {{np.min(qvel_traj[:, dof_adr]):.2f}} to {{np.max(qvel_traj[:, dof_adr]):.2f}} rad/s")
         print(f"    Acc range: {{np.min(qacc_traj[:, dof_adr]):.2f}} to {{np.max(qacc_traj[:, dof_adr]):.2f}} rad/s²")
 
-print("\\n" + "="*70)
+print("")
+print("="*70)
 print("PHASE 1: INVERSE DYNAMICS ANALYSIS")
 print("="*70)
 print("Calculating required torques for trajectory...")
 
 # CRITICAL DIAGNOSTIC: Check data structure
-print("\\n🔍 DATA STRUCTURE DIAGNOSTIC:")
+print("")
+print("🔍 DATA STRUCTURE DIAGNOSTIC:")
 print(f"  model.nu (actuators): {{model.nu}}")
 print(f"  model.nv (DOFs): {{model.nv}}")
 print(f"  model.nq (positions): {{model.nq}}")
-print("\\n  Joint → DOF mapping:")
+print("")
+print("  Joint → DOF mapping:")
 for jname, jid in joint_ids.items():
     dof_adr = model.jnt_dofadr[jid]
     print(f"    {{jname:30s}} → DOF {{dof_adr}}")
-print("\\n  Actuator → Joint mapping:")
+print("")
+print("  Actuator → Joint mapping:")
 if model.nu > 0:
     for i in range(model.nu):
         act_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
@@ -1187,7 +1201,8 @@ for step in range(n_steps):
 torque_history = np.array(torque_history)
 
 # Save torque_history to CSV for verification
-print("\\n💾 Saving torque history to CSV...")
+print("")
+print("💾 Saving torque history to CSV...")
 import csv
 with open('phase1_torque_history.csv', 'w', newline='') as f:
     writer = csv.writer(f)
@@ -1222,7 +1237,8 @@ print(f"  File size: ~{{len(torque_history) * len(joint_ids) * 8 / 1024:.1f}} KB
 print(f"  Saved {{n_steps}} steps × {{model.nu}} joints to phase1_torque_history.csv")
 print(f"  File size: ~{{n_steps * model.nu * 8 / 1024:.1f}} KB")
 
-print("\\nInverse Dynamics Results:")
+print("")
+print("Inverse Dynamics Results:")
 print("  Joint Name                    | Max Torque (Nm)")
 print("  " + "-"*60)
 for jname, jid in joint_ids.items():
@@ -1247,21 +1263,25 @@ if len(adjusted_limits) > 0:
     print(f"  → Forward simulation needs extra for friction, damping, numerical errors")
     print(f"  Adjusted force limits: {{np.mean(adjusted_limits):.2f}} Nm (avg), {{np.max(adjusted_limits):.2f}} Nm (max)")
 
-print("\\n" + "="*70)
+print("")
+print("="*70)
 print("PHASE 2: PHYSICS SIMULATION WITH TORQUE CONTROL")
 print("="*70)
 
-print("\\nUsing REAL PHYSICS SIMULATION with torque control:")
+print("")
+print("Using REAL PHYSICS SIMULATION with torque control:")
 print("  Apply torques from Phase 1 → mj_step() → simulate dynamics")
 print("  This tests: Can torque control track the trajectory?")
 print("  Goal: Prepare for motor parameter tuning (Mode 2 development)")
-print("\\nNote: Using mj_step() for REAL dynamics simulation")
+print("")
+print("Note: Using mj_step() for REAL dynamics simulation")
 print("  NOT kinematic playback - we want to see physics behavior!")
 
 # CRITICAL: Initialize from trajectory first frame, NOT qpos=0
 # qpos=0 causes geometric constraint violations → NaN/Inf
 # Solution: Start from a valid configuration (trajectory start)
-print("\\n📍 Initialization for physics simulation:")
+print("")
+print("📍 Initialization for physics simulation:")
 print("  Setting initial pose to TRAJECTORY FIRST FRAME (not qpos=0)")
 print("  This avoids geometric constraint violations")
 mujoco.mj_resetData(model, data)
@@ -1288,7 +1308,8 @@ print(f"  Actuators disabled, using pure torque control")
 print(f"  This should be stable (no constraint violations)")
 
 # Check initial position (should be zero mismatch since we set it directly)
-print("\\n=== Initial Position Check ===")
+print("")
+print("=== Initial Position Check ===")
 init_errors = []
 for jname, jnt_idx in joint_ids.items():
     qadr = model.jnt_qposadr[jnt_idx]
@@ -1302,7 +1323,8 @@ for jname, jnt_idx in joint_ids.items():
 
 if init_errors:
     init_rms = np.sqrt(np.mean(init_errors))
-    print(f"\\nInitial mismatch RMS: {{init_rms:.4f}} rad ({{np.rad2deg(init_rms):.2f}}°)")
+    print("")
+    print(f"Initial mismatch RMS: {{init_rms:.4f}} rad ({{np.rad2deg(init_rms):.2f}}°)")
 print("Note: With torque control, initial mismatch is okay")
 print("=" * 50)
 
@@ -1314,13 +1336,16 @@ times = []
 # Phase 2 data logging (save every step for CSV)
 phase2_log = []  # Will store: [time, step, target_pos, actual_pos, applied_force] per joint
 
-print("\\nStarting forward simulation with TORQUE CONTROL...")
+print("")
+print("Starting forward simulation with TORQUE CONTROL...")
 
 # DEBUG: Check torque_history contents
-print("\\n🔍 TORQUE HISTORY DIAGNOSTIC:")
+print("")
+print("🔍 TORQUE HISTORY DIAGNOSTIC:")
 print(f"  torque_history shape: {{torque_history.shape}}")
 print(f"  Expected: ({{n_steps}}, {{model.nv}})")  # nv not nu!
-print("\\n  Sample torques at key steps:")
+print("")
+print("  Sample torques at key steps:")
 for sample_step in [0, 500, 2500, 5000]:
     if sample_step < len(torque_history):
         max_t = np.max(np.abs(torque_history[sample_step]))
@@ -1333,10 +1358,12 @@ for sample_step in [0, 500, 2500, 5000]:
             if abs(t) > 0.1:  # Only show significant torques
                 print(f"      {{jname:30s}}: {{t:+8.2f}} Nm")
 
-print("\\nInitial position set. RMS: 0.0000 rad (should be ~0)")
+print("")
+print("Initial position set. RMS: 0.0000 rad (should be ~0)")
 print("=" * 50)
 
-print("\\nStarting forward simulation...")
+print("")
+print("Starting forward simulation...")
 
 try:
     with mujoco.viewer.launch_passive(model, data) as viewer:
@@ -1557,10 +1584,12 @@ try:
             
             sim_step += 1  # Increment simulation step
         
-        print("\\nSimulation complete!")
+        print("")
+        print("Simulation complete!")
         
         # Save Phase 2 applied control for comparison
-        print("\\n💾 Saving Phase 2 control history to CSV...")
+        print("")
+        print("💾 Saving Phase 2 control history to CSV...")
         with open('phase2_control_applied.csv', 'w', newline='') as f:
             writer = csv.writer(f)
             
