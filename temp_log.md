@@ -28,8 +28,8 @@ Select Analysis Mode:
 Enter choice [0/1/2/3/4]: 4
 Starting Inverse-to-Forward Validation...
 ======================================================================
-MODE 4 SCRIPT VERSION: 20260205_161846
-Generated: 2026-02-05 16:18:46
+MODE 4 SCRIPT VERSION: 20260205_162341
+Generated: 2026-02-05 16:23:41
 ======================================================================
 
 Model has 20 joints, 20 actuators
@@ -210,55 +210,39 @@ Checking physics stability step-by-step...
   data.qvel (first 5): [0. 0. 0. 0. 0.]
 
 📍 Analyzing initialization options:
-  Option A: model.qpos0 → [0. 0. 0. 0. 0.] (causes collision)
-  Option B: qpos_traj[0] → [0. 0. 0. 0. 0.] (actual recorded pose)
-  Choosing Option B: Use actual trajectory start
+  Option A: model.qpos0 → [0. 0. 0. 0. 0.]
+  Option B: qpos_traj[0] → [0. 0. 0. 0. 0.]
+  ⚠️  WARNING: qpos_traj[0] is all zeros! Recording started at invalid pose.
+  ⚠️  All frames are zero! Using small random values to avoid collision
 
-📍 After setting ctrl = qpos_traj[0]:
-  data.ctrl (first 5): [0. 0. 0. 0. 0.]
+📍 Strategy: Kinematic initialization (no actuator dynamics)
+  Setting data.qpos directly to: [-0.05164453  0.06931115  0.08699298  0.01449901 -0.05609536]
+  After mj_forward (kinematic only):
+    data.qpos (first 5): [-0.05164453  0.06931115  0.08699298  0.01449901 -0.05609536]
+    data.ctrl (first 5): [-0.05164453  0.06931115  0.08699298  0.01449901 -0.05609536]
 
 📍 Running 500 steps with detailed logging...
-  Step   0: max|qpos|=  0.322, max|qvel|=321.913, max|qacc|=470418.525
-  Step   1: max|qpos|= 10.055, max|qvel|=10376.468, max|qacc|=15923521.240
-  Step   2: max|qpos|= 13.010, max|qvel|=9971.733, max|qacc|=19712952.373
-  Step   3: max|qpos|= 16.105, max|qvel|=19511.436, max|qacc|=29130622.796
-  Step   4: max|qpos|= 45.537, max|qvel|=48256.430, max|qacc|=51521713.976
-WARNING: Nan, Inf or huge value in QACC at DOF 4. The simulation is unstable. Time = 0.0080.
+  Step   0: max|qpos|= 10.515, max|qvel|=10601.010, max|qacc|=15770123.958
+  Step   1: max|qpos|= 18.594, max|qvel|=22164.924, max|qacc|=33849926.358
+  Step   2: max|qpos|= 71.035, max|qvel|=78340.093, max|qacc|=98164534.305
+  Step   3: max|qpos|=1353.973, max|qvel|=1368487.727, max|qacc|=1932157698.996
 
-  Step  50: max|qpos|= 13.010, max|qvel|=9971.733, max|qacc|=19712952.373
-  Step 100: max|qpos|= 45.537, max|qvel|=48256.430, max|qacc|=51521713.976
-  Step 150: max|qpos|= 74.862, max|qvel|=92147.013, max|qacc|=121969513.223
-  Step 200: max|qpos|=  0.322, max|qvel|=321.913, max|qacc|=470418.525
-  Step 250: max|qpos|= 13.010, max|qvel|=9971.733, max|qacc|=19712952.373
-  Step 300: max|qpos|= 45.537, max|qvel|=48256.430, max|qacc|=51521713.976
-  Step 350: max|qpos|= 74.862, max|qvel|=92147.013, max|qacc|=121969513.223
-  Step 400: max|qpos|=  0.322, max|qvel|=321.913, max|qacc|=470418.525
-  Step 450: max|qpos|= 13.010, max|qvel|=9971.733, max|qacc|=19712952.373
+💥 EXPLOSION DETECTED at step 3!
+  max|qpos|=1353.9732324643185, max|qvel|=1368487.7273677876, max|qacc|=1932157698.996029
+    💥 RingFinger-2nd-pitch          : qpos=  +11.0810, qvel=+6120.8479
+    💥 MiddleFinger-1st-pitch        : qpos=  +17.2734, qvel=+18387.2961
+    💥 IndexFinger_1st_roll          : qpos=  -13.5097, qvel=-7541.3009
+    💥 thumb_1st_yaw                 : qpos= +784.1732, qvel=+823055.1469
+    💥 Thumb-1st-pitch               : qpos= +127.4000, qvel=+56365.3726
+    💥 Thumb-2nd-pitch               : qpos=-1353.9732, qvel=-1368487.7274
 
-✅ 500 steps completed without explosion
-  Final max|qpos|=16.105
-
-  Natural equilibrium found (all 20 joints):
-    LittleFinger-1st_roll         : -7.7006 rad (-441.21°)
-    LittleFinger-1st-pitch        : +5.6847 rad (+325.71°)
-    LittleFinger-2nd-pitch        : -1.5617 rad ( -89.48°)
-    LittleFinger-3rd-pitch        : +7.2628 rad (+416.13°)
-    RingFinger-1st_roll           : -7.4050 rad (-424.27°)
-    RingFinger-1st-pitch          : +4.9199 rad (+281.89°)
-    RingFinger-2nd-pitch          : -2.2647 rad (-129.76°)
-    RingFinger-3rd-pitch          : +7.4581 rad (+427.32°)
-    MiddleFinger_1st_roll         : -2.7191 rad (-155.80°)
-    MiddleFinger-1st-pitch        : -16.1055 rad (-922.77°)
-    MiddleFinger-2nd-pitch        : +10.8001 rad (+618.80°)
-    MiddleFinger-3rd-pitch        : +3.7384 rad (+214.19°)
-    IndexFinger_1st_roll          : +9.7001 rad (+555.77°)
-    IndexFinger-1st-pitch         : +1.6082 rad ( +92.14°)
-    IndexFinger-2nd-pitch         : +1.4952 rad ( +85.67°)
-    IndexFinger-3rd-pitch         : -7.7715 rad (-445.27°)
-    thumb_1st_yaw                 : +2.3389 rad (+134.01°)
-    Thumb-1st-pitch               : +4.5560 rad (+261.04°)
-    Thumb-2nd-pitch               : +1.3905 rad ( +79.67°)
-    Thumb-3rd-pitch               : +8.7764 rad (+502.85°)
+❌ Physics exploded at step 3
+   Problem: Model is fundamentally unstable!
+   Possible causes:
+     1. Joint limits violated
+     2. Actuator gains too high
+     3. Model geometry/mass issues
+     4. Constraints causing conflict
 
 ======================================================================
 DEBUG MODE COMPLETE - Exiting early for analysis
