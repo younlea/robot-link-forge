@@ -1,4 +1,4 @@
-:~/Downloads/direct_hand_parm$ ./run_torque_replay_0_recording_1768623534448.sh 
+~/Downloads/direct_hand_parm$ ./run_torque_replay_0_recording_1768623534448.sh 
 Creating virtual environment...
 Installing dependencies (mujoco, matplotlib, numpy, scipy)...
 ========================================
@@ -28,8 +28,8 @@ Select Analysis Mode:
 Enter choice [0/1/2/3/4]: 4
 Starting Inverse-to-Forward Validation...
 ======================================================================
-MODE 4 SCRIPT VERSION: 20260205_132343
-Generated: 2026-02-05 13:23:43
+MODE 4 SCRIPT VERSION: 20260205_140811
+Generated: 2026-02-05 14:08:11
 ======================================================================
 
 Model has 20 joints, 20 actuators
@@ -197,10 +197,6 @@ Using position control (not force control):
 
 Note: This is NOT pure force feedforward
   Using PD position control for stability
-  data.ctrl = torque_history[step]
-  (Direct application of inverse dynamics forces)
-
-This tests: Can the actuators track trajectory with computed forces?
 
 Letting physics settle at initial pose...
 WARNING: Nan, Inf or huge value in QACC at DOF 4. The simulation is unstable. Time = 0.0080.
@@ -332,3 +328,4 @@ Position Control (PD kp=200, kd=20):
   → Or robot model has issues (mass/inertia/constraints)
 ======================================================================
 
+Plot saved to: mode4_validation.png
