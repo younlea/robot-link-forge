@@ -1240,9 +1240,16 @@ if np.any(np.isnan(data.qpos)) or np.any(np.isinf(data.qpos)):
 if np.any(np.isnan(data.ctrl)) or np.any(np.isinf(data.ctrl)):
     print("  ⚠️  WARNING: NaN/Inf detected in ctrl immediately after reset!")
 
-# Step 2: Initialize ctrl to model defaults
-data.ctrl[:] = model.qpos0[:model.nu]
-print(f"\\n📍 After setting ctrl = model.qpos0:")
+# CRITICAL ISSUE: model.qpos0 = [0,0,0...] causes instant physics explosion
+# Root cause: qpos=0 is geometrically impossible (collisions, joint limit violations)
+# Solution: Initialize ctrl to trajectory's first frame instead
+print(f"\\n📍 Analyzing initialization options:")
+print(f"  Option A: model.qpos0 → {{model.qpos0[:5]}} (causes collision)")
+print(f"  Option B: qpos_traj[0] → {{qpos_traj[0, :5]}} (actual recorded pose)")
+print(f"  Choosing Option B: Use actual trajectory start")
+
+data.ctrl[:] = qpos_traj[0, :model.nu]
+print(f"\\n📍 After setting ctrl = qpos_traj[0]:")
 print(f"  data.ctrl (first 5): {{data.ctrl[:5]}}")
 
 # Step 3: Run step-by-step and check for explosions
