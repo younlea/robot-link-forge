@@ -1327,36 +1327,19 @@ times = []
 # Phase 2 data logging (save every step for CSV)
 phase2_log = []  # Will store: [time, step, target_pos, actual_pos, applied_force] per joint
 
-# Setup real-time 3D torque visualization
-if HAS_MATPLOTLIB:
-    import matplotlib
-    matplotlib.use('TkAgg')  # Use interactive backend
-    from mpl_toolkits.mplot3d import Axes3D
-    
-    fig = plt.figure(figsize=(12, 8))
-    ax = fig.add_subplot(111, projection='3d')
-    plt.ion()  # Interactive mode
-    plt.show(block=False)
-    
-    # Prepare joint list for visualization (limit to main joints for clarity)
-    vis_joints = []
-    vis_joint_indices = []
-    for jname, jid in joint_ids.items():
-        if 'pitch' in jname.lower() or 'roll' in jname.lower() or 'yaw' in jname.lower():
-            vis_joints.append(jname)
-            vis_joint_indices.append(model.jnt_dofadr[jid])
-    
-    # Initialize torque history for plotting (circular buffer)
-    plot_window = 100  # Show last 100 steps
-    torque_plot_buffer = np.zeros((plot_window, len(vis_joints)))
-    time_plot_buffer = np.zeros(plot_window)
-    plot_step_counter = 0
-    
-    print(f"📊 Real-time 3D torque visualization enabled")
-    print(f"   Tracking {{len(vis_joints)}} joints")
-else:
-    fig = None
-    ax = None
+# Store all torque data for post-simulation visualization
+all_torque_data = []  # Will store qfrc_applied at each step
+all_qpos_data = []    # Will store qpos at each step for replay
+
+# Prepare joint list for visualization
+vis_joints = []
+vis_joint_indices = []
+for jname, jid in joint_ids.items():
+    if 'pitch' in jname.lower() or 'roll' in jname.lower() or 'yaw' in jname.lower():
+        vis_joints.append(jname)
+        vis_joint_indices.append(model.jnt_dofadr[jid])
+
+print(f"📊 Will visualize {{len(vis_joints)}} joints in post-simulation analysis")
 
 print("")
 print("Starting forward simulation with TORQUE CONTROL...")
@@ -1387,10 +1370,47 @@ print("=" * 50)
 print("")
 print("Starting forward simulation...")
 
-try:
-    with mujoco.viewer.launch_passive(model, data) as viewer:
-        start_time = time.time()
-        sim_step = 0  # Simulation step counter
+# Replay loop - allows replaying simulation
+replay = True
+while replay:
+    print("")
+    print("="*70)
+    print("🎬 Starting/Restarting Simulation...")
+    print("="*70)
+    
+    # Reset tracking data for this run
+    tracking_errors_run = []
+    control_torques_run = []
+    times_run = []
+    phase2_log_run = []
+    all_torque_data_run = []
+    all_qpos_data_run = []
+    
+    # Reset simulation state
+    mujoco.mj_resetData(model, data)
+    data.qpos[:] = qpos_traj[0]
+    data.qvel[:] = qvel_traj[0]
+    data.qfrc_applied[:] = 0.0
+    mujoco.mj_forward(model, data)
+    
+    try:
+        with mujoco.viewer.launch_passive(model, data) as viewer:
+            # Set better camera view for hand visualization
+            # Adjust these values for optimal viewing angle
+            viewer.cam.azimuth = 90    # Horizontal rotation (degrees)
+            viewer.cam.elevation = -20  # Vertical angle (degrees)
+            viewer.cam.distance = 1.5   # Distance from target
+            viewer.cam.lookat[:] = [0.0, 0.0, 0.3]  # Look at point (x, y, z)
+            
+            print("")
+            print("📹 Camera controls:")
+            print("  - Right-click drag: Rotate view")
+            print("  - Scroll wheel: Zoom in/out")
+            print("  - Left-click drag: Pan view")
+            print("")
+            
+            start_time = time.time()
+            sim_step = 0  # Simulation step counter
         
         while viewer.is_running() and sim_step < n_steps:
             # REAL PHYSICS SIMULATION with torque control
@@ -1565,9 +1585,13 @@ try:
             # Track ACTUAL applied torque (not actuator control which is 0)
             max_applied_torque = np.max(np.abs(data.qfrc_applied))
             
-            tracking_errors.append(rms_error)
-            control_torques.append(max_applied_torque)  # Store actual torque magnitude
-            times.append(elapsed)
+            tracking_errors_run.append(rms_error)
+            control_torques_run.append(max_applied_torque)  # Store actual torque magnitude
+            times_run.append(elapsed)
+            
+            # Store torque and position data for interactive visualization
+            all_torque_data_run.append(data.qfrc_applied.copy())
+            all_qpos_data_run.append(data.qpos.copy())
             
             # Save Phase 2 data every 10 steps (reduce file size)
             if sim_step % 10 == 0:
@@ -1586,50 +1610,7 @@ try:
                     log_entry[f'{{jname}}_force'] = applied_torque  # This is Nm, not rad
                     log_entry[f'{{jname}}_error'] = target - actual
                 
-                phase2_log.append(log_entry)
-                
-                # Update 3D torque plot
-                if HAS_MATPLOTLIB and fig is not None:
-                    # Add current torques to circular buffer
-                    buffer_idx = plot_step_counter % plot_window
-                    time_plot_buffer[buffer_idx] = elapsed
-                    for i, dof_idx in enumerate(vis_joint_indices):
-                        torque_plot_buffer[buffer_idx, i] = data.qfrc_applied[dof_idx]
-                    plot_step_counter += 1
-                    
-                    # Update plot every 50 steps (0.5s)
-                    if plot_step_counter % 5 == 0:
-                        ax.cla()
-                        
-                        # Determine how much data to plot
-                        n_points = min(plot_step_counter, plot_window)
-                        
-                        # Create meshgrid for 3D surface
-                        if n_points > 1:
-                            X = np.arange(len(vis_joints))  # Joint index
-                            Y = time_plot_buffer[:n_points]  # Time
-                            X, Y = np.meshgrid(X, Y)
-                            Z = torque_plot_buffer[:n_points, :]  # Torque values
-                            
-                            # Plot 3D surface
-                            surf = ax.plot_surface(X, Y, Z, cmap='coolwarm', alpha=0.8, 
-                                                 linewidth=0, antialiased=True)
-                            
-                            ax.set_xlabel('Joint Index')
-                            ax.set_ylabel('Time (s)')
-                            ax.set_zlabel('Torque (Nm)')
-                            ax.set_title('Real-time Joint Torques (3D)')
-                            
-                            # Set joint names as x-tick labels (rotate for readability)
-                            ax.set_xticks(np.arange(len(vis_joints)))
-                            ax.set_xticklabels([j[:15] for j in vis_joints], rotation=45, ha='right')
-                            
-                            # Adjust z-axis limits for better visualization
-                            max_torque_plot = np.max(np.abs(Z))
-                            ax.set_zlim(-max_torque_plot*1.2, max_torque_plot*1.2)
-                            
-                            plt.draw()
-                            plt.pause(0.001)  # Small pause to update display
+                phase2_log_run.append(log_entry)
             
             # Print progress with diagnostics
             if sim_step % 500 == 0:
@@ -1650,33 +1631,209 @@ try:
         print("")
         print("Simulation complete!")
         
-        # Close 3D plot
-        if HAS_MATPLOTLIB and fig is not None:
-            plt.ioff()
-            print("")
-            print("📊 Keeping 3D torque plot open. Close window to continue...")
-            plt.show()  # Keep plot open until user closes
+        # Store this run's data for final analysis
+        tracking_errors.extend(tracking_errors_run)
+        control_torques.extend(control_torques_run)
+        times.extend(times_run)
+        phase2_log.extend(phase2_log_run)
+        all_torque_data.extend(all_torque_data_run)
+        all_qpos_data.extend(all_qpos_data_run)
         
-        # Save Phase 2 applied control for comparison
-        print("")
-        print("💾 Saving Phase 2 control history to CSV...")
-        with open('phase2_control_applied.csv', 'w', newline='') as f:
-            writer = csv.writer(f)
+    except KeyboardInterrupt:
+        print("\\n⚠️ Simulation interrupted by user")
+    
+    # Ask if user wants to replay
+    print("")
+    print("="*70)
+    print("🔄 REPLAY OPTIONS")
+    print("="*70)
+    print("  [R] Replay simulation from start")
+    print("  [Q] Quit and show final results")
+    print("")
+    
+    choice = input("Enter your choice (R/Q): ").strip().upper()
+    
+    if choice == 'R':
+        replay = True
+        print("\\n🔄 Restarting simulation...")
+        # Clear previous run data from final analysis (keep only last run)
+        tracking_errors = []
+        control_torques = []
+        times = []
+        phase2_log = []
+        all_torque_data = []
+        all_qpos_data = []
+    else:
+        replay = False
+        print("\\n📊 Generating interactive visualization...")
+
+# Convert lists to numpy arrays for easier indexing
+all_torque_data = np.array(all_torque_data)
+all_qpos_data = np.array(all_qpos_data)
+
+# Interactive visualization with time slider
+if HAS_MATPLOTLIB and len(all_torque_data) > 0:
+    from matplotlib.widgets import Slider
+    from mpl_toolkits.mplot3d import Axes3D
+    
+    # Create figure with 3D plot and slider
+    fig_interactive = plt.figure(figsize=(14, 10))
+    ax_3d = fig_interactive.add_subplot(111, projection='3d')
+    plt.subplots_adjust(bottom=0.15)
+    
+    # Add slider for time control
+    ax_slider = plt.axes([0.15, 0.05, 0.7, 0.03])
+    time_slider = Slider(ax_slider, 'Time (s)', 0, duration, valinit=0, valstep=dt)
+    
+    # Initial plot
+    def plot_torques_at_time(time_val):
+        \"\"\"Plot 3D bar chart of torques at given time\"\"\"
+        ax_3d.cla()
+        
+        # Find closest time step
+        step_idx = int(time_val / dt)
+        step_idx = min(step_idx, len(all_torque_data) - 1)
+        
+        # Get torques at this time step
+        torques_at_time = all_torque_data[step_idx]
+        
+        # Prepare data for 3D bar plot
+        # Group joints by finger
+        fingers = {{'Thumb': [], 'Index': [], 'Middle': [], 'Ring': [], 'Little': []}}
+        for jname, jid in joint_ids.items():
+            dof_adr = model.jnt_dofadr[jid]
+            torque = torques_at_time[dof_adr]
             
-            # Header: time, step, then for each joint: target, actual, force, error
-            header = ['time_s', 'step']
-            for jname in joint_names_ordered:
-                header.extend([
-                    f'{{jname}}_target_rad',
-                    f'{{jname}}_actual_rad',
-                    f'{{jname}}_force_Nm',
-                    f'{{jname}}_error_rad'
-                ])
-            writer.writerow(header)
+            # Categorize by finger
+            for finger_name in fingers.keys():
+                if finger_name in jname:
+                    fingers[finger_name].append((jname, torque))
+                    break
+        
+        # Create 3D bar plot
+        x_pos = []
+        y_pos = []
+        z_pos = []
+        dx = []
+        dy = []
+        dz = []
+        colors = []
+        labels = []
+        
+        finger_colors = {{
+            'Thumb': 'red',
+            'Index': 'blue', 
+            'Middle': 'green',
+            'Ring': 'orange',
+            'Little': 'purple'
+        }}
+        
+        finger_idx = 0
+        for finger_name, joint_list in fingers.items():
+            if not joint_list:
+                continue
+            for joint_idx, (jname, torque) in enumerate(joint_list):
+                x_pos.append(finger_idx)
+                y_pos.append(joint_idx)
+                z_pos.append(0)
+                dx.append(0.8)
+                dy.append(0.8)
+                dz.append(torque)
+                colors.append(finger_colors[finger_name])
+                labels.append(f"{{finger_name}}-{{joint_idx+1}}")
+            finger_idx += 1
+        
+        # Plot bars
+        ax_3d.bar3d(x_pos, y_pos, z_pos, dx, dy, dz, color=colors, alpha=0.8, shade=True)
+        
+        ax_3d.set_xlabel('Finger')
+        ax_3d.set_ylabel('Joint')
+        ax_3d.set_zlabel('Torque (Nm)')
+        ax_3d.set_title(f'Joint Torques at t={{time_val:.2f}}s')
+        
+        # Set x-axis labels
+        ax_3d.set_xticks(range(len(fingers)))
+        ax_3d.set_xticklabels(list(fingers.keys()))
+        
+        # Set reasonable z-axis limits
+        max_torque = np.max(np.abs(all_torque_data))
+        ax_3d.set_zlim(-max_torque*1.1, max_torque*1.1)
+        
+        plt.draw()
+    
+    # Update function for slider
+    def update_time(val):
+        time_val = time_slider.val
+        plot_torques_at_time(time_val)
+        
+        # Update MuJoCo viewer if still open
+        step_idx = int(time_val / dt)
+        step_idx = min(step_idx, len(all_qpos_data) - 1)
+        if step_idx < len(all_qpos_data):
+            data.qpos[:] = all_qpos_data[step_idx]
+            mujoco.mj_forward(model, data)
+    
+    time_slider.on_changed(update_time)
+    
+    # Initial plot
+    plot_torques_at_time(0.0)
+    
+    print("")
+    print("="*70)
+    print("🎮 INTERACTIVE VISUALIZATION")
+    print("="*70)
+    print("  - Use slider to scrub through time")
+    print("  - Graph shows: Finger (X) - Joint (Y) - Torque (Z)")
+    print("  - Colors represent different fingers")
+    print("")
+    print("  Opening MuJoCo viewer for pose visualization...")
+    print("  (Viewer will update when you move the slider)")
+    print("="*70)
+    
+    # Launch MuJoCo viewer in passive mode for visualization
+    try:
+        with mujoco.viewer.launch_passive(model, data) as viewer:
+            # Set camera view
+            viewer.cam.azimuth = 90
+            viewer.cam.elevation = -20
+            viewer.cam.distance = 1.5
+            viewer.cam.lookat[:] = [0.0, 0.0, 0.3]
             
-            # Write logged data
-            for entry in phase2_log:
-                row = [entry['time'], entry['step']]
+            # Keep viewer open while matplotlib is interactive
+            print("\\n📹 MuJoCo viewer active. Move slider to see pose change.")
+            print("   Close matplotlib window to continue...")
+            
+            while plt.fignum_exists(fig_interactive.number):
+                viewer.sync()
+                plt.pause(0.1)
+    except:
+        print("\\n⚠️ Could not open MuJoCo viewer")
+    
+    plt.close(fig_interactive)
+
+# Final summary and cleanup
+if HAS_MATPLOTLIB and len(all_torque_data) > 0:
+
+# Save Phase 2 applied control for comparison (last run only)
+print("")
+print("💾 Saving Phase 2 control history to CSV...")
+with open('phase2_control_applied.csv', 'w', newline='') as f:
+    writer = csv.writer(f)
+    
+    # Header: time, step, then for each joint: target, actual, force, error
+    header = ['time_s', 'step']
+    for jname in joint_names_ordered:
+        header.extend([
+            f'{{jname}}_target_rad',
+            f'{{jname}}_actual_rad',
+            f'{{jname}}_force_Nm',
+            f'{{jname}}_error_rad'
+        ])
+    writer.writerow(header)
+    
+    # Write logged data
+    for entry in phase2_log:
+        row = [entry['time'], entry['step']]
                 for jname in joint_names_ordered:
                     row.append(entry.get(f'{{jname}}_target', 0))
                     row.append(entry.get(f'{{jname}}_actual', 0))
@@ -1730,7 +1887,10 @@ if len(tracking_errors) > 0:
     
     # Plot results
     if HAS_MATPLOTLIB:
-        fig, axes = plt.subplots(3, 1, figsize=(12, 10))
+        print("")
+        print("📊 Generating final validation plots...")
+        
+        fig_results, axes = plt.subplots(3, 1, figsize=(12, 10))
         
         # Plot 1: Tracking Error (RMS)
         axes[0].plot(times, np.rad2deg(tracking_errors), 'b-', linewidth=1.5, label='RMS Error')
@@ -1795,7 +1955,8 @@ if len(tracking_errors) > 0:
         
         plt.tight_layout()
         plt.savefig('mode4_validation.png', dpi=150)
-        print("\\nPlot saved to: mode4_validation.png")
+        print("\\n📊 Plot saved to: mode4_validation.png")
+        print("📊 Showing final results. Close window to exit...")
         plt.show()
 
 # Cleanup temporary MJCF file
