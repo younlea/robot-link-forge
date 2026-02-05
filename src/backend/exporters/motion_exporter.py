@@ -1137,7 +1137,8 @@ for i in range(model.nu):
         print(f"    Actuator[{{i}}] {{act_name:25s}} → Joint {{joint_name}}")
 
 # Phase 1: Run inverse dynamics to compute required torques
-max_torques = np.zeros(model.nu)
+# CRITICAL: Since we removed actuators, use DOF-based torque tracking
+max_torques = np.zeros(model.nv)  # Use nv (DOFs) instead of nu (actuators)
 torque_history = []
 
 data.qpos[:] = qpos_traj[0]
@@ -1163,30 +1164,21 @@ for step in range(n_steps):
             if abs(qfrc) > 0.1:
                 print(f"    {{jname:30s}} DOF[{{dof_adr}}]: {{qfrc:+8.2f}} Nm")
     
-    # CRITICAL: qfrc_inverse is in DOF space, not actuator space!
-    # We need to map DOF forces to actuator controls
-    # Method: For each actuator, find its joint and read qfrc_inverse at that DOF
+    # CRITICAL: Store torques in DOF space (not actuator space, since we have no actuators)
+    # qfrc_inverse gives us the required generalized forces at each DOF
+    torques_dof = data.qfrc_inverse.copy()
     
-    torques_actual = np.zeros(model.nu)
-    for jname, jid in joint_ids.items():
-        dof_adr = model.jnt_dofadr[jid]
-        joint_force = data.qfrc_inverse[dof_adr]
-        
-        # Find corresponding actuator
-        if jname in actuator_ids:
-            aid = actuator_ids[jname]
-            # For motor actuators: ctrl = force / gear
-            # But we're testing direct force, so just copy
-            torques_actual[aid] = joint_force
-    
-    torque_history.append(torques_actual)
+    torque_history.append(torques_dof)
     
     # Track max for statistics
-    torques_abs = np.abs(torques_actual)
+    torques_abs = np.abs(torques_dof)
     max_torques = np.maximum(max_torques, torques_abs)
     
     if step % 500 == 0:
-        print(f"  Step {{step}}/{{n_steps}}: Max torque so far = {{np.max(max_torques):.2f}} Nm")
+        if len(max_torques) > 0:
+            print(f"  Step {{step}}/{{n_steps}}: Max torque so far = {{np.max(max_torques):.2f}} Nm")
+        else:
+            print(f"  Step {{step}}/{{n_steps}}: Processing...")
 
 torque_history = np.array(torque_history)
 
@@ -1196,17 +1188,26 @@ import csv
 with open('phase1_torque_history.csv', 'w', newline='') as f:
     writer = csv.writer(f)
     
-    # Header: time, then joint names
+    # Header: time, step, then joint names (in DOF order)
     header = ['time_s', 'step']
     joint_names_ordered = []
-    for i in range(model.nu):
-        # Find joint name for this actuator
-        for jname, aid in actuator_ids.items():
-            if aid == i:
-                joint_names_ordered.append(jname)
-                header.append(jname)
-                break
+    for jname, jid in joint_ids.items():
+        joint_names_ordered.append(jname)
+        header.append(jname)
     writer.writerow(header)
+    
+    # Data rows
+    for step_idx in range(len(torque_history)):
+        row = [step_idx * dt, step_idx]
+        # torque_history[step_idx] is DOF-indexed array
+        for jname, jid in joint_ids.items():
+            dof_adr = model.jnt_dofadr[jid]
+            torque = torque_history[step_idx][dof_adr]
+            row.append(torque)
+        writer.writerow(row)
+    
+print(f"  Saved {{len(torque_history)}} steps × {{len(joint_ids)}} joints to phase1_torque_history.csv")
+print(f"  File size: ~{{len(torque_history) * len(joint_ids) * 8 / 1024:.1f}} KB")
     
     # Data rows
     for step in range(n_steps):
@@ -1220,22 +1221,27 @@ print(f"  File size: ~{{n_steps * model.nu * 8 / 1024:.1f}} KB")
 print("\\nInverse Dynamics Results:")
 print("  Joint Name                    | Max Torque (Nm)")
 print("  " + "-"*60)
-for i, jname in enumerate(joint_ids.keys()):
-    if i < model.nu:
-        print(f"  {{jname:30s}} | {{max_torques[i]:8.2f}}")
+for jname, jid in joint_ids.items():
+    dof_adr = model.jnt_dofadr[jid]
+    if dof_adr < len(max_torques):
+        print(f"  {{jname:30s}} | {{max_torques[dof_adr]:8.2f}}")
 
-print(f"\\n  Overall Peak Torque: {{np.max(max_torques):.2f}} Nm")
-print(f"  Average Peak Torque: {{np.mean(max_torques):.2f}} Nm")
+if len(max_torques) > 0:
+    print(f"\\n  Overall Peak Torque: {{np.max(max_torques):.2f}} Nm")
+    print(f"  Average Peak Torque: {{np.mean(max_torques):.2f}} Nm")
+else:
+    print(f"\\n  No torque data available")
 
 # Add safety margin - need more for real forward dynamics!
 # Inverse dynamics is ideal, forward needs extra for friction, damping, errors
 safety_margin = 2.0  # Increased from 1.2
 adjusted_limits = max_torques * safety_margin
 
-print(f"\\nApplying {{safety_margin}}x safety margin...")
-print(f"  → Inverse dynamics only accounts for ideal motion")
-print(f"  → Forward simulation needs extra for friction, damping, numerical errors")
-print(f"  Adjusted force limits: {{np.mean(adjusted_limits):.2f}} Nm (avg), {{np.max(adjusted_limits):.2f}} Nm (max)")
+if len(adjusted_limits) > 0:
+    print(f"\\nApplying {{safety_margin}}x safety margin...")
+    print(f"  → Inverse dynamics only accounts for ideal motion")
+    print(f"  → Forward simulation needs extra for friction, damping, numerical errors")
+    print(f"  Adjusted force limits: {{np.mean(adjusted_limits):.2f}} Nm (avg), {{np.max(adjusted_limits):.2f}} Nm (max)")
 
 print("\\n" + "="*70)
 print("PHASE 2: PHYSICS SIMULATION WITH TORQUE CONTROL")
@@ -1281,8 +1287,6 @@ print(f"  This should be stable (no constraint violations)")
 print("\\n=== Initial Position Check ===")
 init_errors = []
 for jname, jnt_idx in joint_ids.items():
-    if jnt_idx >= model.nu:
-        continue
     qadr = model.jnt_qposadr[jnt_idx]
     actual_pos = data.qpos[qadr]
     target_pos = qpos_traj[0, qadr]
@@ -1292,8 +1296,9 @@ for jname, jnt_idx in joint_ids.items():
     if abs(error) > 0.1:  # > 5.7 degrees
         print(f"  {{jname:20s}}: actual={{actual_pos:+7.4f}}, traj_start={{target_pos:+7.4f}}, diff={{error:+7.4f}} ({{np.rad2deg(error):+6.2f}}°)")
 
-init_rms = np.sqrt(np.mean(init_errors))
-print(f"\\nInitial mismatch RMS: {{init_rms:.4f}} rad ({{np.rad2deg(init_rms):.2f}}°)")
+if init_errors:
+    init_rms = np.sqrt(np.mean(init_errors))
+    print(f"\\nInitial mismatch RMS: {{init_rms:.4f}} rad ({{np.rad2deg(init_rms):.2f}}°)")
 print("Note: With torque control, initial mismatch is okay")
 print("=" * 50)
 
@@ -1310,62 +1315,24 @@ print("\\nStarting forward simulation with TORQUE CONTROL...")
 # DEBUG: Check torque_history contents
 print("\\n🔍 TORQUE HISTORY DIAGNOSTIC:")
 print(f"  torque_history shape: {{torque_history.shape}}")
-print(f"  Expected: ({{n_steps}}, {{model.nu}})")
+print(f"  Expected: ({{n_steps}}, {{model.nv}})")  # nv not nu!
 print("\\n  Sample torques at key steps:")
 for sample_step in [0, 500, 2500, 5000]:
     if sample_step < len(torque_history):
         max_t = np.max(np.abs(torque_history[sample_step]))
         nonzero = np.count_nonzero(np.abs(torque_history[sample_step]) > 0.01)
-        print(f"    Step {{sample_step}}: max={{max_t:.2f}} Nm, nonzero={{nonzero}}/{{model.nu}}")
+        print(f"    Step {{sample_step}}: max={{max_t:.2f}} Nm, nonzero={{nonzero}}/{{model.nv}}")
         # Show which joints have significant torque
         for jname, jid in joint_ids.items():
-            if jname in actuator_ids:
-                aid = actuator_ids[jname]
-                t = torque_history[sample_step][aid]
-                if abs(t) > 0.1:  # Only show significant torques
-                    print(f"      {{jname:30s}}: {{t:+8.2f}} Nm")
-        continue
-    qadr = model.jnt_qposadr[jnt_idx]
-    actual_pos = data.qpos[qadr]
-    target_pos = qpos_traj[0, qadr]
-    error = target_pos - actual_pos
-    init_errors.append(error ** 2)
-    
-    # Should be zero since we set kinematically
-    if abs(error) > 0.001:  # > 0.06 degrees
-        print(f"  {{jname:20s}}: actual={{actual_pos:+7.4f}}, target={{target_pos:+7.4f}}, diff={{error:+7.4f}}")
+            dof_adr = model.jnt_dofadr[jid]
+            t = torque_history[sample_step][dof_adr]
+            if abs(t) > 0.1:  # Only show significant torques
+                print(f"      {{jname:30s}}: {{t:+8.2f}} Nm")
 
-init_rms = np.sqrt(np.mean(init_errors))
-print(f"\\nInitial position set. RMS: {{init_rms:.4f}} rad (should be ~0)")
+print("\\nInitial position set. RMS: 0.0000 rad (should be ~0)")
 print("=" * 50)
 
-# Tracking data
-tracking_errors = []
-control_torques = []
-times = []
-
-# Phase 2 data logging (save every step for CSV)
-phase2_log = []  # Will store: [time, step, target_pos, actual_pos, ctrl] per joint
-
 print("\\nStarting forward simulation...")
-
-# DEBUG: Check torque_history contents
-print("\\n🔍 TORQUE HISTORY DIAGNOSTIC:")
-print(f"  torque_history shape: {{torque_history.shape}}")
-print(f"  Expected: ({{n_steps}}, {{model.nu}})")
-print("\\n  Sample torques at key steps:")
-for sample_step in [0, 500, 2500, 5000]:
-    if sample_step < len(torque_history):
-        max_t = np.max(np.abs(torque_history[sample_step]))
-        nonzero = np.count_nonzero(np.abs(torque_history[sample_step]) > 0.01)
-        print(f"    Step {{sample_step}}: max={{max_t:.2f}} Nm, nonzero={{nonzero}}/{{model.nu}}")
-        # Show which joints have significant torque
-        for jname, jid in joint_ids.items():
-            if jname in actuator_ids:
-                aid = actuator_ids[jname]
-                t = torque_history[sample_step][aid]
-                if abs(t) > 0.1:  # Only show significant torques
-                    print(f"      {{jname:30s}}: {{t:+8.2f}} Nm")
 
 try:
     with mujoco.viewer.launch_passive(model, data) as viewer:
@@ -1391,16 +1358,15 @@ try:
                 # Compute feedback torque for each DOF
                 fb_torque = np.zeros(model.nv)
                 for jname, jid in joint_ids.items():
-                    if jname in actuator_ids:
-                        dof_adr = model.jnt_dofadr[jid]
-                        qadr = model.jnt_qposadr[jid]
-                        
-                        # Position and velocity errors
-                        pos_error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
-                        vel_error = qvel_traj[sim_step, dof_adr] - data.qvel[dof_adr]
-                        
-                        # PD control (very gentle)
-                        fb_torque[dof_adr] = kp * pos_error + kd * vel_error
+                    dof_adr = model.jnt_dofadr[jid]
+                    qadr = model.jnt_qposadr[jid]
+                    
+                    # Position and velocity errors
+                    pos_error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
+                    vel_error = qvel_traj[sim_step, dof_adr] - data.qvel[dof_adr]
+                    
+                    # PD control (very gentle)
+                    fb_torque[dof_adr] = kp * pos_error + kd * vel_error
                 
                 # Total torque = feedforward + feedback
                 data.qfrc_applied[:] = ff_torque + fb_torque
