@@ -1196,35 +1196,35 @@ print(f"  → Forward simulation needs extra for friction, damping, numerical er
 print(f"  Adjusted force limits: {{np.mean(adjusted_limits):.2f}} Nm (avg), {{np.max(adjusted_limits):.2f}} Nm (max)")
 
 print("\\n" + "="*70)
-print("PHASE 2: FORWARD SIMULATION WITH TORQUE CONTROL")
+print("PHASE 2: PHYSICS SIMULATION WITH TORQUE CONTROL")
 print("="*70)
 
-print("\\nUsing DIRECT TORQUE control (not position control):")
-print("  Apply torques from Phase 1 inverse dynamics")
-print("  Use data.qfrc_applied (generalized forces)")
-print("  This is pure feedforward torque control")
-print("\\nNote: Position actuators in MJCF are IGNORED")
-print("  We bypass actuators and apply forces directly")
+print("\\nUsing REAL PHYSICS SIMULATION with torque control:")
+print("  Apply torques from Phase 1 → mj_step() → simulate dynamics")
+print("  This tests: Can torque control track the trajectory?")
+print("  Goal: Prepare for motor parameter tuning (Mode 2 development)")
+print("\\nNote: Using mj_step() for REAL dynamics simulation")
+print("  NOT kinematic playback - we want to see physics behavior!")
 
-# CRITICAL: With torque control, DON'T let physics settle
-# model.qpos0=[0,0,0] is unstable, gravity causes explosion
-# Instead: Start KINEMATICALLY at trajectory first frame
-print("\\n📍 Initialization for torque control:")
-print("  SKIPPING physics settle (causes instability)")
-print("  Setting initial pose kinematically to trajectory start")
+# CRITICAL: Initialize from trajectory first frame, NOT qpos=0
+# qpos=0 causes geometric constraint violations → NaN/Inf
+# Solution: Start from a valid configuration (trajectory start)
+print("\\n📍 Initialization for physics simulation:")
+print("  Setting initial pose to TRAJECTORY FIRST FRAME (not qpos=0)")
+print("  This avoids geometric constraint violations")
 mujoco.mj_resetData(model, data)
 
-# Set to trajectory first frame KINEMATICALLY (no dynamics)
-# Even though trajectory starts at [0,0,0], we set it without running physics
+# Initialize from trajectory start (valid configuration)
 data.qpos[:] = qpos_traj[0]
-data.qvel[:] = 0.0
-data.ctrl[:] = 0.0  # Disable actuators
+data.qvel[:] = qvel_traj[0]
+data.ctrl[:] = 0.0  # Disable position actuators
 data.qfrc_applied[:] = 0.0
 
-# Compute kinematics (no dynamics, just geometry)
+# Compute forward kinematics for initial state
 mujoco.mj_forward(model, data)
 
-print(f"  Initial pose set (kinematic, no physics). Sample: {{data.qpos[:5]}}")
+print(f"  Initial pose from trajectory: {{data.qpos[:5]}}")
+print(f"  This should be stable (no constraint violations)")
 
 # Check initial position (should be zero mismatch since we set it directly)
 print("\\n=== Initial Position Check ===")
@@ -1322,63 +1322,119 @@ try:
         sim_step = 0  # Simulation step counter
         
         while viewer.is_running() and sim_step < n_steps:
-            # Use simulation steps, not real time!
-            # Real time can be too fast and skip steps
+            # REAL PHYSICS SIMULATION with torque control
+            # This is what we want to test for Mode 2 development!
             
-            # TORQUE CONTROL: Apply forces from inverse dynamics
-            # Bypass position actuators completely
-            data.ctrl[:] = 0.0  # Disable position actuators
+            # Apply torques from inverse dynamics (Phase 1)
+            # Use qfrc_applied to directly apply generalized forces
+            if sim_step < len(torque_history):
+                data.qfrc_applied[:] = torque_history[sim_step]
+            else:
+                data.qfrc_applied[:] = 0.0
             
-            # CRITICAL: Inverse dynamics alone is NOT enough!
-            # We need: feedforward torque + gravity compensation + tracking feedback
-            
-            # Step 1: Apply feedforward torques from Phase 1
-            for jname, jid in joint_ids.items():
-                if jname in actuator_ids:
-                    aid = actuator_ids[jname]
-                    dof_adr = model.jnt_dofadr[jid]
-                    qadr = model.jnt_qposadr[jid]
-                    
-                    # Feedforward from inverse dynamics
-                    ff_torque = torque_history[sim_step][aid]
-                    
-                    # PD feedback for tracking (essential for stability!)
-                    # Without this, robot drifts away from trajectory
-                    kp = 50.0  # Position gain
-                    kd = 10.0  # Velocity gain
-                    
-                    pos_error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
-                    vel_error = qvel_traj[sim_step, qadr] - data.qvel[dof_adr]
-                    
-                    pd_torque = kp * pos_error + kd * vel_error
-                    
-                    # Total torque = feedforward + feedback
-                    total_torque = ff_torque + pd_torque
-                    
-                    data.qfrc_applied[dof_adr] = total_torque
-            
-            # Store applied forces for logging
-            applied_forces = data.qfrc_applied.copy()
-            
-            # DEBUG: Verify torques before physics step
-            if sim_step == 0 or sim_step == 500:
-                print(f"\\n🔍 DEBUG at step {{sim_step}}:")
-                print(f"  Using TORQUE control (feedforward + PD feedback)")
-                nonzero_torques = np.count_nonzero(np.abs(data.qfrc_applied) > 0.01)
-                print(f"  Nonzero torques: {{nonzero_torques}}/{{model.nv}}")
+            # DEBUG: Monitor torque application, physics state, and COLLISIONS
+            if sim_step == 0 or sim_step == 500 or sim_step % 1000 == 0:
+                print(f"\\n🔍 PHYSICS DEBUG at step {{sim_step}}:")
+                print(f"  Using REAL PHYSICS (mj_step) with torque control")
                 max_torque = np.max(np.abs(data.qfrc_applied))
-                print(f"  Max torque: {{max_torque:.2f}} Nm")
-                for jname, jid in list(joint_ids.items())[:5]:
+                nonzero_torques = np.count_nonzero(np.abs(data.qfrc_applied) > 0.01)
+                print(f"  Applied torques: {{nonzero_torques}}/{{model.nv}}, Max: {{max_torque:.2f}} Nm")
+                
+                # Check for instability warnings
+                if np.any(np.isnan(data.qpos)) or np.any(np.isinf(data.qpos)):
+                    print("  ⚠️ WARNING: NaN/Inf detected in qpos!")
+                if np.max(np.abs(data.qvel)) > 100:
+                    print(f"  ⚠️ WARNING: High velocity detected: {{np.max(np.abs(data.qvel)):.2f}}")
+                
+                # COLLISION DETECTION: Check for contacts between bodies
+                print(f"\\n  💥 COLLISION DEBUG:")
+                print(f"     Active contacts: {{data.ncon}}")
+                
+                if data.ncon > 0:
+                    print(f"     ⚠️ COLLISIONS DETECTED! Analyzing contact pairs...")
+                    for i in range(min(data.ncon, 10)):  # Show first 10 contacts
+                        contact = data.contact[i]
+                        geom1 = contact.geom1
+                        geom2 = contact.geom2
+                        
+                        # Get body IDs from geometry IDs
+                        body1_id = model.geom_bodyid[geom1]
+                        body2_id = model.geom_bodyid[geom2]
+                        
+                        # Get body names
+                        body1_name = model.body(body1_id).name if body1_id >= 0 else "world"
+                        body2_name = model.body(body2_id).name if body2_id >= 0 else "world"
+                        
+                        # Contact distance (negative = penetration)
+                        dist = contact.dist
+                        
+                        # Get contact force magnitude
+                        # contact.frame: contact frame (3x3 rotation matrix stored as 9 elements)
+                        # We need to compute force from constraint forces
+                        # For now, just show penetration depth
+                        
+                        print(f"       Contact {{i+1}}: {{body1_name:25s}} <-> {{body2_name:25s}}")
+                        print(f"                 Penetration: {{-dist*1000:.2f}} mm" + 
+                              (" 🔴 DEEP!" if dist < -0.005 else ""))
+                
+                else:
+                    print(f"     ✅ No collisions (collision exclusions working)")
+                
+                # Show sample joint states
+                print(f"\\n  Joint States:")
+                for jname, jid in list(joint_ids.items())[:3]:
                     if jname in actuator_ids:
                         dof_adr = model.jnt_dofadr[jid]
                         qadr = model.jnt_qposadr[jid]
-                        target_pos = qpos_traj[sim_step, qadr]
-                        current_pos = data.qpos[qadr]
+                        pos = data.qpos[qadr]
+                        vel = data.qvel[dof_adr]
                         torque = data.qfrc_applied[dof_adr]
-                        pos_err = target_pos - current_pos
-                        print(f"    {{jname:30s}}: target={{target_pos:+8.4f}}, curr={{current_pos:+8.4f}}, err={{pos_err:+7.4f}}, torque={{torque:+8.2f}} Nm")
+                        target = qpos_traj[sim_step, qadr]
+                        error = target - pos
+                        print(f"    {{jname:30s}}: pos={{pos:+7.3f}} (target={{target:+7.3f}}, err={{error:+7.3f}}), vel={{vel:+7.3f}}, torque={{torque:+7.2f}} Nm")
             
+            # Run physics simulation step
+            # This is the KEY difference from kinematic playback!
             mujoco.mj_step(model, data)
+            
+            # COLLISION MONITORING: Check for any collisions after step
+            # This is CRITICAL - collisions can cause constraint forces that lead to instability
+            if data.ncon > 0:
+                # Collision detected! This could be the cause of divergence
+                if sim_step % 100 == 0:  # Report every 100 steps if collisions persist
+                    print(f"\\n⚠️ COLLISION WARNING at step {{sim_step}}:")
+                    print(f"   {{data.ncon}} active contacts detected")
+                    # Show first few problematic contacts
+                    for i in range(min(data.ncon, 3)):
+                        contact = data.contact[i]
+                        body1_id = model.geom_bodyid[contact.geom1]
+                        body2_id = model.geom_bodyid[contact.geom2]
+                        body1_name = model.body(body1_id).name if body1_id >= 0 else "world"
+                        body2_name = model.body(body2_id).name if body2_id >= 0 else "world"
+                        print(f"      {{body1_name}} <-> {{body2_name}}, penetration: {{-contact.dist*1000:.2f}}mm")
+            
+            # Check for catastrophic failure (NaN/Inf)
+            if np.any(np.isnan(data.qpos)) or np.any(np.isinf(data.qpos)):
+                print(f"\\n🔴 CATASTROPHIC FAILURE at step {{sim_step}}:")
+                print(f"   NaN/Inf detected in qpos!")
+                print(f"   Last known collisions: {{data.ncon}}")
+                if data.ncon > 0:
+                    print(f"   Collision body pairs:")
+                    for i in range(min(data.ncon, 5)):
+                        contact = data.contact[i]
+                        body1_id = model.geom_bodyid[contact.geom1]
+                        body2_id = model.geom_bodyid[contact.geom2]
+                        body1_name = model.body(body1_id).name if body1_id >= 0 else "world"
+                        body2_name = model.body(body2_id).name if body2_id >= 0 else "world"
+                        print(f"      {{body1_name}} <-> {{body2_name}}")
+                print(f"\\n   This likely means:")
+                print(f"   1. Missing collision exclusions (check MJCF <contact> section)")
+                print(f"   2. Excessive constraint forces from geometry conflicts")
+                print(f"   3. Torques too high or initial configuration invalid")
+                break  # Stop simulation
+            
+            # Store actual applied forces for analysis
+            applied_forces = data.qfrc_applied.copy()
             
             # Sync viewer every 10 steps for faster playback (100Hz physics -> 10Hz rendering)
             if sim_step % 10 == 0:

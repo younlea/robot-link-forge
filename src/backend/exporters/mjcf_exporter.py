@@ -798,6 +798,14 @@ def generate_mjcf_xml(
                     xml.insert(i, exclusion)
                 break
         print(f"✓ Added {len(contact_exclusions)} collision exclusions (parent-child + siblings)")
+        print(f"  Sample exclusions:")
+        for excl in contact_exclusions[:5]:  # Show first 5
+            print(f"    {excl.strip()}")
+        if len(contact_exclusions) > 5:
+            print(f"    ... and {len(contact_exclusions) - 5} more")
+    else:
+        print(f"⚠️ WARNING: No collision exclusions were added!")
+        print(f"   This may cause instability from adjacent link collisions")
 
     if actuators:
         xml.append("  <actuator>")
