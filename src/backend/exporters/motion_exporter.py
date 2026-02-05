@@ -1145,7 +1145,8 @@ data.qpos[:] = qpos_traj[0]
 data.qvel[:] = 0.0
 mujoco.mj_forward(model, data)
 
-print("\\n" + "="*70)
+print("")
+print("="*70)
 for step in range(n_steps):
     data.qpos[:] = qpos_traj[step]
     data.qvel[:] = qvel_traj[step]
