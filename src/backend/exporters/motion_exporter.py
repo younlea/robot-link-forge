@@ -1243,19 +1243,27 @@ for i in range(1500):
             data.ctrl[aid] = qpos_traj[0, qadr]
     mujoco.mj_step(model, data)
 
-# Check initial error
+# Check initial position mismatch (potential oscillation cause)
+print("\\n=== Initial Position Mismatch Check ===")
 init_errors = []
 for jname, jnt_idx in joint_ids.items():
     if jnt_idx >= model.nu:
         continue
     qadr = model.jnt_qposadr[jnt_idx]
-    error = qpos_traj[0, qadr] - data.qpos[qadr]
+    actual_pos = data.qpos[qadr]
+    target_pos = qpos_traj[0, qadr]
+    error = target_pos - actual_pos
     init_errors.append(error ** 2)
+    
+    # Print detailed mismatch for each joint
+    print(f"  {{jname:20s}}: actual={{actual_pos:7.4f}} rad, target={{target_pos:7.4f}} rad, diff={{error:7.4f}} rad ({{np.rad2deg(error):6.2f}}°)")
+    
     if abs(error) > 0.1:  # > 5.7 degrees
-        print(f"  Warning: {{jname}} has {{np.rad2deg(abs(error)):.1f}}° initial error")
+        print(f"    ⚠️  WARNING: Large mismatch detected!")
 
 init_rms = np.sqrt(np.mean(init_errors))
-print(f"Initial RMS error after stabilization: {{init_rms:.4f}} rad ({{np.rad2deg(init_rms):.2f}}°)")
+print(f"\\nInitial RMS error after stabilization: {{init_rms:.4f}} rad ({{np.rad2deg(init_rms):.2f}}°)")
+print("=" * 50)
 
 if init_rms > 0.2:
     print("  ⚠️  Large initial error! Physics may be unstable or gains too weak")
