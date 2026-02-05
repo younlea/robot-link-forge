@@ -1407,14 +1407,15 @@ try:
                         jid = joint_ids[jname]
                         aid = actuator_ids[jname]
                         qadr = model.jnt_qposadr[jid]
+                        dof_adr = model.jnt_dofadr[jid]
                         
                         target = qpos_traj[sim_step, qadr]
                         actual = data.qpos[qadr]
-                        ctrl_cmd = data.ctrl[aid]  # Position command
+                        applied_torque = applied_forces[dof_adr]  # Torque in Nm, not rad!
                         
                         log_entry[f'{{jname}}_target'] = target
                         log_entry[f'{{jname}}_actual'] = actual
-                        log_entry[f'{{jname}}_ctrl'] = ctrl_cmd
+                        log_entry[f'{{jname}}_force'] = applied_torque  # This is Nm, not rad
                         log_entry[f'{{jname}}_error'] = target - actual
                 
                 phase2_log.append(log_entry)
