@@ -85,9 +85,10 @@ def generate_mjcf_xml(
     # CRITICAL: Contact settings to prevent adjacent link collisions
     # Adjacent links in kinematic chain should not collide with each other
     xml.append('  <contact>')
-    xml.append('    <!-- Exclude parent-child body pairs from collision detection -->')
-    xml.append('    <!-- This prevents instability when joints are at extreme positions -->')
-    # Will be populated after build_body() collects parent-child pairs
+    xml.append('    <!-- Exclude parent-child and sibling body pairs from collision detection -->')
+    xml.append('    <!-- Parent-child: joints in kinematic chain -->')
+    xml.append('    <!-- Siblings: multiple joints from same parent (e.g. finger yaw+pitch) -->')
+    # Will be populated after build_body() collects pairs
     xml.append('  </contact>')
     
     # Placeholder for contact exclusions - will be inserted later
@@ -749,6 +750,25 @@ def generate_mjcf_xml(
                 sensor_name = f"sensor_{body_name}"
                 sensors.append(f'    <touch name="{sensor_name}" site="{site_name}" />')
 
+        # Collect child body names for sibling collision exclusion
+        # (e.g., finger yaw and pitch joints from same parent link)
+        child_body_names = []
+        for child_joint_id in link.childJoints:
+            child_joint = robot.joints.get(child_joint_id)
+            if child_joint and child_joint.childLinkId:
+                child_link = robot.links.get(child_joint.childLinkId)
+                if child_link:
+                    child_body_name = unique_link_names.get(child_joint.childLinkId, child_link.name)
+                    child_body_names.append(child_body_name)
+        
+        # Add sibling pairs (children of same parent) for collision exclusion
+        # This handles cases like finger first joint with yaw+pitch at same location
+        if len(child_body_names) >= 2:
+            for i in range(len(child_body_names)):
+                for j in range(i + 1, len(child_body_names)):
+                    parent_child_pairs.append((child_body_names[i], child_body_names[j]))
+        
+        # Build child bodies recursively
         for child_joint_id in link.childJoints:
             child_joint = robot.joints.get(child_joint_id)
             if child_joint and child_joint.childLinkId:
@@ -763,10 +783,10 @@ def generate_mjcf_xml(
     xml.append("    </body>  <!-- End fixed_world -->")
     xml.append("  </worldbody>")
     
-    # Insert contact exclusions now that we have all parent-child pairs
+    # Insert contact exclusions now that we have all parent-child and sibling pairs
     contact_exclusions = []
-    for parent, child in parent_child_pairs:
-        contact_exclusions.append(f'    <exclude body1="{parent}" body2="{child}"/>')
+    for body1, body2 in parent_child_pairs:
+        contact_exclusions.append(f'    <exclude body1="{body1}" body2="{body2}"/>')
     
     # Insert before closing </contact>
     if contact_exclusions:
@@ -777,7 +797,7 @@ def generate_mjcf_xml(
                 for exclusion in contact_exclusions:
                     xml.insert(i, exclusion)
                 break
-        print(f"✓ Added {len(contact_exclusions)} parent-child collision exclusions")
+        print(f"✓ Added {len(contact_exclusions)} collision exclusions (parent-child + siblings)")
 
     if actuators:
         xml.append("  <actuator>")
