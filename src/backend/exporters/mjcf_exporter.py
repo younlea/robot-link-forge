@@ -81,6 +81,17 @@ def generate_mjcf_xml(
     xml.append(
         '  <option timestep="0.001" iterations="100" solver="Newton" tolerance="1e-10" gravity="0 0 -9.81"/>'
     )
+    
+    # CRITICAL: Contact settings to prevent adjacent link collisions
+    # Adjacent links in kinematic chain should not collide with each other
+    xml.append('  <contact>')
+    xml.append('    <!-- Exclude parent-child body pairs from collision detection -->')
+    xml.append('    <!-- This prevents instability when joints are at extreme positions -->')
+    # Will be populated after build_body() collects parent-child pairs
+    xml.append('  </contact>')
+    
+    # Placeholder for contact exclusions - will be inserted later
+    contact_section_index = len(xml) - 1
 
     # 2. Write Assets
     xml.append("  <asset>")
@@ -108,9 +119,10 @@ def generate_mjcf_xml(
     generated_joints_info = []
     actuator_counter = {}  # Track actuator names to avoid duplicates
     joint_counter = {}  # Track joint names to avoid duplicates
+    parent_child_pairs = []  # Track parent-child body pairs for collision exclusion
 
     def build_body(
-        link_id: str, parent_joint_id: Optional[str] = None, indent_level: int = 2
+        link_id: str, parent_joint_id: Optional[str] = None, indent_level: int = 2, parent_body_name: Optional[str] = None
     ):
         indent = "  " * indent_level
         link = robot.links.get(link_id)
@@ -121,6 +133,10 @@ def generate_mjcf_xml(
         # Fallback to to_snake_case if not in map (should not happen if map is comprehensive)
         if link_id not in unique_link_names:
             body_name = to_snake_case(body_name)
+
+        # Track parent-child relationship for collision exclusion
+        if parent_body_name:
+            parent_child_pairs.append((parent_body_name, body_name))
 
         # Determine if it is a leaf (Pre-calculation for Collision & Sensors)
         is_leaf = True
@@ -736,16 +752,32 @@ def generate_mjcf_xml(
         for child_joint_id in link.childJoints:
             child_joint = robot.joints.get(child_joint_id)
             if child_joint and child_joint.childLinkId:
-                build_body(child_joint.childLinkId, child_joint_id, indent_level + 1)
+                build_body(child_joint.childLinkId, child_joint_id, indent_level + 1, body_name)
 
         xml.append(f"{indent}</body>")
 
     build_body(
-        robot.baseLinkId, indent_level=3
+        robot.baseLinkId, indent_level=3, parent_body_name="fixed_world"
     )  # Indent 3 because inside fixed_world body
 
     xml.append("    </body>  <!-- End fixed_world -->")
     xml.append("  </worldbody>")
+    
+    # Insert contact exclusions now that we have all parent-child pairs
+    contact_exclusions = []
+    for parent, child in parent_child_pairs:
+        contact_exclusions.append(f'    <exclude body1="{parent}" body2="{child}"/>')
+    
+    # Insert before closing </contact>
+    if contact_exclusions:
+        # Find contact section and insert exclusions
+        for i, line in enumerate(xml):
+            if line.strip() == '</contact>':
+                # Insert all exclusions before this line
+                for exclusion in contact_exclusions:
+                    xml.insert(i, exclusion)
+                break
+        print(f"✓ Added {len(contact_exclusions)} parent-child collision exclusions")
 
     if actuators:
         xml.append("  <actuator>")

@@ -1329,14 +1329,33 @@ try:
             # Bypass position actuators completely
             data.ctrl[:] = 0.0  # Disable position actuators
             
-            # Apply torques directly via qfrc_applied
+            # CRITICAL: Inverse dynamics alone is NOT enough!
+            # We need: feedforward torque + gravity compensation + tracking feedback
+            
+            # Step 1: Apply feedforward torques from Phase 1
             for jname, jid in joint_ids.items():
                 if jname in actuator_ids:
                     aid = actuator_ids[jname]
                     dof_adr = model.jnt_dofadr[jid]
-                    # Use torque from Phase 1 inverse dynamics
-                    torque = torque_history[sim_step][aid]
-                    data.qfrc_applied[dof_adr] = torque
+                    qadr = model.jnt_qposadr[jid]
+                    
+                    # Feedforward from inverse dynamics
+                    ff_torque = torque_history[sim_step][aid]
+                    
+                    # PD feedback for tracking (essential for stability!)
+                    # Without this, robot drifts away from trajectory
+                    kp = 50.0  # Position gain
+                    kd = 10.0  # Velocity gain
+                    
+                    pos_error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
+                    vel_error = qvel_traj[sim_step, qadr] - data.qvel[dof_adr]
+                    
+                    pd_torque = kp * pos_error + kd * vel_error
+                    
+                    # Total torque = feedforward + feedback
+                    total_torque = ff_torque + pd_torque
+                    
+                    data.qfrc_applied[dof_adr] = total_torque
             
             # Store applied forces for logging
             applied_forces = data.qfrc_applied.copy()
@@ -1344,7 +1363,7 @@ try:
             # DEBUG: Verify torques before physics step
             if sim_step == 0 or sim_step == 500:
                 print(f"\\n🔍 DEBUG at step {{sim_step}}:")
-                print(f"  Using TORQUE control (not position)")
+                print(f"  Using TORQUE control (feedforward + PD feedback)")
                 nonzero_torques = np.count_nonzero(np.abs(data.qfrc_applied) > 0.01)
                 print(f"  Nonzero torques: {{nonzero_torques}}/{{model.nv}}")
                 max_torque = np.max(np.abs(data.qfrc_applied))
@@ -1356,7 +1375,8 @@ try:
                         target_pos = qpos_traj[sim_step, qadr]
                         current_pos = data.qpos[qadr]
                         torque = data.qfrc_applied[dof_adr]
-                        print(f"    {{jname:30s}}: target_pos={{target_pos:+8.4f}}, current={{current_pos:+8.4f}}, torque={{torque:+8.4f}} Nm")
+                        pos_err = target_pos - current_pos
+                        print(f"    {{jname:30s}}: target={{target_pos:+8.4f}}, curr={{current_pos:+8.4f}}, err={{pos_err:+7.4f}}, torque={{torque:+8.2f}} Nm")
             
             mujoco.mj_step(model, data)
             
