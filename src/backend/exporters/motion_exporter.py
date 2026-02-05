@@ -1219,9 +1219,23 @@ for jname, jid in joint_ids.items():
         data.ctrl[aid] = qpos_traj[0, qadr]
 
 # Let physics settle WITH position control
+# Use many steps and force positions initially for stability
 print("\\nLetting physics settle at initial pose...")
-for i in range(100):
-    # Keep setting control to initial position
+print("  Phase 1: Force positions directly (500 steps)")
+for i in range(500):
+    # Force positions for first 500 steps
+    data.qpos[:] = qpos_traj[0]
+    data.qvel[:] = 0.0
+    for jname, jid in joint_ids.items():
+        if jname in actuator_ids:
+            aid = actuator_ids[jname]
+            qadr = model.jnt_qposadr[jid]
+            data.ctrl[aid] = qpos_traj[0, qadr]
+    mujoco.mj_forward(model, data)
+
+print("  Phase 2: Let actuators stabilize (1500 steps)")
+for i in range(1500):
+    # Now let actuators work
     for jname, jid in joint_ids.items():
         if jname in actuator_ids:
             aid = actuator_ids[jname]
