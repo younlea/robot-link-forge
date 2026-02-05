@@ -1240,17 +1240,47 @@ if np.any(np.isnan(data.qpos)) or np.any(np.isinf(data.qpos)):
 if np.any(np.isnan(data.ctrl)) or np.any(np.isinf(data.ctrl)):
     print("  ⚠️  WARNING: NaN/Inf detected in ctrl immediately after reset!")
 
-# CRITICAL ISSUE: model.qpos0 = [0,0,0...] causes instant physics explosion
-# Root cause: qpos=0 is geometrically impossible (collisions, joint limit violations)
-# Solution: Initialize ctrl to trajectory's first frame instead
+# CRITICAL ISSUE: Both model.qpos0 AND qpos_traj[0] are [0,0,0...]
+# This causes instant physics explosion (collision, constraint violation)
 print(f"\\n📍 Analyzing initialization options:")
-print(f"  Option A: model.qpos0 → {{model.qpos0[:5]}} (causes collision)")
-print(f"  Option B: qpos_traj[0] → {{qpos_traj[0, :5]}} (actual recorded pose)")
-print(f"  Choosing Option B: Use actual trajectory start")
+print(f"  Option A: model.qpos0 → {{model.qpos0[:5]}}")
+print(f"  Option B: qpos_traj[0] → {{qpos_traj[0, :5]}}")
 
-data.ctrl[:] = qpos_traj[0, :model.nu]
-print(f"\\n📍 After setting ctrl = qpos_traj[0]:")
-print(f"  data.ctrl (first 5): {{data.ctrl[:5]}}")
+# Check if trajectory is all zeros
+if np.allclose(qpos_traj[0], 0.0, atol=0.01):
+    print(f"  ⚠️  WARNING: qpos_traj[0] is all zeros! Recording started at invalid pose.")
+    
+    # Try to find first non-zero frame
+    first_valid_frame = -1
+    for frame_idx in range(min(100, len(qpos_traj))):
+        if not np.allclose(qpos_traj[frame_idx], 0.0, atol=0.01):
+            first_valid_frame = frame_idx
+            break
+    
+    if first_valid_frame > 0:
+        print(f"  Found first valid frame at index {{first_valid_frame}}: {{qpos_traj[first_valid_frame, :5]}}")
+        init_qpos = qpos_traj[first_valid_frame]
+    else:
+        print(f"  ⚠️  All frames are zero! Using small random values to avoid collision")
+        # Use small random values to avoid exact collision geometry
+        init_qpos = np.random.uniform(-0.1, 0.1, size=model.nq)
+else:
+    print(f"  Using qpos_traj[0] (non-zero)")
+    init_qpos = qpos_traj[0]
+
+# CRITICAL: Set qpos directly and use mj_forward (kinematic, no dynamics)
+# This bypasses actuator dynamics and avoids constraint explosions
+print(f"\\n📍 Strategy: Kinematic initialization (no actuator dynamics)")
+print(f"  Setting data.qpos directly to: {{init_qpos[:5]}}")
+data.qpos[:] = init_qpos
+data.qvel[:] = 0.0
+data.ctrl[:] = init_qpos[:model.nu]
+
+# Use mj_forward to compute derived quantities WITHOUT stepping dynamics
+mujoco.mj_forward(model, data)
+print(f"  After mj_forward (kinematic only):")
+print(f"    data.qpos (first 5): {{data.qpos[:5]}}")
+print(f"    data.ctrl (first 5): {{data.ctrl[:5]}}")
 
 # Step 3: Run step-by-step and check for explosions
 print("\\n📍 Running 500 steps with detailed logging...")
