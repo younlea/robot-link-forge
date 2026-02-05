@@ -1,5 +1,4 @@
 ~/Downloads/direct_hand_parm$ ./run_torque_replay_0_recording_1768623534448.sh 
-Creating virtual environment...
 Installing dependencies (mujoco, matplotlib, numpy, scipy)...
 ========================================
   MuJoCo Motion Analysis Tool
@@ -28,8 +27,8 @@ Select Analysis Mode:
 Enter choice [0/1/2/3/4]: 4
 Starting Inverse-to-Forward Validation...
 ======================================================================
-MODE 4 SCRIPT VERSION: 20260205_195345
-Generated: 2026-02-05 19:53:45
+MODE 4 SCRIPT VERSION: 20260205_195601
+Generated: 2026-02-05 19:56:01
 ======================================================================
 
 
@@ -38,7 +37,7 @@ PREPARING MODEL FOR PURE TORQUE CONTROL
 ======================================================================
 Removing position actuators from MJCF...
   This allows pure qfrc_applied control without actuator interference
-  Created temporary MJCF without actuators: tmpwu_c7o5o.xml
+  Created temporary MJCF without actuators: tmp3k6_wn3k.xml
   Model loaded: 0 actuators (should be 0), 20 DOFs
   ✅ SUCCESS: Pure torque control model (no actuators)
 ======================================================================
@@ -253,16 +252,169 @@ Starting forward simulation...
      ✅ No collisions (collision exclusions working)
 
   Joint States:
-ERROR: zero-size array to reduction operation maximum which has no identity
-Traceback (most recent call last):
-  File "/home/younleakim/Downloads/direct_hand_parm/inverse_to_forward_validation.py", line 741, in <module>
-    max_ctrl = np.max(np.abs(data.ctrl[:model.nu]))
-  File "/home/younleakim/Downloads/direct_hand_parm/venv/lib/python3.10/site-packages/numpy/core/fromnumeric.py", line 2810, in max
-    return _wrapreduction(a, np.maximum, 'max', axis, None, out,
-  File "/home/younleakim/Downloads/direct_hand_parm/venv/lib/python3.10/site-packages/numpy/core/fromnumeric.py", line 88, in _wrapreduction
-    return ufunc.reduce(obj, axis, dtype, out, **passkwargs)
-ValueError: zero-size array to reduction operation maximum which has no identity
+  T=0.00s: RMS error=0.0000 rad (0.0°), Max cmd=0.00 rad
+    Worst errors: IndexFinger-1st-pitch=0.0° (cmd=0.00rad)  Thumb-1st-pitch=0.0° (cmd=0.00rad)  MiddleFinger-1st-pitch=0.0° (cmd=0.00rad)  
 
-Cleaned up temporary file: tmpwu_c7o5o.xml
+🔍 PHYSICS DEBUG at step 500:
+  Using REAL PHYSICS (mj_step) with torque control
+  Applied torques: 5/20, Max: 2.91 Nm
 
-Mode 4 validation complete.
+  💥 COLLISION DEBUG:
+     Active contacts: 0
+     ✅ No collisions (collision exclusions working)
+
+  Joint States:
+  T=0.50s: RMS error=0.0000 rad (0.0°), Max cmd=0.00 rad
+    Worst errors: IndexFinger-1st-pitch=0.0° (cmd=0.00rad)  Thumb-1st-pitch=0.0° (cmd=0.00rad)  IndexFinger-2nd-pitch=0.0° (cmd=0.00rad)  
+
+🔍 PHYSICS DEBUG at step 1000:
+  Using REAL PHYSICS (mj_step) with torque control
+  Applied torques: 5/20, Max: 2.92 Nm
+
+  💥 COLLISION DEBUG:
+     Active contacts: 0
+     ✅ No collisions (collision exclusions working)
+
+  Joint States:
+  T=1.00s: RMS error=0.0003 rad (0.0°), Max cmd=0.00 rad
+    Worst errors: IndexFinger-1st-pitch=0.1° (cmd=0.00rad)  Thumb-1st-pitch=0.0° (cmd=0.00rad)  MiddleFinger-1st-pitch=0.0° (cmd=0.00rad)  
+  T=1.50s: RMS error=0.0003 rad (0.0°), Max cmd=0.00 rad
+    Worst errors: IndexFinger-1st-pitch=0.1° (cmd=0.00rad)  Thumb-1st-pitch=0.0° (cmd=0.00rad)  MiddleFinger-1st-pitch=0.0° (cmd=0.00rad)  
+
+⚠️ COLLISION WARNING at step 1900:
+   1 active contacts detected
+      index_finger-3rd-end <-> thumb-3rd-end, penetration: 36.31mm
+
+🔍 PHYSICS DEBUG at step 2000:
+  Using REAL PHYSICS (mj_step) with torque control
+  Applied torques: 11/20, Max: 25.84 Nm
+
+  💥 COLLISION DEBUG:
+     Active contacts: 1
+     ⚠️ COLLISIONS DETECTED! Analyzing contact pairs...
+       Contact 1: index_finger-3rd-end      <-> thumb-3rd-end            
+                 Penetration: 97.06 mm 🔴 DEEP!
+
+  Joint States:
+
+⚠️ COLLISION WARNING at step 2000:
+   1 active contacts detected
+      index_finger-3rd-end <-> thumb-3rd-end, penetration: 97.50mm
+  T=2.00s: RMS error=0.0001 rad (0.0°), Max cmd=0.00 rad
+    Worst errors: IndexFinger-1st-pitch=0.0° (cmd=0.00rad)  Thumb-1st-pitch=0.0° (cmd=0.00rad)  MiddleFinger-1st-pitch=0.0° (cmd=0.00rad)  
+
+⚠️ COLLISION WARNING at step 2100:
+   1 active contacts detected
+      index_finger-3rd-end <-> thumb-3rd-end, penetration: 121.09mm
+
+⚠️ COLLISION WARNING at step 2200:
+   1 active contacts detected
+      index_finger-3rd-end <-> thumb-3rd-end, penetration: 104.25mm
+
+⚠️ COLLISION WARNING at step 2300:
+   1 active contacts detected
+      index_finger-3rd-end <-> thumb-3rd-end, penetration: 49.48mm
+  T=2.50s: RMS error=0.0007 rad (0.0°), Max cmd=0.00 rad
+    Worst errors: thumb_1st_yaw=0.2° (cmd=0.00rad)  IndexFinger-1st-pitch=0.1° (cmd=0.00rad)  IndexFinger_1st_roll=0.1° (cmd=0.00rad)  
+
+🔍 PHYSICS DEBUG at step 3000:
+  Using REAL PHYSICS (mj_step) with torque control
+  Applied torques: 6/20, Max: 39.10 Nm
+
+  💥 COLLISION DEBUG:
+     Active contacts: 0
+     ✅ No collisions (collision exclusions working)
+
+  Joint States:
+  T=3.00s: RMS error=0.0005 rad (0.0°), Max cmd=0.00 rad
+    Worst errors: IndexFinger-1st-pitch=0.1° (cmd=0.00rad)  thumb_1st_yaw=0.1° (cmd=0.00rad)  Thumb-1st-pitch=0.0° (cmd=0.00rad)  
+  T=3.50s: RMS error=0.0003 rad (0.0°), Max cmd=0.00 rad
+    Worst errors: IndexFinger-1st-pitch=0.1° (cmd=0.00rad)  thumb_1st_yaw=0.0° (cmd=0.00rad)  MiddleFinger-1st-pitch=0.0° (cmd=0.00rad)  
+
+🔍 PHYSICS DEBUG at step 4000:
+  Using REAL PHYSICS (mj_step) with torque control
+  Applied torques: 8/20, Max: 30.18 Nm
+
+  💥 COLLISION DEBUG:
+     Active contacts: 0
+     ✅ No collisions (collision exclusions working)
+
+  Joint States:
+  T=4.00s: RMS error=0.0003 rad (0.0°), Max cmd=0.00 rad
+    Worst errors: MiddleFinger-1st-pitch=0.1° (cmd=0.00rad)  thumb_1st_yaw=0.0° (cmd=0.00rad)  Thumb-1st-pitch=0.0° (cmd=0.00rad)  
+  T=4.50s: RMS error=0.0003 rad (0.0°), Max cmd=0.00 rad
+    Worst errors: MiddleFinger-1st-pitch=0.1° (cmd=0.00rad)  Thumb-1st-pitch=0.0° (cmd=0.00rad)  thumb_1st_yaw=0.0° (cmd=0.00rad)  
+
+⚠️ COLLISION WARNING at step 4900:
+   1 active contacts detected
+      middle_finger-3rd-end <-> thumb-3rd-end, penetration: 4.86mm
+
+🔍 PHYSICS DEBUG at step 5000:
+  Using REAL PHYSICS (mj_step) with torque control
+  Applied torques: 10/20, Max: 19.27 Nm
+
+  💥 COLLISION DEBUG:
+     Active contacts: 1
+     ⚠️ COLLISIONS DETECTED! Analyzing contact pairs...
+       Contact 1: middle_finger-3rd-end     <-> thumb-3rd-end            
+                 Penetration: 64.53 mm 🔴 DEEP!
+
+  Joint States:
+
+⚠️ COLLISION WARNING at step 5000:
+   1 active contacts detected
+      middle_finger-3rd-end <-> thumb-3rd-end, penetration: 64.93mm
+  T=5.00s: RMS error=0.0001 rad (0.0°), Max cmd=0.00 rad
+    Worst errors: MiddleFinger-1st-pitch=0.0° (cmd=0.00rad)  IndexFinger-1st-pitch=0.0° (cmd=0.00rad)  Thumb-3rd-pitch=0.0° (cmd=0.00rad)  
+
+⚠️ COLLISION WARNING at step 5100:
+   1 active contacts detected
+      middle_finger-3rd-end <-> thumb-3rd-end, penetration: 83.95mm
+
+⚠️ COLLISION WARNING at step 5200:
+   1 active contacts detected
+      middle_finger-3rd-end <-> thumb-3rd-end, penetration: 54.15mm
+
+⚠️ COLLISION WARNING at step 5300:
+   1 active contacts detected
+      middle_finger-3rd-end <-> thumb-3rd-end, penetration: 21.06mm
+  T=5.50s: RMS error=0.0589 rad (3.4°), Max cmd=0.00 rad
+    Worst errors: MiddleFinger_1st_roll=8.1° (cmd=0.00rad)  MiddleFinger-2nd-pitch=8.1° (cmd=0.00rad)  thumb_1st_yaw=7.1° (cmd=0.00rad)  
+
+🔍 PHYSICS DEBUG at step 6000:
+  Using REAL PHYSICS (mj_step) with torque control
+  Applied torques: 9/20, Max: 2.91 Nm
+
+  💥 COLLISION DEBUG:
+     Active contacts: 0
+     ✅ No collisions (collision exclusions working)
+
+  Joint States:
+  T=6.00s: RMS error=0.0257 rad (1.5°), Max cmd=0.00 rad
+    Worst errors: MiddleFinger_1st_roll=3.6° (cmd=0.00rad)  MiddleFinger-2nd-pitch=3.5° (cmd=0.00rad)  thumb_1st_yaw=3.1° (cmd=0.00rad)  
+  T=6.50s: RMS error=0.0113 rad (0.6°), Max cmd=0.00 rad
+    Worst errors: MiddleFinger_1st_roll=1.6° (cmd=0.00rad)  MiddleFinger-2nd-pitch=1.5° (cmd=0.00rad)  thumb_1st_yaw=1.3° (cmd=0.00rad)  
+
+Simulation complete!
+
+💾 Saving Phase 2 control history to CSV...
+  Saved 684 samples (every 10 steps) to phase2_control_applied.csv
+
+======================================================================
+VALIDATION RESULTS
+======================================================================
+
+Tracking Performance:
+  Average RMS Error: 0.008253 rad (0.473 deg)
+  Maximum RMS Error: 0.078200 rad (4.481 deg)
+
+Torque Control (Direct Force Application):
+  Average Torque: 0.00 Nm
+  Peak Torque: 0.00 Nm
+
+======================================================================
+⚠ PARTIAL: Some tracking error but acceptable
+  → Try increasing kp (stiffness)
+  → Or check for collisions/joint limits
+======================================================================
+
