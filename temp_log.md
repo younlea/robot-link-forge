@@ -28,8 +28,8 @@ Select Analysis Mode:
 Enter choice [0/1/2/3/4]: 4
 Starting Inverse-to-Forward Validation...
 ======================================================================
-MODE 4 SCRIPT VERSION: 20260205_161239
-Generated: 2026-02-05 16:12:39
+MODE 4 SCRIPT VERSION: 20260205_161846
+Generated: 2026-02-05 16:18:46
 ======================================================================
 
 Model has 20 joints, 20 actuators
@@ -209,7 +209,12 @@ Checking physics stability step-by-step...
   data.ctrl (first 5): [0. 0. 0. 0. 0.]
   data.qvel (first 5): [0. 0. 0. 0. 0.]
 
-📍 After setting ctrl = model.qpos0:
+📍 Analyzing initialization options:
+  Option A: model.qpos0 → [0. 0. 0. 0. 0.] (causes collision)
+  Option B: qpos_traj[0] → [0. 0. 0. 0. 0.] (actual recorded pose)
+  Choosing Option B: Use actual trajectory start
+
+📍 After setting ctrl = qpos_traj[0]:
   data.ctrl (first 5): [0. 0. 0. 0. 0.]
 
 📍 Running 500 steps with detailed logging...
