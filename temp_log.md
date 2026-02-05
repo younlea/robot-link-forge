@@ -1,3 +1,4 @@
+```
 ~/Downloads/direct_hand_parm$ ./run_torque_replay_0_recording_1768623534448.sh 
 Creating virtual environment...
 Installing dependencies (mujoco, matplotlib, numpy, scipy)...
@@ -485,5 +486,6 @@ Torque Control (Direct Force Application):
 ======================================================================
 ✗ FAILED: Large tracking errors even with position control
   → Trajectory may be too fast for physics timestep
+```
   → Or robot model has issues (mass/inertia/constraints)
 ======================================================================
