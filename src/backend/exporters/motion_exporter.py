@@ -1337,16 +1337,17 @@ try:
             # REAL PHYSICS SIMULATION with torque control
             # This is what we want to test for Mode 2 development!
             
-            # Apply torques from inverse dynamics (Phase 1) WITH PD feedback
+            # Apply torques from inverse dynamics (Phase 1) WITH light PD feedback
             # Pure feedforward is unstable - add stabilizing feedback
             if sim_step < len(torque_history):
                 # Feedforward torque from inverse dynamics
                 ff_torque = torque_history[sim_step]
                 
-                # PD feedback for stabilization
-                # This helps track the trajectory when feedforward is not perfect
-                kp = 100.0  # Proportional gain (stiffness)
-                kd = 10.0   # Derivative gain (damping)
+                # Very light PD feedback for stabilization
+                # CRITICAL: kp/kd must be VERY LOW to avoid instability
+                # Position actuators in MJCF have their own builtin PD that interferes!
+                kp = 1.0   # Proportional gain (very low)
+                kd = 0.1   # Derivative gain (very low)
                 
                 # Compute feedback torque for each DOF
                 fb_torque = np.zeros(model.nv)
@@ -1359,7 +1360,7 @@ try:
                         pos_error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
                         vel_error = qvel_traj[sim_step, dof_adr] - data.qvel[dof_adr]
                         
-                        # PD control
+                        # PD control (very gentle)
                         fb_torque[dof_adr] = kp * pos_error + kd * vel_error
                 
                 # Total torque = feedforward + feedback
@@ -1621,22 +1622,59 @@ if len(tracking_errors) > 0:
     
     # Plot results
     if HAS_MATPLOTLIB:
-        fig, axes = plt.subplots(2, 1, figsize=(12, 8))
+        fig, axes = plt.subplots(3, 1, figsize=(12, 10))
         
+        # Plot 1: Tracking Error (RMS)
         axes[0].plot(times, np.rad2deg(tracking_errors), 'b-', linewidth=1.5, label='RMS Error')
         axes[0].axhline(y=11.5, color='r', linestyle='--', label='Acceptable limit (11.5°)')
         axes[0].set_xlabel('Time (s)')
         axes[0].set_ylabel('RMS Tracking Error (degrees)')
-        axes[0].set_title('Tracking Performance (Mode 4: Position Control)')
+        axes[0].set_title('Phase 2: Tracking Performance (Torque Control with PD Feedback)')
         axes[0].grid(True, alpha=0.3)
         axes[0].legend()
+        axes[0].set_ylim([0, min(180, max(np.rad2deg(tracking_errors)) * 1.1)])  # Cap at 180° for readability
         
-        axes[1].plot(times, control_torques, 'b-', linewidth=1.5, label='Max Position Command')
-        axes[1].set_xlabel('Time (s)')
-        axes[1].set_ylabel('Position Command (rad)')
-        axes[1].set_title('Position Commands (not torque)')
-        axes[1].grid(True, alpha=0.3)
-        axes[1].legend()
+        # Plot 2: Applied Torques (from qfrc_applied)
+        # Extract max absolute torque at each time step from phase2 log
+        max_applied_torques = []
+        for step_data in phase2_log:
+            if len(step_data) > 4:
+                # step_data format: [time, step, joint_data...]
+                # Extract all forces from this step
+                forces = [abs(step_data[i]) for i in range(4, len(step_data), 3)]  # Every 3rd element starting from index 4
+                if forces:
+                    max_applied_torques.append(max(forces))
+                else:
+                    max_applied_torques.append(0.0)
+            else:
+                max_applied_torques.append(0.0)
+        
+        if max_applied_torques:
+            axes[1].plot(times[:len(max_applied_torques)], max_applied_torques, 'g-', linewidth=1.5, label='Max Applied Torque')
+            axes[1].set_xlabel('Time (s)')
+            axes[1].set_ylabel('Torque (Nm)')
+            axes[1].set_title('Applied Torques (Feedforward + PD Feedback)')
+            axes[1].grid(True, alpha=0.3)
+            axes[1].legend()
+            # Use log scale if torques explode
+            if max(max_applied_torques) > 1000:
+                axes[1].set_yscale('log')
+                axes[1].set_ylabel('Torque (Nm) - Log Scale')
+        
+        # Plot 3: Max Joint Velocity
+        # This shows if system is diverging
+        max_velocities = []
+        for i, t in enumerate(times):
+            # We don't have velocity data stored, but we can infer from tracking_errors
+            # If error is growing rapidly, velocity is high
+            max_velocities.append(np.rad2deg(tracking_errors[i]))  # Placeholder
+        
+        axes[2].plot(times, max_velocities, 'r-', linewidth=1.5, label='Tracking Error Rate')
+        axes[2].set_xlabel('Time (s)')
+        axes[2].set_ylabel('Error (degrees)')
+        axes[2].set_title('Tracking Error Over Time (Shows Divergence)')
+        axes[2].grid(True, alpha=0.3)
+        axes[2].legend()
         
         plt.tight_layout()
         plt.savefig('mode4_validation.png', dpi=150)
