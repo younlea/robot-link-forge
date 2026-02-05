@@ -1,4 +1,4 @@
-~/Downloads/direct_hand_parm$ ./run_torque_replay_0_recording_1768623534448.sh 
+:~/Downloads/direct_hand_parm$ ./run_torque_replay_0_recording_1768623534448.sh 
 Creating virtual environment...
 Installing dependencies (mujoco, matplotlib, numpy, scipy)...
 ========================================
@@ -27,6 +27,11 @@ Select Analysis Mode:
 ========================================
 Enter choice [0/1/2/3/4]: 4
 Starting Inverse-to-Forward Validation...
+======================================================================
+MODE 4 SCRIPT VERSION: 20260205_132343
+Generated: 2026-02-05 13:23:43
+======================================================================
+
 Model has 20 joints, 20 actuators
 Recording duration: 6.83s (6835ms)
 Found 20 joints in recording
