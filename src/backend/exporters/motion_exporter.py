@@ -1218,26 +1218,88 @@ for jname, jid in joint_ids.items():
         qadr = model.jnt_qposadr[jid]
         data.ctrl[aid] = qpos_traj[0, qadr]
 
-# CRITICAL FIX: Recording starts at qpos=0, which is physically unstable
-# DON'T force trajectory start pose - find natural equilibrium first
-print("\\nLetting physics settle to natural equilibrium...")
-print("  Strategy: Start from model default, then gradually move to trajectory start")
+# DEBUGGING MODE: Run only 500 steps and check each step
+# User observed: joints explode from step 0
+print("\\n" + "=" * 70)
+print("DEBUG MODE: Running first 500 steps only (no trajectory motion)")
+print("Checking physics stability step-by-step...")
+print("=" * 70)
 
-# Step 1: Let model settle to its natural pose (no forcing)
-print("  Phase 1: Find natural equilibrium (500 steps)")
+# Step 1: Check initial state right after reset
+print("\\n📍 STEP 0: Initial state after mj_resetData")
 mujoco.mj_resetData(model, data)
-data.ctrl[:] = model.qpos0[:model.nu]  # Start ctrl at model defaults
+
+print(f"  model.qpos0 (first 5): {{model.qpos0[:5]}}")
+print(f"  data.qpos (first 5): {{data.qpos[:5]}}")
+print(f"  data.ctrl (first 5): {{data.ctrl[:5]}}")
+print(f"  data.qvel (first 5): {{data.qvel[:5]}}")
+
+# Check for any NaN/Inf already
+if np.any(np.isnan(data.qpos)) or np.any(np.isinf(data.qpos)):
+    print("  ⚠️  WARNING: NaN/Inf detected in qpos immediately after reset!")
+if np.any(np.isnan(data.ctrl)) or np.any(np.isinf(data.ctrl)):
+    print("  ⚠️  WARNING: NaN/Inf detected in ctrl immediately after reset!")
+
+# Step 2: Initialize ctrl to model defaults
+data.ctrl[:] = model.qpos0[:model.nu]
+print(f"\\n📍 After setting ctrl = model.qpos0:")
+print(f"  data.ctrl (first 5): {{data.ctrl[:5]}}")
+
+# Step 3: Run step-by-step and check for explosions
+print("\\n📍 Running 500 steps with detailed logging...")
+explosion_step = -1
 for i in range(500):
     mujoco.mj_step(model, data)
+    
+    # Check every 10 steps
+    if i % 10 == 0 or i < 5:
+        max_qpos = np.max(np.abs(data.qpos))
+        max_qvel = np.max(np.abs(data.qvel))
+        max_qacc = np.max(np.abs(data.qacc))
+        
+        if i < 5 or i % 50 == 0:
+            print(f"  Step {{i:3d}}: max|qpos|={{max_qpos:7.3f}}, max|qvel|={{max_qvel:7.3f}}, max|qacc|={{max_qacc:8.3f}}")
+        
+        # Detect explosion
+        if np.any(np.isnan(data.qpos)) or np.any(np.isinf(data.qpos)) or max_qpos > 100:
+            explosion_step = i
+            print(f"\\n💥 EXPLOSION DETECTED at step {{i}}!")
+            print(f"  max|qpos|={{max_qpos}}, max|qvel|={{max_qvel}}, max|qacc|={{max_qacc}}")
+            
+            # Find which joint exploded
+            for jname, jid in joint_ids.items():
+                qadr = model.jnt_qposadr[jid]
+                if abs(data.qpos[qadr]) > 10 or np.isnan(data.qpos[qadr]) or np.isinf(data.qpos[qadr]):
+                    print(f"    💥 {{jname:30s}}: qpos={{data.qpos[qadr]:+10.4f}}, qvel={{data.qvel[qadr]:+10.4f}}")
+            break
 
-# Save natural equilibrium as starting point
-natural_qpos = data.qpos.copy()
-print(f"  Natural equilibrium found (sample joints):")
-for jname in list(joint_ids.keys())[:5]:
-    jid = joint_ids[jname]
-    qadr = model.jnt_qposadr[jid]
-    print(f"    {{jname:30s}}: {{natural_qpos[qadr]:7.4f}} rad")
+if explosion_step == -1:
+    print("\\n✅ 500 steps completed without explosion")
+    print(f"  Final max|qpos|={{np.max(np.abs(data.qpos)):.3f}}")
+    
+    # Save natural equilibrium as starting point
+    natural_qpos = data.qpos.copy()
+    print(f"\\n  Natural equilibrium found (all 20 joints):")
+    for jname, jid in joint_ids.items():
+        qadr = model.jnt_qposadr[jid]
+        print(f"    {{jname:30s}}: {{natural_qpos[qadr]:+7.4f}} rad ({{np.rad2deg(natural_qpos[qadr]):+7.2f}}°)")
+else:
+    print(f"\\n❌ Physics exploded at step {{explosion_step}}")
+    print("   Problem: Model is fundamentally unstable!")
+    print("   Possible causes:")
+    print("     1. Joint limits violated")
+    print("     2. Actuator gains too high")
+    print("     3. Model geometry/mass issues")
+    print("     4. Constraints causing conflict")
+    natural_qpos = model.qpos0.copy()
 
+print("\\n" + "=" * 70)
+print("DEBUG MODE COMPLETE - Exiting early for analysis")
+print("=" * 70)
+import sys
+sys.exit(0)
+
+# OLD CODE BELOW (unreachable in debug mode)
 # Step 2: Gradually blend from natural pose to trajectory start
 print("  Phase 2: Gradually move to trajectory start (1500 steps)")
 for i in range(1500):
