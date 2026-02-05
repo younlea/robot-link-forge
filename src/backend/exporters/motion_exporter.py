@@ -1129,13 +1129,18 @@ for jname, jid in joint_ids.items():
     dof_adr = model.jnt_dofadr[jid]
     print(f"    {{jname:30s}} → DOF {{dof_adr}}")
 print("\\n  Actuator → Joint mapping:")
-for i in range(model.nu):
-    act_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
-    trnid = model.actuator_trnid[i, 0]  # Transmission ID (joint)
-    if trnid >= 0:
-        joint_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, trnid)
-        print(f"    Actuator[{{i}}] {{act_name:25s}} → Joint {{joint_name}}")
+if model.nu > 0:
+    for i in range(model.nu):
+        act_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
+        trnid = model.actuator_trnid[i, 0]  # Transmission ID (joint)
+        if trnid >= 0:
+            joint_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, trnid)
+            print(f"    Actuator[{{i}}] {{act_name:25s}} → Joint {{joint_name}}")
+else:
+    print("    (No actuators - using pure torque control)")
 
+print("")
+print("="*70)
 # Phase 1: Run inverse dynamics to compute required torques
 # CRITICAL: Since we removed actuators, use DOF-based torque tracking
 max_torques = np.zeros(model.nv)  # Use nv (DOFs) instead of nu (actuators)
@@ -1145,8 +1150,6 @@ data.qpos[:] = qpos_traj[0]
 data.qvel[:] = 0.0
 mujoco.mj_forward(model, data)
 
-print("")
-print("="*70)
 for step in range(n_steps):
     data.qpos[:] = qpos_traj[step]
     data.qvel[:] = qvel_traj[step]
