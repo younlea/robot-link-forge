@@ -1655,17 +1655,24 @@ print("")
 
 # Interactive visualization with time slider
 if HAS_MATPLOTLIB and len(all_torque_data) > 0:
-    from matplotlib.widgets import Slider
+    from matplotlib.widgets import Slider, Button
     from mpl_toolkits.mplot3d import Axes3D
     
     # Create figure with 3D plot and slider
     fig_interactive = plt.figure(figsize=(14, 10))
     ax_3d = fig_interactive.add_subplot(111, projection='3d')
-    plt.subplots_adjust(bottom=0.15)
+    plt.subplots_adjust(bottom=0.2)
     
     # Add slider for time control
-    ax_slider = plt.axes([0.15, 0.05, 0.7, 0.03])
+    ax_slider = plt.axes([0.15, 0.1, 0.65, 0.03])
     time_slider = Slider(ax_slider, 'Time (s)', 0, duration, valinit=0, valstep=dt)
+    
+    # Add Play/Pause button
+    ax_button = plt.axes([0.82, 0.1, 0.08, 0.04])
+    play_button = Button(ax_button, 'Play')
+    
+    # Animation state (use dict to avoid global variable issues in generated script)
+    anim_state = {{'is_playing': False, 'timer': None}}
     
     # Initial plot
     def plot_torques_at_time(time_val):
@@ -1778,6 +1785,46 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     
     time_slider.on_changed(update_time)
     
+    # Play/Pause functionality
+    def toggle_play(event):
+        anim_state['is_playing'] = not anim_state['is_playing']
+        if anim_state['is_playing']:
+            play_button.label.set_text('Pause')
+            start_animation()
+        else:
+            play_button.label.set_text('Play')
+            if anim_state['timer'] is not None:
+                anim_state['timer'].remove()
+                anim_state['timer'] = None
+        plt.draw()
+    
+    def start_animation():
+        if anim_state['timer'] is None:
+            anim_state['timer'] = fig_interactive.canvas.new_timer(interval=int(dt*1000))
+            anim_state['timer'].add_callback(animate_step)
+            anim_state['timer'].start()
+    
+    def animate_step():
+        if not anim_state['is_playing']:
+            return
+        
+        current_time = time_slider.val
+        next_time = current_time + dt
+        
+        if next_time >= duration:
+            # Loop back to start
+            next_time = 0
+        
+        time_slider.set_val(next_time)
+    
+    # Keyboard event handler
+    def on_key(event):
+        if event.key == ' ':  # Spacebar
+            toggle_play(None)
+    
+    play_button.on_clicked(toggle_play)
+    fig_interactive.canvas.mpl_connect('key_press_event', on_key)
+    
     # Initial plot
     plot_torques_at_time(0.0)
     
@@ -1788,11 +1835,14 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     print("  Two windows are now open:")
     print("  1. Matplotlib: 3D bar chart with time slider")
     print("     - Drag slider to move through time")
+    print("     - Click 'Play' button to auto-play animation")
+    print("     - Press SPACEBAR to play/pause")
+    print("     - Animation loops automatically")
     print("     - Chart shows: Finger (X) - Joint (Y) - Torque (Z)")
     print("     - Colors: different fingers")
     print("")
     print("  2. MuJoCo Viewer: Robot pose synchronized with slider")
-    print("     - Automatically updates when you move slider")
+    print("     - Automatically updates when you move slider or play")
     print("     - Right-click drag: rotate camera")
     print("     - Scroll: zoom in/out")
     print("")
