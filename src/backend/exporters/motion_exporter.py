@@ -1675,8 +1675,8 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     ax_speed = plt.axes([0.87, 0.3, 0.1, 0.15])
     speed_radio = RadioButtons(ax_speed, ('0.1x', '0.5x', '1x', '1.5x', '2x'), active=2)
     
-    # Animation state (use dict to avoid global variable issues in generated script)
-    anim_state = {{'is_playing': False, 'timer': None, 'speed': 1.0}}
+    # Animation state - store model, data, viewer reference for playback
+    anim_state = {{'is_playing': False, 'timer': None, 'speed': 1.0, 'viewer': None, 'model': model, 'data': data}}
     
     # Initial plot
     def plot_torques_at_time(time_val):
@@ -1781,11 +1781,13 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
         plot_torques_at_time(time_val)
         
         # Update MuJoCo viewer if still open
-        step_idx = int(time_val / dt)
-        step_idx = min(step_idx, len(all_qpos_data) - 1)
-        if step_idx < len(all_qpos_data):
-            data.qpos[:] = all_qpos_data[step_idx]
-            mujoco.mj_forward(model, data)
+        if anim_state['viewer'] is not None:
+            step_idx = int(time_val / dt)
+            step_idx = min(step_idx, len(all_qpos_data) - 1)
+            if step_idx < len(all_qpos_data):
+                anim_state['data'].qpos[:] = all_qpos_data[step_idx]
+                mujoco.mj_forward(anim_state['model'], anim_state['data'])
+                anim_state['viewer'].sync()
     
     time_slider.on_changed(update_time)
     
@@ -1818,9 +1820,9 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     
     def start_animation():
         if anim_state['timer'] is None:
-            # Calculate interval based on speed multiplier
-            # Match simulation rendering: 10 steps per sync (dt * 10)
-            interval = int(dt * 10 * 1000 / anim_state['speed'])
+            # Calculate interval: dt (in seconds) * 1000 (to ms) / speed
+            # This gives real-time playback at 1x speed
+            interval = int(dt * 1000 / anim_state['speed'])
             anim_state['timer'] = fig_interactive.canvas.new_timer(interval=interval)
             anim_state['timer'].add_callback(animate_step)
             anim_state['timer'].start()
@@ -1830,14 +1832,34 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
             return
         
         current_time = time_slider.val
-        # Advance by 10 steps to match simulation rendering
-        next_time = current_time + (dt * 10)
+        # Advance by simulation timestep
+        next_time = current_time + dt
         
         if next_time >= duration:
             # Loop back to start
             next_time = 0
         
         time_slider.set_val(next_time)
+        
+        # Update MuJoCo viewer to match matplotlib
+        if anim_state['viewer'] is not None:
+            # Find corresponding simulation step
+            step_idx = int(next_time / dt)
+            if step_idx < len(all_qpos_data):
+                # Update MuJoCo state to match this timestep
+                anim_state['data'].qpos[:] = all_qpos_data[step_idx]
+                mujoco.mj_forward(anim_state['model'], anim_state['data'])
+                anim_state['viewer'].sync()
+        
+        # Update MuJoCo viewer to match matplotlib
+        if anim_state['viewer'] is not None:
+            # Find corresponding simulation step
+            step_idx = int(next_time / dt)
+            if step_idx < len(all_qpos_data):
+                # Update MuJoCo state to match this timestep
+                anim_state['data'].qpos[:] = all_qpos_data[step_idx]
+                mujoco.mj_forward(anim_state['model'], anim_state['data'])
+                anim_state['viewer'].sync()
     
     # Keyboard event handler
     def on_key(event):
@@ -1889,6 +1911,9 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     # Launch MuJoCo viewer in passive mode for visualization
     try:
         with mujoco.viewer.launch_passive(model, data) as viewer:
+            # Store viewer reference for animation callbacks
+            anim_state['viewer'] = viewer
+            
             # Set camera view
             viewer.cam.azimuth = 90
             viewer.cam.elevation = -20
@@ -1906,10 +1931,15 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
                     plt.pause(0.01)  # Small delay + event processing
             except KeyboardInterrupt:
                 print("\\n⚠️ Interrupted by user")
+            finally:
+                # Clear viewer reference when closing
+                anim_state['viewer'] = None
     except KeyboardInterrupt:
         print("\\n⚠️ Interrupted by user")
     except Exception as e:
         print(f"\\n⚠️ Could not open MuJoCo viewer: {{e}}")
+    finally:
+        anim_state['viewer'] = None
     
     # Cleanup
     plt.ioff()  # Turn off interactive mode
@@ -2003,7 +2033,8 @@ if len(tracking_errors) > 0:
         
         # Plot 2: Per-Finger Torques
         # Extract per-joint torque data from phase2_log
-        finger_colors = {{'thumb': '#FF6B6B', 'index': '#4ECDC4', 'middle': '#45B7D1', 'ring': '#FFA07A', 'pinky': '#98D8C8'}}
+        # Use highly distinctive colors that are easy to differentiate
+        finger_colors = {{'thumb': '#FF0000', 'index': '#00FF00', 'middle': '#0000FF', 'ring': '#FF00FF', 'pinky': '#FFA500'}}
         finger_names = ['thumb', 'index', 'middle', 'ring', 'pinky']
         
         for finger in finger_names:
