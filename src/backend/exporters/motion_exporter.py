@@ -1370,44 +1370,43 @@ print("=" * 50)
 print("")
 print("Starting forward simulation...")
 
-# Replay loop - allows replaying simulation
-replay = True
-while replay:
-    print("")
-    print("="*70)
-    print("🎬 Starting/Restarting Simulation...")
-    print("="*70)
-    
-    # Reset tracking data for this run
-    tracking_errors_run = []
-    control_torques_run = []
-    times_run = []
-    phase2_log_run = []
-    all_torque_data_run = []
-    all_qpos_data_run = []
-    
-    # Reset simulation state
-    mujoco.mj_resetData(model, data)
-    data.qpos[:] = qpos_traj[0]
-    data.qvel[:] = qvel_traj[0]
-    data.qfrc_applied[:] = 0.0
-    mujoco.mj_forward(model, data)
-    
-    try:
-        with mujoco.viewer.launch_passive(model, data) as viewer:
-            # Set better camera view for hand visualization
-            # Adjust these values for optimal viewing angle
-            viewer.cam.azimuth = 90    # Horizontal rotation (degrees)
-            viewer.cam.elevation = -20  # Vertical angle (degrees)
-            viewer.cam.distance = 1.5   # Distance from target
-            viewer.cam.lookat[:] = [0.0, 0.0, 0.3]  # Look at point (x, y, z)
-            
-            print("")
-            print("📹 Camera controls:")
-            print("  - Right-click drag: Rotate view")
-            print("  - Scroll wheel: Zoom in/out")
-            print("  - Left-click drag: Pan view")
-            print("")
+# Single simulation run (no replay loop)
+print("")
+print("="*70)
+print("🎬 Starting Simulation...")
+print("="*70)
+
+# Tracking data for this run
+tracking_errors_run = []
+control_torques_run = []
+times_run = []
+phase2_log_run = []
+all_torque_data_run = []
+all_qpos_data_run = []
+
+# Reset simulation state
+mujoco.mj_resetData(model, data)
+data.qpos[:] = qpos_traj[0]
+data.qvel[:] = qvel_traj[0]
+data.qfrc_applied[:] = 0.0
+mujoco.mj_forward(model, data)
+
+try:
+    with mujoco.viewer.launch_passive(model, data) as viewer:
+        # Set better camera view for hand visualization
+        # Adjust these values for optimal viewing angle
+        viewer.cam.azimuth = 90    # Horizontal rotation (degrees)
+        viewer.cam.elevation = -20  # Vertical angle (degrees)
+        viewer.cam.distance = 1.5   # Distance from target
+        viewer.cam.lookat[:] = [0.0, 0.0, 0.3]  # Look at point (x, y, z)
+        
+        print("")
+        print("📹 Camera controls:")
+        print("  - Right-click drag: Rotate view")
+        print("  - Scroll wheel: Zoom in/out")
+        print("  - Left-click drag: Pan view")
+        print("  - Close window when simulation completes to see interactive analysis")
+        print("")
             
             start_time = time.time()
             sim_step = 0  # Simulation step counter
@@ -1630,34 +1629,29 @@ while replay:
         
         print("")
         print("Simulation complete!")
+        print("Close the viewer window to see interactive visualization...")
         
-        # Store this run's data for final analysis
-        tracking_errors.extend(tracking_errors_run)
-        control_torques.extend(control_torques_run)
-        times.extend(times_run)
-        phase2_log.extend(phase2_log_run)
-        all_torque_data.extend(all_torque_data_run)
-        all_qpos_data.extend(all_qpos_data_run)
-        
-    except KeyboardInterrupt:
-        print("\\n⚠️ Simulation interrupted by user")
-        replay = False
-    
-    # Auto-replay when simulation ends (viewer still open)
-    if replay:
-        print("")
-        print("="*70)
-        print("🔄 AUTO-REPLAY")
-        print("="*70)
-        print("  Simulation will restart automatically...")
-        print("  Close the viewer window to see final results")
-        print("="*70)
-        time.sleep(1)
-        # Keep data for final analysis
+except KeyboardInterrupt:
+    print("\\n⚠️ Simulation interrupted by user")
+
+# Store data for final analysis
+tracking_errors = tracking_errors_run
+control_torques = control_torques_run
+times = times_run
+phase2_log = phase2_log_run
+all_torque_data = all_torque_data_run
+all_qpos_data = all_qpos_data_run
 
 # Convert lists to numpy arrays for easier indexing
 all_torque_data = np.array(all_torque_data)
 all_qpos_data = np.array(all_qpos_data)
+
+print("")
+print("="*70)
+print("📊 INTERACTIVE VISUALIZATION")
+print("="*70)
+print("Opening interactive visualization with time slider...")
+print("")
 
 # Interactive visualization with time slider
 if HAS_MATPLOTLIB and len(all_torque_data) > 0:
@@ -1789,14 +1783,20 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     
     print("")
     print("="*70)
-    print("🎮 INTERACTIVE VISUALIZATION")
+    print("🎮 INTERACTIVE ANALYSIS MODE")
     print("="*70)
-    print("  - Use slider to scrub through time")
-    print("  - Graph shows: Finger (X) - Joint (Y) - Torque (Z)")
-    print("  - Colors represent different fingers")
+    print("  Two windows are now open:")
+    print("  1. Matplotlib: 3D bar chart with time slider")
+    print("     - Drag slider to move through time")
+    print("     - Chart shows: Finger (X) - Joint (Y) - Torque (Z)")
+    print("     - Colors: different fingers")
     print("")
-    print("  Opening MuJoCo viewer for pose visualization...")
-    print("  (Viewer will update when you move the slider)")
+    print("  2. MuJoCo Viewer: Robot pose synchronized with slider")
+    print("     - Automatically updates when you move slider")
+    print("     - Right-click drag: rotate camera")
+    print("     - Scroll: zoom in/out")
+    print("")
+    print("  👉 Close matplotlib window when done to see final results")
     print("="*70)
     
     # Launch MuJoCo viewer in passive mode for visualization
@@ -1809,8 +1809,7 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
             viewer.cam.lookat[:] = [0.0, 0.0, 0.3]
             
             # Keep viewer open while matplotlib is interactive
-            print("\\n📹 MuJoCo viewer active. Move slider to see pose change.")
-            print("   Close matplotlib window to continue...")
+            print("\\n✅ Both windows active. Move slider to analyze motion...")
             
             while plt.fignum_exists(fig_interactive.number):
                 viewer.sync()
