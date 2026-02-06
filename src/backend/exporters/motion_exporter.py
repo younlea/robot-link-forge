@@ -1794,7 +1794,7 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
         else:
             play_button.label.set_text('Play')
             if anim_state['timer'] is not None:
-                anim_state['timer'].remove()
+                anim_state['timer'].stop()
                 anim_state['timer'] = None
         plt.draw()
     
