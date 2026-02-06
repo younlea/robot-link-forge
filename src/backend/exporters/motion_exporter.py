@@ -1773,7 +1773,7 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
         max_torque = np.max(np.abs(all_torque_data))
         ax_3d.set_zlim(-max_torque*1.1, max_torque*1.1)
         
-        plt.draw()
+        fig_interactive.canvas.draw_idle()  # Use draw_idle() to avoid auto-focus
     
     # Update function for slider
     def update_time(val):
@@ -1814,12 +1814,13 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
             if anim_state['timer'] is not None:
                 anim_state['timer'].stop()
                 anim_state['timer'] = None
-        plt.draw()
+        fig_interactive.canvas.draw_idle()  # Use draw_idle() instead of plt.draw() to avoid auto-focus
     
     def start_animation():
         if anim_state['timer'] is None:
             # Calculate interval based on speed multiplier
-            interval = int(dt * 1000 / anim_state['speed'])
+            # Match simulation rendering: 10 steps per sync (dt * 10)
+            interval = int(dt * 10 * 1000 / anim_state['speed'])
             anim_state['timer'] = fig_interactive.canvas.new_timer(interval=interval)
             anim_state['timer'].add_callback(animate_step)
             anim_state['timer'].start()
@@ -1829,7 +1830,8 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
             return
         
         current_time = time_slider.val
-        next_time = current_time + dt
+        # Advance by 10 steps to match simulation rendering
+        next_time = current_time + (dt * 10)
         
         if next_time >= duration:
             # Loop back to start
@@ -1884,7 +1886,7 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
             
             while plt.fignum_exists(fig_interactive.number):
                 viewer.sync()
-                plt.pause(0.1)
+                time.sleep(0.01)  # Small delay to prevent CPU overload, doesn't steal focus
     except:
         print("\\n⚠️ Could not open MuJoCo viewer")
     
