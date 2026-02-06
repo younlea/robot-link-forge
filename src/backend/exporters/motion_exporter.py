@@ -1862,9 +1862,11 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
             return
         
         current_time = time_slider.val
-        # Advance by simulation timestep multiplied by speed
-        # 2x speed = 2x time advancement per step
-        next_time = current_time + (dt * anim_state['speed'])
+        # Advance by simulation timestep multiplied by speed and base multiplier
+        # Base multiplier compensates for small dt value (typically 0.002s)
+        # With 60fps and dt=0.002, we need ~40x multiplier for real-time
+        base_multiplier = 40
+        next_time = current_time + (dt * anim_state['speed'] * base_multiplier)
         
         if next_time >= duration:
             # Loop back to start
