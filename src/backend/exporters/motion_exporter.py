@@ -1419,30 +1419,30 @@ while replay:
                 # Apply torques from inverse dynamics (Phase 1) WITH light PD feedback
                 # Pure feedforward is unstable - add stabilizing feedback
                 if sim_step < len(torque_history):
-                # Feedforward torque from inverse dynamics
-                ff_torque = torque_history[sim_step]
-                
-                # Very light PD feedback for stabilization
-                # CRITICAL: kp/kd must be VERY LOW to avoid instability
-                # Position actuators in MJCF have their own builtin PD that interferes!
-                kp = 1.0   # Proportional gain (very low)
-                kd = 0.1   # Derivative gain (very low)
-                
-                # Compute feedback torque for each DOF
-                fb_torque = np.zeros(model.nv)
-                for jname, jid in joint_ids.items():
-                    dof_adr = model.jnt_dofadr[jid]
-                    qadr = model.jnt_qposadr[jid]
+                    # Feedforward torque from inverse dynamics
+                    ff_torque = torque_history[sim_step]
                     
-                    # Position and velocity errors
-                    pos_error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
-                    vel_error = qvel_traj[sim_step, dof_adr] - data.qvel[dof_adr]
+                    # Very light PD feedback for stabilization
+                    # CRITICAL: kp/kd must be VERY LOW to avoid instability
+                    # Position actuators in MJCF have their own builtin PD that interferes!
+                    kp = 1.0   # Proportional gain (very low)
+                    kd = 0.1   # Derivative gain (very low)
                     
-                    # PD control (very gentle)
-                    fb_torque[dof_adr] = kp * pos_error + kd * vel_error
-                
-                # Total torque = feedforward + feedback
-                data.qfrc_applied[:] = ff_torque + fb_torque
+                    # Compute feedback torque for each DOF
+                    fb_torque = np.zeros(model.nv)
+                    for jname, jid in joint_ids.items():
+                        dof_adr = model.jnt_dofadr[jid]
+                        qadr = model.jnt_qposadr[jid]
+                        
+                        # Position and velocity errors
+                        pos_error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
+                        vel_error = qvel_traj[sim_step, dof_adr] - data.qvel[dof_adr]
+                        
+                        # PD control (very gentle)
+                        fb_torque[dof_adr] = kp * pos_error + kd * vel_error
+                    
+                    # Total torque = feedforward + feedback
+                    data.qfrc_applied[:] = ff_torque + fb_torque
                 else:
                     data.qfrc_applied[:] = 0.0
                 
@@ -1468,28 +1468,28 @@ while replay:
                         print(f"     ⚠️ COLLISIONS DETECTED! Analyzing contact pairs...")
                         for i in range(min(data.ncon, 10)):  # Show first 10 contacts
                             contact = data.contact[i]
-                        geom1 = contact.geom1
-                        geom2 = contact.geom2
-                        
-                        # Get body IDs from geometry IDs
-                        body1_id = model.geom_bodyid[geom1]
-                        body2_id = model.geom_bodyid[geom2]
-                        
-                        # Get body names
-                        body1_name = model.body(body1_id).name if body1_id >= 0 else "world"
-                        body2_name = model.body(body2_id).name if body2_id >= 0 else "world"
-                        
-                        # Contact distance (negative = penetration)
-                        dist = contact.dist
-                        
-                        # Get contact force magnitude
-                        # contact.frame: contact frame (3x3 rotation matrix stored as 9 elements)
-                        # We need to compute force from constraint forces
-                        # For now, just show penetration depth
-                        
-                        print(f"       Contact {{i+1}}: {{body1_name:25s}} <-> {{body2_name:25s}}")
-                        print(f"                 Penetration: {{-dist*1000:.2f}} mm" + 
-                              (" 🔴 DEEP!" if dist < -0.005 else ""))
+                            geom1 = contact.geom1
+                            geom2 = contact.geom2
+                            
+                            # Get body IDs from geometry IDs
+                            body1_id = model.geom_bodyid[geom1]
+                            body2_id = model.geom_bodyid[geom2]
+                            
+                            # Get body names
+                            body1_name = model.body(body1_id).name if body1_id >= 0 else "world"
+                            body2_name = model.body(body2_id).name if body2_id >= 0 else "world"
+                            
+                            # Contact distance (negative = penetration)
+                            dist = contact.dist
+                            
+                            # Get contact force magnitude
+                            # contact.frame: contact frame (3x3 rotation matrix stored as 9 elements)
+                            # We need to compute force from constraint forces
+                            # For now, just show penetration depth
+                            
+                            print(f"       Contact {{i+1}}: {{body1_name:25s}} <-> {{body2_name:25s}}")
+                            print(f"                 Penetration: {{-dist*1000:.2f}} mm" + 
+                                  (" 🔴 DEEP!" if dist < -0.005 else ""))
                     
                     else:
                         print(f"     ✅ No collisions (collision exclusions working)")
