@@ -1,10 +1,20 @@
+========================================
+Enter choice [0/1/2/3/4]: 4
+Starting Inverse-to-Forward Validation...
+  File "/home/younleakim/Downloads/direct_hand_parm/inverse_to_forward_validation.py", line 629
+    ff_torque = torque_history[sim_step]
+    ^
+IndentationError: expected an indented block after 'if' statement on line 627
+
+
+code -----------------------------
 #!/usr/bin/env python3
 """
 Mode 4: Inverse-to-Forward Validation
 Uses inverse dynamics torques as motor limits to test forward tracking
 
-Script Version: 20260206_084036
-Generated: 2026-02-06 08:40:36
+Script Version: 20260206_090428
+Generated: 2026-02-06 09:04:28
 """
 import time
 import mujoco
@@ -13,8 +23,8 @@ import numpy as np
 import json
 
 # Version info
-SCRIPT_VERSION = "20260206_084036"
-SCRIPT_DATE = "2026-02-06 08:40:36"
+SCRIPT_VERSION = "20260206_090428"
+SCRIPT_DATE = "2026-02-06 09:04:28"
 
 print("="*70)
 print(f"MODE 4 SCRIPT VERSION: {SCRIPT_VERSION}")
@@ -87,126 +97,126 @@ recording_data = {
     {
       "timestamp": 580,
       "joints": {
-        "MiddleFinger-2nd-pitch": 0,
-        "LittleFinger-3rd-pitch": 0,
-        "IndexFinger_1st_roll": 0,
-        "RingFinger-2nd-pitch": 0,
-        "Thumb-3rd-pitch": 0,
-        "RingFinger-3rd-pitch": 0,
-        "MiddleFinger_1st_roll": 0,
-        "Thumb-2nd-pitch": 0,
-        "IndexFinger-2nd-pitch": 0,
-        "LittleFinger-1st-pitch": 0,
         "RingFinger-1st-pitch": 0,
-        "RingFinger-1st_roll": 0,
+        "RingFinger-3rd-pitch": 0,
         "Thumb-1st-pitch": 0,
-        "LittleFinger-2nd-pitch": 0,
+        "MiddleFinger-1st-pitch": 0,
+        "RingFinger-1st_roll": 0,
+        "Thumb-2nd-pitch": 0,
+        "MiddleFinger-2nd-pitch": 0,
+        "IndexFinger-2nd-pitch": 0,
+        "thumb_1st_yaw": 0,
+        "LittleFinger-3rd-pitch": 0,
         "MiddleFinger-3rd-pitch": 0,
         "IndexFinger-3rd-pitch": 0,
         "LittleFinger-1st_roll": 0,
+        "MiddleFinger_1st_roll": 0,
         "IndexFinger-1st-pitch": 0,
-        "thumb_1st_yaw": 0,
-        "MiddleFinger-1st-pitch": 0
+        "RingFinger-2nd-pitch": 0,
+        "Thumb-3rd-pitch": 0,
+        "IndexFinger_1st_roll": 0,
+        "LittleFinger-1st-pitch": 0,
+        "LittleFinger-2nd-pitch": 0
       }
     },
     {
       "timestamp": 2093,
       "joints": {
-        "MiddleFinger-2nd-pitch": 0,
-        "LittleFinger-3rd-pitch": 0,
-        "IndexFinger_1st_roll": 0,
-        "RingFinger-2nd-pitch": 0,
-        "Thumb-3rd-pitch": 0,
-        "RingFinger-3rd-pitch": 0,
-        "MiddleFinger_1st_roll": 0,
-        "Thumb-2nd-pitch": 0,
-        "IndexFinger-2nd-pitch": 0,
-        "LittleFinger-1st-pitch": 0,
         "RingFinger-1st-pitch": 0,
-        "RingFinger-1st_roll": 0,
+        "RingFinger-3rd-pitch": 0,
         "Thumb-1st-pitch": -0.940796326794897,
-        "LittleFinger-2nd-pitch": 0,
+        "MiddleFinger-1st-pitch": 0,
+        "RingFinger-1st_roll": 0,
+        "Thumb-2nd-pitch": 0,
+        "MiddleFinger-2nd-pitch": 0,
+        "IndexFinger-2nd-pitch": 0,
+        "thumb_1st_yaw": 0,
+        "LittleFinger-3rd-pitch": 0,
         "MiddleFinger-3rd-pitch": 0,
         "IndexFinger-3rd-pitch": 0,
         "LittleFinger-1st_roll": 0,
+        "MiddleFinger_1st_roll": 0,
         "IndexFinger-1st-pitch": -1.5707963267949,
-        "thumb_1st_yaw": 0,
-        "MiddleFinger-1st-pitch": 0
+        "RingFinger-2nd-pitch": 0,
+        "Thumb-3rd-pitch": 0,
+        "IndexFinger_1st_roll": 0,
+        "LittleFinger-1st-pitch": 0,
+        "LittleFinger-2nd-pitch": 0
       }
     },
     {
       "timestamp": 3614,
       "joints": {
-        "MiddleFinger-2nd-pitch": 0,
-        "LittleFinger-3rd-pitch": 0,
-        "IndexFinger_1st_roll": 0,
-        "RingFinger-2nd-pitch": 0,
-        "Thumb-3rd-pitch": 0,
-        "RingFinger-3rd-pitch": 0,
-        "MiddleFinger_1st_roll": 0,
-        "Thumb-2nd-pitch": 0,
-        "IndexFinger-2nd-pitch": 0,
-        "LittleFinger-1st-pitch": 0,
         "RingFinger-1st-pitch": 0,
-        "RingFinger-1st_roll": 0,
+        "RingFinger-3rd-pitch": 0,
         "Thumb-1st-pitch": 0,
-        "LittleFinger-2nd-pitch": 0,
+        "MiddleFinger-1st-pitch": 0,
+        "RingFinger-1st_roll": 0,
+        "Thumb-2nd-pitch": 0,
+        "MiddleFinger-2nd-pitch": 0,
+        "IndexFinger-2nd-pitch": 0,
+        "thumb_1st_yaw": 0,
+        "LittleFinger-3rd-pitch": 0,
         "MiddleFinger-3rd-pitch": 0,
         "IndexFinger-3rd-pitch": 0,
         "LittleFinger-1st_roll": 0,
+        "MiddleFinger_1st_roll": 0,
         "IndexFinger-1st-pitch": 0,
-        "thumb_1st_yaw": 0,
-        "MiddleFinger-1st-pitch": 0
+        "RingFinger-2nd-pitch": 0,
+        "Thumb-3rd-pitch": 0,
+        "IndexFinger_1st_roll": 0,
+        "LittleFinger-1st-pitch": 0,
+        "LittleFinger-2nd-pitch": 0
       }
     },
     {
       "timestamp": 5052,
       "joints": {
-        "MiddleFinger-2nd-pitch": -0.220796326794897,
-        "LittleFinger-3rd-pitch": 0,
-        "IndexFinger_1st_roll": 0,
-        "RingFinger-2nd-pitch": 0,
-        "Thumb-3rd-pitch": 0,
-        "RingFinger-3rd-pitch": 0,
-        "MiddleFinger_1st_roll": 0.0254670748005671,
-        "Thumb-2nd-pitch": 0,
-        "IndexFinger-2nd-pitch": 0,
-        "LittleFinger-1st-pitch": 0,
         "RingFinger-1st-pitch": 0,
-        "RingFinger-1st_roll": 0,
+        "RingFinger-3rd-pitch": 0,
         "Thumb-1st-pitch": -0.780796326794897,
-        "LittleFinger-2nd-pitch": 0,
+        "MiddleFinger-1st-pitch": -1.5707963267949,
+        "RingFinger-1st_roll": 0,
+        "Thumb-2nd-pitch": 0,
+        "MiddleFinger-2nd-pitch": -0.220796326794897,
+        "IndexFinger-2nd-pitch": 0,
+        "thumb_1st_yaw": -0.393598775598299,
+        "LittleFinger-3rd-pitch": 0,
         "MiddleFinger-3rd-pitch": 0,
         "IndexFinger-3rd-pitch": 0,
         "LittleFinger-1st_roll": 0,
+        "MiddleFinger_1st_roll": 0.0254670748005671,
         "IndexFinger-1st-pitch": 0,
-        "thumb_1st_yaw": -0.393598775598299,
-        "MiddleFinger-1st-pitch": -1.5707963267949
+        "RingFinger-2nd-pitch": 0,
+        "Thumb-3rd-pitch": 0,
+        "IndexFinger_1st_roll": 0,
+        "LittleFinger-1st-pitch": 0,
+        "LittleFinger-2nd-pitch": 0
       }
     },
     {
       "timestamp": 6835,
       "joints": {
-        "MiddleFinger-2nd-pitch": 0,
-        "LittleFinger-3rd-pitch": 0,
-        "IndexFinger_1st_roll": 0,
-        "RingFinger-2nd-pitch": 0,
-        "Thumb-3rd-pitch": 0,
-        "RingFinger-3rd-pitch": 0,
-        "MiddleFinger_1st_roll": 0,
-        "Thumb-2nd-pitch": 0,
-        "IndexFinger-2nd-pitch": 0,
-        "LittleFinger-1st-pitch": 0,
         "RingFinger-1st-pitch": 0,
-        "RingFinger-1st_roll": 0,
+        "RingFinger-3rd-pitch": 0,
         "Thumb-1st-pitch": 0,
-        "LittleFinger-2nd-pitch": 0,
+        "MiddleFinger-1st-pitch": 0,
+        "RingFinger-1st_roll": 0,
+        "Thumb-2nd-pitch": 0,
+        "MiddleFinger-2nd-pitch": 0,
+        "IndexFinger-2nd-pitch": 0,
+        "thumb_1st_yaw": 0,
+        "LittleFinger-3rd-pitch": 0,
         "MiddleFinger-3rd-pitch": 0,
         "IndexFinger-3rd-pitch": 0,
         "LittleFinger-1st_roll": 0,
+        "MiddleFinger_1st_roll": 0,
         "IndexFinger-1st-pitch": 0,
-        "thumb_1st_yaw": 0,
-        "MiddleFinger-1st-pitch": 0
+        "RingFinger-2nd-pitch": 0,
+        "Thumb-3rd-pitch": 0,
+        "IndexFinger_1st_roll": 0,
+        "LittleFinger-1st-pitch": 0,
+        "LittleFinger-2nd-pitch": 0
       }
     }
   ]
@@ -617,14 +627,14 @@ while replay:
             
             start_time = time.time()
             sim_step = 0  # Simulation step counter
-        
-        while viewer.is_running() and sim_step < n_steps:
-            # REAL PHYSICS SIMULATION with torque control
-            # This is what we want to test for Mode 2 development!
             
-            # Apply torques from inverse dynamics (Phase 1) WITH light PD feedback
-            # Pure feedforward is unstable - add stabilizing feedback
-            if sim_step < len(torque_history):
+            while viewer.is_running() and sim_step < n_steps:
+                # REAL PHYSICS SIMULATION with torque control
+                # This is what we want to test for Mode 2 development!
+                
+                # Apply torques from inverse dynamics (Phase 1) WITH light PD feedback
+                # Pure feedforward is unstable - add stabilizing feedback
+                if sim_step < len(torque_history):
                 # Feedforward torque from inverse dynamics
                 ff_torque = torque_history[sim_step]
                 
@@ -649,31 +659,31 @@ while replay:
                 
                 # Total torque = feedforward + feedback
                 data.qfrc_applied[:] = ff_torque + fb_torque
-            else:
-                data.qfrc_applied[:] = 0.0
-            
-            # DEBUG: Monitor torque application, physics state, and COLLISIONS
-            if sim_step == 0 or sim_step == 500 or sim_step % 1000 == 0:
-                print(f"\n🔍 PHYSICS DEBUG at step {sim_step}:")
-                print(f"  Using REAL PHYSICS (mj_step) with torque control")
-                max_torque = np.max(np.abs(data.qfrc_applied))
-                nonzero_torques = np.count_nonzero(np.abs(data.qfrc_applied) > 0.01)
-                print(f"  Applied torques: {nonzero_torques}/{model.nv}, Max: {max_torque:.2f} Nm")
+                else:
+                    data.qfrc_applied[:] = 0.0
                 
-                # Check for instability warnings
-                if np.any(np.isnan(data.qpos)) or np.any(np.isinf(data.qpos)):
-                    print("  ⚠️ WARNING: NaN/Inf detected in qpos!")
-                if np.max(np.abs(data.qvel)) > 100:
-                    print(f"  ⚠️ WARNING: High velocity detected: {np.max(np.abs(data.qvel)):.2f}")
-                
-                # COLLISION DETECTION: Check for contacts between bodies
-                print(f"\n  💥 COLLISION DEBUG:")
-                print(f"     Active contacts: {data.ncon}")
-                
-                if data.ncon > 0:
-                    print(f"     ⚠️ COLLISIONS DETECTED! Analyzing contact pairs...")
-                    for i in range(min(data.ncon, 10)):  # Show first 10 contacts
-                        contact = data.contact[i]
+                # DEBUG: Monitor torque application, physics state, and COLLISIONS
+                if sim_step == 0 or sim_step == 500 or sim_step % 1000 == 0:
+                    print(f"\n🔍 PHYSICS DEBUG at step {sim_step}:")
+                    print(f"  Using REAL PHYSICS (mj_step) with torque control")
+                    max_torque = np.max(np.abs(data.qfrc_applied))
+                    nonzero_torques = np.count_nonzero(np.abs(data.qfrc_applied) > 0.01)
+                    print(f"  Applied torques: {nonzero_torques}/{model.nv}, Max: {max_torque:.2f} Nm")
+                    
+                    # Check for instability warnings
+                    if np.any(np.isnan(data.qpos)) or np.any(np.isinf(data.qpos)):
+                        print("  ⚠️ WARNING: NaN/Inf detected in qpos!")
+                    if np.max(np.abs(data.qvel)) > 100:
+                        print(f"  ⚠️ WARNING: High velocity detected: {np.max(np.abs(data.qvel)):.2f}")
+                    
+                    # COLLISION DETECTION: Check for contacts between bodies
+                    print(f"\n  💥 COLLISION DEBUG:")
+                    print(f"     Active contacts: {data.ncon}")
+                    
+                    if data.ncon > 0:
+                        print(f"     ⚠️ COLLISIONS DETECTED! Analyzing contact pairs...")
+                        for i in range(min(data.ncon, 10)):  # Show first 10 contacts
+                            contact = data.contact[i]
                         geom1 = contact.geom1
                         geom2 = contact.geom2
                         
@@ -696,143 +706,143 @@ while replay:
                         print(f"       Contact {i+1}: {body1_name:25s} <-> {body2_name:25s}")
                         print(f"                 Penetration: {-dist*1000:.2f} mm" + 
                               (" 🔴 DEEP!" if dist < -0.005 else ""))
+                    
+                    else:
+                        print(f"     ✅ No collisions (collision exclusions working)")
+                    
+                    # Show sample joint states
+                    print(f"\n  Joint States:")
+                    for jname, jid in list(joint_ids.items())[:3]:
+                        if jname in actuator_ids:
+                            dof_adr = model.jnt_dofadr[jid]
+                            qadr = model.jnt_qposadr[jid]
+                            pos = data.qpos[qadr]
+                            vel = data.qvel[dof_adr]
+                            torque = data.qfrc_applied[dof_adr]
+                            target = qpos_traj[sim_step, qadr]
+                            error = target - pos
+                            print(f"    {jname:30s}: pos={pos:+7.3f} (target={target:+7.3f}, err={error:+7.3f}), vel={vel:+7.3f}, torque={torque:+7.2f} Nm")
                 
-                else:
-                    print(f"     ✅ No collisions (collision exclusions working)")
+                # Run physics simulation step
+                # This is the KEY difference from kinematic playback!
+                mujoco.mj_step(model, data)
                 
-                # Show sample joint states
-                print(f"\n  Joint States:")
-                for jname, jid in list(joint_ids.items())[:3]:
-                    if jname in actuator_ids:
-                        dof_adr = model.jnt_dofadr[jid]
-                        qadr = model.jnt_qposadr[jid]
-                        pos = data.qpos[qadr]
-                        vel = data.qvel[dof_adr]
-                        torque = data.qfrc_applied[dof_adr]
-                        target = qpos_traj[sim_step, qadr]
-                        error = target - pos
-                        print(f"    {jname:30s}: pos={pos:+7.3f} (target={target:+7.3f}, err={error:+7.3f}), vel={vel:+7.3f}, torque={torque:+7.2f} Nm")
-            
-            # Run physics simulation step
-            # This is the KEY difference from kinematic playback!
-            mujoco.mj_step(model, data)
-            
-            # COLLISION MONITORING: Check for any collisions after step
-            # This is CRITICAL - collisions can cause constraint forces that lead to instability
-            if data.ncon > 0:
-                # Collision detected! This could be the cause of divergence
-                if sim_step % 100 == 0:  # Report every 100 steps if collisions persist
-                    print(f"\n⚠️ COLLISION WARNING at step {sim_step}:")
-                    print(f"   {data.ncon} active contacts detected")
-                    # Show first few problematic contacts
-                    for i in range(min(data.ncon, 3)):
-                        contact = data.contact[i]
-                        body1_id = model.geom_bodyid[contact.geom1]
-                        body2_id = model.geom_bodyid[contact.geom2]
-                        body1_name = model.body(body1_id).name if body1_id >= 0 else "world"
-                        body2_name = model.body(body2_id).name if body2_id >= 0 else "world"
-                        print(f"      {body1_name} <-> {body2_name}, penetration: {-contact.dist*1000:.2f}mm")
-            
-            # Check for catastrophic failure (NaN/Inf)
-            if np.any(np.isnan(data.qpos)) or np.any(np.isinf(data.qpos)):
-                print(f"\n🔴 CATASTROPHIC FAILURE at step {sim_step}:")
-                print(f"   NaN/Inf detected in qpos!")
-                print(f"   Last known collisions: {data.ncon}")
+                # COLLISION MONITORING: Check for any collisions after step
+                # This is CRITICAL - collisions can cause constraint forces that lead to instability
                 if data.ncon > 0:
-                    print(f"   Collision body pairs:")
-                    for i in range(min(data.ncon, 5)):
-                        contact = data.contact[i]
-                        body1_id = model.geom_bodyid[contact.geom1]
-                        body2_id = model.geom_bodyid[contact.geom2]
-                        body1_name = model.body(body1_id).name if body1_id >= 0 else "world"
-                        body2_name = model.body(body2_id).name if body2_id >= 0 else "world"
-                        print(f"      {body1_name} <-> {body2_name}")
-                print(f"\n   This likely means:")
-                print(f"   1. Missing collision exclusions (check MJCF <contact> section)")
-                print(f"   2. Excessive constraint forces from geometry conflicts")
-                print(f"   3. Torques too high or initial configuration invalid")
-                break  # Stop simulation
-            
-            # Store actual applied forces for analysis
-            applied_forces = data.qfrc_applied.copy()
-            
-            # Sync viewer every 10 steps for faster playback (100Hz physics -> 10Hz rendering)
-            if sim_step % 10 == 0:
-                viewer.sync()
-            
-            # Calculate elapsed time for logging
-            elapsed = sim_step * dt
-            
-            # Log tracking error with detailed diagnostics
-            errors = []
-            error_details = []
-            saturated_joints = []
-            
-            for jname, jnt_idx in joint_ids.items():
-                qadr = model.jnt_qposadr[jnt_idx]
-                error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
-                errors.append(error ** 2)
+                    # Collision detected! This could be the cause of divergence
+                    if sim_step % 100 == 0:  # Report every 100 steps if collisions persist
+                        print(f"\n⚠️ COLLISION WARNING at step {sim_step}:")
+                        print(f"   {data.ncon} active contacts detected")
+                        # Show first few problematic contacts
+                        for i in range(min(data.ncon, 3)):
+                            contact = data.contact[i]
+                            body1_id = model.geom_bodyid[contact.geom1]
+                            body2_id = model.geom_bodyid[contact.geom2]
+                            body1_name = model.body(body1_id).name if body1_id >= 0 else "world"
+                            body2_name = model.body(body2_id).name if body2_id >= 0 else "world"
+                            print(f"      {body1_name} <-> {body2_name}, penetration: {-contact.dist*1000:.2f}mm")
                 
-                # Get position command value
-                ctrl_val = 0.0
-                if jname in actuator_ids:
-                    aid = actuator_ids[jname]
-                    ctrl_val = data.ctrl[aid]
+                # Check for catastrophic failure (NaN/Inf)
+                if np.any(np.isnan(data.qpos)) or np.any(np.isinf(data.qpos)):
+                    print(f"\n🔴 CATASTROPHIC FAILURE at step {sim_step}:")
+                    print(f"   NaN/Inf detected in qpos!")
+                    print(f"   Last known collisions: {data.ncon}")
+                    if data.ncon > 0:
+                        print(f"   Collision body pairs:")
+                        for i in range(min(data.ncon, 5)):
+                            contact = data.contact[i]
+                            body1_id = model.geom_bodyid[contact.geom1]
+                            body2_id = model.geom_bodyid[contact.geom2]
+                            body1_name = model.body(body1_id).name if body1_id >= 0 else "world"
+                            body2_name = model.body(body2_id).name if body2_id >= 0 else "world"
+                            print(f"      {body1_name} <-> {body2_name}")
+                    print(f"\n   This likely means:")
+                    print(f"   1. Missing collision exclusions (check MJCF <contact> section)")
+                    print(f"   2. Excessive constraint forces from geometry conflicts")
+                    print(f"   3. Torques too high or initial configuration invalid")
+                    break  # Stop simulation
                 
-                error_details.append((jname, abs(error), abs(ctrl_val)))
+                # Store actual applied forces for analysis
+                applied_forces = data.qfrc_applied.copy()
                 
-                # Check if position command is large
-                if jname in actuator_ids:
-                    aid = actuator_ids[jname]
-                    if abs(ctrl_val) > 1.57:  # > 90 degrees
-                        saturated_joints.append(jname)
-            
-            rms_error = np.sqrt(np.mean(errors))
-            # Track ACTUAL applied torque (not actuator control which is 0)
-            max_applied_torque = np.max(np.abs(data.qfrc_applied))
-            
-            tracking_errors_run.append(rms_error)
-            control_torques_run.append(max_applied_torque)  # Store actual torque magnitude
-            times_run.append(elapsed)
-            
-            # Store torque and position data for interactive visualization
-            all_torque_data_run.append(data.qfrc_applied.copy())
-            all_qpos_data_run.append(data.qpos.copy())
-            
-            # Save Phase 2 data every 10 steps (reduce file size)
-            if sim_step % 10 == 0:
-                log_entry = {'time': elapsed, 'step': sim_step}
-                for jname in joint_ids.keys():
-                    jid = joint_ids[jname]
-                    qadr = model.jnt_qposadr[jid]
-                    dof_adr = model.jnt_dofadr[jid]
+                # Sync viewer every 10 steps for faster playback (100Hz physics -> 10Hz rendering)
+                if sim_step % 10 == 0:
+                    viewer.sync()
+                
+                # Calculate elapsed time for logging
+                elapsed = sim_step * dt
+                
+                # Log tracking error with detailed diagnostics
+                errors = []
+                error_details = []
+                saturated_joints = []
+                
+                for jname, jnt_idx in joint_ids.items():
+                    qadr = model.jnt_qposadr[jnt_idx]
+                    error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
+                    errors.append(error ** 2)
                     
-                    target = qpos_traj[sim_step, qadr]
-                    actual = data.qpos[qadr]
-                    applied_torque = applied_forces[dof_adr]  # Torque in Nm, not rad!
+                    # Get position command value
+                    ctrl_val = 0.0
+                    if jname in actuator_ids:
+                        aid = actuator_ids[jname]
+                        ctrl_val = data.ctrl[aid]
                     
-                    log_entry[f'{jname}_target'] = target
-                    log_entry[f'{jname}_actual'] = actual
-                    log_entry[f'{jname}_force'] = applied_torque  # This is Nm, not rad
-                    log_entry[f'{jname}_error'] = target - actual
+                    error_details.append((jname, abs(error), abs(ctrl_val)))
+                    
+                    # Check if position command is large
+                    if jname in actuator_ids:
+                        aid = actuator_ids[jname]
+                        if abs(ctrl_val) > 1.57:  # > 90 degrees
+                            saturated_joints.append(jname)
                 
-                phase2_log_run.append(log_entry)
-            
-            # Print progress with diagnostics
-            if sim_step % 500 == 0:
-                # Find worst 3 joints
-                error_details.sort(key=lambda x: x[1], reverse=True)
-                worst_joints = error_details[:3]
+                rms_error = np.sqrt(np.mean(errors))
+                # Track ACTUAL applied torque (not actuator control which is 0)
+                max_applied_torque = np.max(np.abs(data.qfrc_applied))
                 
-                print(f"  T={elapsed:.2f}s: RMS error={rms_error:.4f} rad ({np.rad2deg(rms_error):.1f}°), Max torque={max_applied_torque:.2f} Nm")
-                print(f"    Worst errors: ", end="")
-                for jname, err, ctrl in worst_joints:
-                    print(f"{jname}={np.rad2deg(err):.1f}°  ", end="")
-                print()
-                if saturated_joints:
-                    print(f"    Large commands: {', '.join(saturated_joints[:5])}")
-            
-            sim_step += 1  # Increment simulation step
+                tracking_errors_run.append(rms_error)
+                control_torques_run.append(max_applied_torque)  # Store actual torque magnitude
+                times_run.append(elapsed)
+                
+                # Store torque and position data for interactive visualization
+                all_torque_data_run.append(data.qfrc_applied.copy())
+                all_qpos_data_run.append(data.qpos.copy())
+                
+                # Save Phase 2 data every 10 steps (reduce file size)
+                if sim_step % 10 == 0:
+                    log_entry = {'time': elapsed, 'step': sim_step}
+                    for jname in joint_ids.keys():
+                        jid = joint_ids[jname]
+                        qadr = model.jnt_qposadr[jid]
+                        dof_adr = model.jnt_dofadr[jid]
+                        
+                        target = qpos_traj[sim_step, qadr]
+                        actual = data.qpos[qadr]
+                        applied_torque = applied_forces[dof_adr]  # Torque in Nm, not rad!
+                        
+                        log_entry[f'{jname}_target'] = target
+                        log_entry[f'{jname}_actual'] = actual
+                        log_entry[f'{jname}_force'] = applied_torque  # This is Nm, not rad
+                        log_entry[f'{jname}_error'] = target - actual
+                    
+                    phase2_log_run.append(log_entry)
+                
+                # Print progress with diagnostics
+                if sim_step % 500 == 0:
+                    # Find worst 3 joints
+                    error_details.sort(key=lambda x: x[1], reverse=True)
+                    worst_joints = error_details[:3]
+                    
+                    print(f"  T={elapsed:.2f}s: RMS error={rms_error:.4f} rad ({np.rad2deg(rms_error):.1f}°), Max torque={max_applied_torque:.2f} Nm")
+                    print(f"    Worst errors: ", end="")
+                    for jname, err, ctrl in worst_joints:
+                        print(f"{jname}={np.rad2deg(err):.1f}°  ", end="")
+                    print()
+                    if saturated_joints:
+                        print(f"    Large commands: {', '.join(saturated_joints[:5])}")
+                
+                sim_step += 1  # Increment simulation step
         
         print("")
         print("Simulation complete!")
@@ -1043,13 +1053,8 @@ with open('phase2_control_applied.csv', 'w', newline='') as f:
             row.append(entry.get(f'{jname}_force', 0))
             row.append(entry.get(f'{jname}_error', 0))
         writer.writerow(row)
-    
-print(f"  Saved {len(phase2_log)} samples (every 10 steps) to phase2_control_applied.csv")
 
-except Exception as e:
-    print(f"ERROR: {e}")
-    import traceback
-    traceback.print_exc()
+print(f"  Saved {len(phase2_log)} samples (every 10 steps) to phase2_control_applied.csv")
 
 # Analysis
 if len(tracking_errors) > 0:
