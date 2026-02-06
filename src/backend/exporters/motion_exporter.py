@@ -1875,7 +1875,16 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     # Show matplotlib in non-blocking mode
     plt.ion()  # Turn on interactive mode
     plt.show(block=False)
-    plt.pause(0.001)  # Give matplotlib time to render
+    
+    # Give matplotlib sufficient time to fully render
+    print("\\n⏳ Rendering matplotlib window...")
+    plt.pause(0.5)  # Increased delay for proper rendering
+    
+    # Force draw to ensure window is visible
+    fig_interactive.canvas.draw()
+    fig_interactive.canvas.flush_events()
+    
+    print("✅ Matplotlib window ready")
     
     # Launch MuJoCo viewer in passive mode for visualization
     try:
