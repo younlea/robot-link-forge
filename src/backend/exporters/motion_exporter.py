@@ -1901,7 +1901,9 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
             try:
                 while plt.fignum_exists(fig_interactive.number):
                     viewer.sync()
-                    time.sleep(0.01)  # Small delay to prevent CPU overload
+                    # Process matplotlib events to make buttons/sliders/radio buttons responsive
+                    fig_interactive.canvas.flush_events()
+                    plt.pause(0.01)  # Small delay + event processing
             except KeyboardInterrupt:
                 print("\\n⚠️ Interrupted by user")
     except KeyboardInterrupt:
@@ -1987,68 +1989,74 @@ if len(tracking_errors) > 0:
         print("")
         print("📊 Generating final validation plots...")
         
-        fig_results, axes = plt.subplots(3, 1, figsize=(12, 10))
+        fig_results, axes = plt.subplots(3, 1, figsize=(12, 12))
         
-        # Plot 1: Tracking Error (RMS)
-        axes[0].plot(times, np.rad2deg(tracking_errors), 'b-', linewidth=1.5, label='RMS Error')
-        axes[0].axhline(y=11.5, color='r', linestyle='--', label='Acceptable limit (11.5°)')
-        axes[0].set_xlabel('Time (s)')
-        axes[0].set_ylabel('RMS Tracking Error (degrees)')
-        axes[0].set_title('Phase 2: Tracking Performance (Torque Control with PD Feedback)')
+        # Plot 1: Overall RMS Tracking Error
+        axes[0].plot(times, np.rad2deg(tracking_errors), 'b-', linewidth=2, label='Overall RMS Error')
+        axes[0].axhline(y=11.5, color='r', linestyle='--', linewidth=1.5, label='Acceptable limit (11.5°)')
+        axes[0].set_xlabel('Time (s)', fontsize=11)
+        axes[0].set_ylabel('RMS Tracking Error (degrees)', fontsize=11)
+        axes[0].set_title('Overall Tracking Performance (Torque Control with PD Feedback)', fontsize=12, fontweight='bold')
         axes[0].grid(True, alpha=0.3)
-        axes[0].legend()
-        axes[0].set_ylim([0, min(180, max(np.rad2deg(tracking_errors)) * 1.1)])  # Cap at 180° for readability
+        axes[0].legend(fontsize=10)
+        axes[0].set_ylim([0, min(180, max(np.rad2deg(tracking_errors)) * 1.1)])
         
-        # Plot 2: Applied Torques (from qfrc_applied)
-        # Extract max absolute torque at each time step from phase2 log
-        max_applied_torques = []
-        for step_data in phase2_log:
-            # step_data is a dictionary with keys like 'time', 'step', 'jointname_force', etc.
-            if isinstance(step_data, dict):
-                # Extract all force values (keys ending with '_force')
-                forces = [abs(v) for k, v in step_data.items() if k.endswith('_force')]
-                if forces:
-                    max_applied_torques.append(max(forces))
+        # Plot 2: Per-Finger Torques
+        # Extract per-joint torque data from phase2_log
+        finger_colors = {{'thumb': '#FF6B6B', 'index': '#4ECDC4', 'middle': '#45B7D1', 'ring': '#FFA07A', 'pinky': '#98D8C8'}}
+        finger_names = ['thumb', 'index', 'middle', 'ring', 'pinky']
+        
+        for finger in finger_names:
+            finger_torques = []
+            for entry in phase2_log:
+                # Collect all forces for this finger
+                finger_forces = [abs(entry.get(f'{{jname}}_force', 0)) 
+                               for jname in joint_names_ordered if finger in jname.lower()]
+                if finger_forces:
+                    finger_torques.append(max(finger_forces))  # Max torque for this finger
                 else:
-                    max_applied_torques.append(0.0)
-            else:
-                max_applied_torques.append(0.0)
+                    finger_torques.append(0.0)
+            
+            if finger_torques:
+                plot_times = times[:len(finger_torques)]
+                axes[1].plot(plot_times, finger_torques, 
+                           color=finger_colors.get(finger, 'gray'), 
+                           linewidth=1.5, 
+                           label=finger.capitalize(),
+                           alpha=0.8)
         
-        if max_applied_torques and len(max_applied_torques) > 0:
-            plot_times = times[:len(max_applied_torques)]
-            axes[1].plot(plot_times, max_applied_torques, 'g-', linewidth=1.5, label='Max Applied Torque')
-            axes[1].set_xlabel('Time (s)')
-            axes[1].set_ylabel('Torque (Nm)')
-            axes[1].set_title('Applied Torques (Feedforward + PD Feedback)')
-            axes[1].grid(True, alpha=0.3)
-            axes[1].legend()
-            # Use log scale if torques explode
-            if len(max_applied_torques) > 0 and max(max_applied_torques) > 1000:
-                axes[1].set_yscale('log')
-                axes[1].set_ylabel('Torque (Nm) - Log Scale')
-        else:
-            # Fallback: just show zeros
-            axes[1].plot(times, [0]*len(times), 'g-', linewidth=1.5, label='No torque data')
-            axes[1].set_xlabel('Time (s)')
-            axes[1].set_ylabel('Torque (Nm)')
-            axes[1].set_title('Applied Torques (No Data)')
-            axes[1].grid(True, alpha=0.3)
-            axes[1].legend()
+        axes[1].set_xlabel('Time (s)', fontsize=11)
+        axes[1].set_ylabel('Torque (Nm)', fontsize=11)
+        axes[1].set_title('Per-Finger Applied Torques (Max per Finger)', fontsize=12, fontweight='bold')
+        axes[1].grid(True, alpha=0.3)
+        axes[1].legend(fontsize=10, ncol=5, loc='upper right')
         
-        # Plot 3: Max Joint Velocity
-        # This shows if system is diverging
-        max_velocities = []
-        for i, t in enumerate(times):
-            # We don't have velocity data stored, but we can infer from tracking_errors
-            # If error is growing rapidly, velocity is high
-            max_velocities.append(np.rad2deg(tracking_errors[i]))  # Placeholder
+        # Plot 3: Per-Finger Tracking Errors
+        for finger in finger_names:
+            finger_errors = []
+            for entry in phase2_log:
+                # Collect all errors for this finger
+                finger_errs = [abs(entry.get(f'{{jname}}_error', 0)) 
+                             for jname in joint_names_ordered if finger in jname.lower()]
+                if finger_errs:
+                    # RMS error for this finger
+                    finger_errors.append(np.sqrt(np.mean(np.array(finger_errs)**2)))
+                else:
+                    finger_errors.append(0.0)
+            
+            if finger_errors:
+                plot_times = times[:len(finger_errors)]
+                axes[2].plot(plot_times, np.rad2deg(finger_errors), 
+                           color=finger_colors.get(finger, 'gray'), 
+                           linewidth=1.5, 
+                           label=finger.capitalize(),
+                           alpha=0.8)
         
-        axes[2].plot(times, max_velocities, 'r-', linewidth=1.5, label='Tracking Error Rate')
-        axes[2].set_xlabel('Time (s)')
-        axes[2].set_ylabel('Error (degrees)')
-        axes[2].set_title('Tracking Error Over Time (Shows Divergence)')
+        axes[2].set_xlabel('Time (s)', fontsize=11)
+        axes[2].set_ylabel('RMS Error (degrees)', fontsize=11)
+        axes[2].set_title('Per-Finger Tracking Errors', fontsize=12, fontweight='bold')
         axes[2].grid(True, alpha=0.3)
-        axes[2].legend()
+        axes[2].legend(fontsize=10, ncol=5, loc='upper right')
         
         plt.tight_layout()
         plt.savefig('mode4_validation.png', dpi=150)
