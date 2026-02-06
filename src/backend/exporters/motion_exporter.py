@@ -1872,6 +1872,11 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     print("  👉 Close matplotlib window when done to see final results")
     print("="*70)
     
+    # Show matplotlib in non-blocking mode
+    plt.ion()  # Turn on interactive mode
+    plt.show(block=False)
+    plt.pause(0.001)  # Give matplotlib time to render
+    
     # Launch MuJoCo viewer in passive mode for visualization
     try:
         with mujoco.viewer.launch_passive(model, data) as viewer:
@@ -1884,13 +1889,23 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
             # Keep viewer open while matplotlib is interactive
             print("\\n✅ Both windows active. Move slider to analyze motion...")
             
-            while plt.fignum_exists(fig_interactive.number):
-                viewer.sync()
-                time.sleep(0.01)  # Small delay to prevent CPU overload, doesn't steal focus
-    except:
-        print("\\n⚠️ Could not open MuJoCo viewer")
+            try:
+                while plt.fignum_exists(fig_interactive.number):
+                    viewer.sync()
+                    time.sleep(0.01)  # Small delay to prevent CPU overload
+            except KeyboardInterrupt:
+                print("\\n⚠️ Interrupted by user")
+    except KeyboardInterrupt:
+        print("\\n⚠️ Interrupted by user")
+    except Exception as e:
+        print(f"\\n⚠️ Could not open MuJoCo viewer: {{e}}")
     
-    plt.close(fig_interactive)
+    # Cleanup
+    plt.ioff()  # Turn off interactive mode
+    try:
+        plt.close(fig_interactive)
+    except:
+        pass
 
 # Save Phase 2 applied control for comparison (last run only)
 print("")
