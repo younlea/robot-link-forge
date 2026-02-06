@@ -1407,11 +1407,11 @@ try:
         print("  - Left-click drag: Pan view")
         print("  - Close window when simulation completes to see interactive analysis")
         print("")
-            
-            start_time = time.time()
-            sim_step = 0  # Simulation step counter
-            
-            while viewer.is_running() and sim_step < n_steps:
+        
+        start_time = time.time()
+        sim_step = 0  # Simulation step counter
+        
+        while viewer.is_running() and sim_step < n_steps:
                 # REAL PHYSICS SIMULATION with torque control
                 # This is what we want to test for Mode 2 development!
                 
