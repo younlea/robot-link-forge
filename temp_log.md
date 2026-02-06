@@ -1,20 +1,18 @@
-========================================
+=======================================
 Enter choice [0/1/2/3/4]: 4
 Starting Inverse-to-Forward Validation...
-  File "/home/younleakim/Downloads/direct_hand_parm/inverse_to_forward_validation.py", line 629
-    ff_torque = torque_history[sim_step]
-    ^
-IndentationError: expected an indented block after 'if' statement on line 627
+  File "/home/younleakim/Downloads/direct_hand_parm/inverse_to_forward_validation.py", line 617
+    start_time = time.time()
+IndentationError: unexpected indent
 
 
-code -----------------------------
 #!/usr/bin/env python3
 """
 Mode 4: Inverse-to-Forward Validation
 Uses inverse dynamics torques as motor limits to test forward tracking
 
-Script Version: 20260206_090428
-Generated: 2026-02-06 09:04:28
+Script Version: 20260206_145759
+Generated: 2026-02-06 14:57:59
 """
 import time
 import mujoco
@@ -23,8 +21,8 @@ import numpy as np
 import json
 
 # Version info
-SCRIPT_VERSION = "20260206_090428"
-SCRIPT_DATE = "2026-02-06 09:04:28"
+SCRIPT_VERSION = "20260206_145759"
+SCRIPT_DATE = "2026-02-06 14:57:59"
 
 print("="*70)
 print(f"MODE 4 SCRIPT VERSION: {SCRIPT_VERSION}")
@@ -97,126 +95,126 @@ recording_data = {
     {
       "timestamp": 580,
       "joints": {
-        "RingFinger-1st-pitch": 0,
-        "RingFinger-3rd-pitch": 0,
-        "Thumb-1st-pitch": 0,
+        "LittleFinger-1st-pitch": 0,
+        "RingFinger-2nd-pitch": 0,
+        "IndexFinger-2nd-pitch": 0,
         "MiddleFinger-1st-pitch": 0,
+        "IndexFinger_1st_roll": 0,
+        "thumb_1st_yaw": 0,
+        "IndexFinger-3rd-pitch": 0,
         "RingFinger-1st_roll": 0,
         "Thumb-2nd-pitch": 0,
-        "MiddleFinger-2nd-pitch": 0,
-        "IndexFinger-2nd-pitch": 0,
-        "thumb_1st_yaw": 0,
-        "LittleFinger-3rd-pitch": 0,
-        "MiddleFinger-3rd-pitch": 0,
-        "IndexFinger-3rd-pitch": 0,
-        "LittleFinger-1st_roll": 0,
-        "MiddleFinger_1st_roll": 0,
         "IndexFinger-1st-pitch": 0,
-        "RingFinger-2nd-pitch": 0,
+        "MiddleFinger_1st_roll": 0,
         "Thumb-3rd-pitch": 0,
-        "IndexFinger_1st_roll": 0,
-        "LittleFinger-1st-pitch": 0,
-        "LittleFinger-2nd-pitch": 0
+        "Thumb-1st-pitch": 0,
+        "LittleFinger-3rd-pitch": 0,
+        "MiddleFinger-2nd-pitch": 0,
+        "LittleFinger-2nd-pitch": 0,
+        "LittleFinger-1st_roll": 0,
+        "RingFinger-1st-pitch": 0,
+        "RingFinger-3rd-pitch": 0,
+        "MiddleFinger-3rd-pitch": 0
       }
     },
     {
       "timestamp": 2093,
       "joints": {
-        "RingFinger-1st-pitch": 0,
-        "RingFinger-3rd-pitch": 0,
-        "Thumb-1st-pitch": -0.940796326794897,
+        "LittleFinger-1st-pitch": 0,
+        "RingFinger-2nd-pitch": 0,
+        "IndexFinger-2nd-pitch": 0,
         "MiddleFinger-1st-pitch": 0,
+        "IndexFinger_1st_roll": 0,
+        "thumb_1st_yaw": 0,
+        "IndexFinger-3rd-pitch": 0,
         "RingFinger-1st_roll": 0,
         "Thumb-2nd-pitch": 0,
-        "MiddleFinger-2nd-pitch": 0,
-        "IndexFinger-2nd-pitch": 0,
-        "thumb_1st_yaw": 0,
-        "LittleFinger-3rd-pitch": 0,
-        "MiddleFinger-3rd-pitch": 0,
-        "IndexFinger-3rd-pitch": 0,
-        "LittleFinger-1st_roll": 0,
-        "MiddleFinger_1st_roll": 0,
         "IndexFinger-1st-pitch": -1.5707963267949,
-        "RingFinger-2nd-pitch": 0,
+        "MiddleFinger_1st_roll": 0,
         "Thumb-3rd-pitch": 0,
-        "IndexFinger_1st_roll": 0,
-        "LittleFinger-1st-pitch": 0,
-        "LittleFinger-2nd-pitch": 0
+        "Thumb-1st-pitch": -0.940796326794897,
+        "LittleFinger-3rd-pitch": 0,
+        "MiddleFinger-2nd-pitch": 0,
+        "LittleFinger-2nd-pitch": 0,
+        "LittleFinger-1st_roll": 0,
+        "RingFinger-1st-pitch": 0,
+        "RingFinger-3rd-pitch": 0,
+        "MiddleFinger-3rd-pitch": 0
       }
     },
     {
       "timestamp": 3614,
       "joints": {
-        "RingFinger-1st-pitch": 0,
-        "RingFinger-3rd-pitch": 0,
-        "Thumb-1st-pitch": 0,
+        "LittleFinger-1st-pitch": 0,
+        "RingFinger-2nd-pitch": 0,
+        "IndexFinger-2nd-pitch": 0,
         "MiddleFinger-1st-pitch": 0,
+        "IndexFinger_1st_roll": 0,
+        "thumb_1st_yaw": 0,
+        "IndexFinger-3rd-pitch": 0,
         "RingFinger-1st_roll": 0,
         "Thumb-2nd-pitch": 0,
-        "MiddleFinger-2nd-pitch": 0,
-        "IndexFinger-2nd-pitch": 0,
-        "thumb_1st_yaw": 0,
-        "LittleFinger-3rd-pitch": 0,
-        "MiddleFinger-3rd-pitch": 0,
-        "IndexFinger-3rd-pitch": 0,
-        "LittleFinger-1st_roll": 0,
-        "MiddleFinger_1st_roll": 0,
         "IndexFinger-1st-pitch": 0,
-        "RingFinger-2nd-pitch": 0,
+        "MiddleFinger_1st_roll": 0,
         "Thumb-3rd-pitch": 0,
-        "IndexFinger_1st_roll": 0,
-        "LittleFinger-1st-pitch": 0,
-        "LittleFinger-2nd-pitch": 0
+        "Thumb-1st-pitch": 0,
+        "LittleFinger-3rd-pitch": 0,
+        "MiddleFinger-2nd-pitch": 0,
+        "LittleFinger-2nd-pitch": 0,
+        "LittleFinger-1st_roll": 0,
+        "RingFinger-1st-pitch": 0,
+        "RingFinger-3rd-pitch": 0,
+        "MiddleFinger-3rd-pitch": 0
       }
     },
     {
       "timestamp": 5052,
       "joints": {
-        "RingFinger-1st-pitch": 0,
-        "RingFinger-3rd-pitch": 0,
-        "Thumb-1st-pitch": -0.780796326794897,
+        "LittleFinger-1st-pitch": 0,
+        "RingFinger-2nd-pitch": 0,
+        "IndexFinger-2nd-pitch": 0,
         "MiddleFinger-1st-pitch": -1.5707963267949,
+        "IndexFinger_1st_roll": 0,
+        "thumb_1st_yaw": -0.393598775598299,
+        "IndexFinger-3rd-pitch": 0,
         "RingFinger-1st_roll": 0,
         "Thumb-2nd-pitch": 0,
-        "MiddleFinger-2nd-pitch": -0.220796326794897,
-        "IndexFinger-2nd-pitch": 0,
-        "thumb_1st_yaw": -0.393598775598299,
-        "LittleFinger-3rd-pitch": 0,
-        "MiddleFinger-3rd-pitch": 0,
-        "IndexFinger-3rd-pitch": 0,
-        "LittleFinger-1st_roll": 0,
-        "MiddleFinger_1st_roll": 0.0254670748005671,
         "IndexFinger-1st-pitch": 0,
-        "RingFinger-2nd-pitch": 0,
+        "MiddleFinger_1st_roll": 0.0254670748005671,
         "Thumb-3rd-pitch": 0,
-        "IndexFinger_1st_roll": 0,
-        "LittleFinger-1st-pitch": 0,
-        "LittleFinger-2nd-pitch": 0
+        "Thumb-1st-pitch": -0.780796326794897,
+        "LittleFinger-3rd-pitch": 0,
+        "MiddleFinger-2nd-pitch": -0.220796326794897,
+        "LittleFinger-2nd-pitch": 0,
+        "LittleFinger-1st_roll": 0,
+        "RingFinger-1st-pitch": 0,
+        "RingFinger-3rd-pitch": 0,
+        "MiddleFinger-3rd-pitch": 0
       }
     },
     {
       "timestamp": 6835,
       "joints": {
-        "RingFinger-1st-pitch": 0,
-        "RingFinger-3rd-pitch": 0,
-        "Thumb-1st-pitch": 0,
+        "LittleFinger-1st-pitch": 0,
+        "RingFinger-2nd-pitch": 0,
+        "IndexFinger-2nd-pitch": 0,
         "MiddleFinger-1st-pitch": 0,
+        "IndexFinger_1st_roll": 0,
+        "thumb_1st_yaw": 0,
+        "IndexFinger-3rd-pitch": 0,
         "RingFinger-1st_roll": 0,
         "Thumb-2nd-pitch": 0,
-        "MiddleFinger-2nd-pitch": 0,
-        "IndexFinger-2nd-pitch": 0,
-        "thumb_1st_yaw": 0,
-        "LittleFinger-3rd-pitch": 0,
-        "MiddleFinger-3rd-pitch": 0,
-        "IndexFinger-3rd-pitch": 0,
-        "LittleFinger-1st_roll": 0,
-        "MiddleFinger_1st_roll": 0,
         "IndexFinger-1st-pitch": 0,
-        "RingFinger-2nd-pitch": 0,
+        "MiddleFinger_1st_roll": 0,
         "Thumb-3rd-pitch": 0,
-        "IndexFinger_1st_roll": 0,
-        "LittleFinger-1st-pitch": 0,
-        "LittleFinger-2nd-pitch": 0
+        "Thumb-1st-pitch": 0,
+        "LittleFinger-3rd-pitch": 0,
+        "MiddleFinger-2nd-pitch": 0,
+        "LittleFinger-2nd-pitch": 0,
+        "LittleFinger-1st_roll": 0,
+        "RingFinger-1st-pitch": 0,
+        "RingFinger-3rd-pitch": 0,
+        "MiddleFinger-3rd-pitch": 0
       }
     }
   ]
@@ -586,44 +584,43 @@ print("=" * 50)
 print("")
 print("Starting forward simulation...")
 
-# Replay loop - allows replaying simulation
-replay = True
-while replay:
-    print("")
-    print("="*70)
-    print("🎬 Starting/Restarting Simulation...")
-    print("="*70)
-    
-    # Reset tracking data for this run
-    tracking_errors_run = []
-    control_torques_run = []
-    times_run = []
-    phase2_log_run = []
-    all_torque_data_run = []
-    all_qpos_data_run = []
-    
-    # Reset simulation state
-    mujoco.mj_resetData(model, data)
-    data.qpos[:] = qpos_traj[0]
-    data.qvel[:] = qvel_traj[0]
-    data.qfrc_applied[:] = 0.0
-    mujoco.mj_forward(model, data)
-    
-    try:
-        with mujoco.viewer.launch_passive(model, data) as viewer:
-            # Set better camera view for hand visualization
-            # Adjust these values for optimal viewing angle
-            viewer.cam.azimuth = 90    # Horizontal rotation (degrees)
-            viewer.cam.elevation = -20  # Vertical angle (degrees)
-            viewer.cam.distance = 1.5   # Distance from target
-            viewer.cam.lookat[:] = [0.0, 0.0, 0.3]  # Look at point (x, y, z)
-            
-            print("")
-            print("📹 Camera controls:")
-            print("  - Right-click drag: Rotate view")
-            print("  - Scroll wheel: Zoom in/out")
-            print("  - Left-click drag: Pan view")
-            print("")
+# Single simulation run (no replay loop)
+print("")
+print("="*70)
+print("🎬 Starting Simulation...")
+print("="*70)
+
+# Tracking data for this run
+tracking_errors_run = []
+control_torques_run = []
+times_run = []
+phase2_log_run = []
+all_torque_data_run = []
+all_qpos_data_run = []
+
+# Reset simulation state
+mujoco.mj_resetData(model, data)
+data.qpos[:] = qpos_traj[0]
+data.qvel[:] = qvel_traj[0]
+data.qfrc_applied[:] = 0.0
+mujoco.mj_forward(model, data)
+
+try:
+    with mujoco.viewer.launch_passive(model, data) as viewer:
+        # Set better camera view for hand visualization
+        # Adjust these values for optimal viewing angle
+        viewer.cam.azimuth = 90    # Horizontal rotation (degrees)
+        viewer.cam.elevation = -20  # Vertical angle (degrees)
+        viewer.cam.distance = 1.5   # Distance from target
+        viewer.cam.lookat[:] = [0.0, 0.0, 0.3]  # Look at point (x, y, z)
+        
+        print("")
+        print("📹 Camera controls:")
+        print("  - Right-click drag: Rotate view")
+        print("  - Scroll wheel: Zoom in/out")
+        print("  - Left-click drag: Pan view")
+        print("  - Close window when simulation completes to see interactive analysis")
+        print("")
             
             start_time = time.time()
             sim_step = 0  # Simulation step counter
@@ -635,30 +632,30 @@ while replay:
                 # Apply torques from inverse dynamics (Phase 1) WITH light PD feedback
                 # Pure feedforward is unstable - add stabilizing feedback
                 if sim_step < len(torque_history):
-                # Feedforward torque from inverse dynamics
-                ff_torque = torque_history[sim_step]
-                
-                # Very light PD feedback for stabilization
-                # CRITICAL: kp/kd must be VERY LOW to avoid instability
-                # Position actuators in MJCF have their own builtin PD that interferes!
-                kp = 1.0   # Proportional gain (very low)
-                kd = 0.1   # Derivative gain (very low)
-                
-                # Compute feedback torque for each DOF
-                fb_torque = np.zeros(model.nv)
-                for jname, jid in joint_ids.items():
-                    dof_adr = model.jnt_dofadr[jid]
-                    qadr = model.jnt_qposadr[jid]
+                    # Feedforward torque from inverse dynamics
+                    ff_torque = torque_history[sim_step]
                     
-                    # Position and velocity errors
-                    pos_error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
-                    vel_error = qvel_traj[sim_step, dof_adr] - data.qvel[dof_adr]
+                    # Very light PD feedback for stabilization
+                    # CRITICAL: kp/kd must be VERY LOW to avoid instability
+                    # Position actuators in MJCF have their own builtin PD that interferes!
+                    kp = 1.0   # Proportional gain (very low)
+                    kd = 0.1   # Derivative gain (very low)
                     
-                    # PD control (very gentle)
-                    fb_torque[dof_adr] = kp * pos_error + kd * vel_error
-                
-                # Total torque = feedforward + feedback
-                data.qfrc_applied[:] = ff_torque + fb_torque
+                    # Compute feedback torque for each DOF
+                    fb_torque = np.zeros(model.nv)
+                    for jname, jid in joint_ids.items():
+                        dof_adr = model.jnt_dofadr[jid]
+                        qadr = model.jnt_qposadr[jid]
+                        
+                        # Position and velocity errors
+                        pos_error = qpos_traj[sim_step, qadr] - data.qpos[qadr]
+                        vel_error = qvel_traj[sim_step, dof_adr] - data.qvel[dof_adr]
+                        
+                        # PD control (very gentle)
+                        fb_torque[dof_adr] = kp * pos_error + kd * vel_error
+                    
+                    # Total torque = feedforward + feedback
+                    data.qfrc_applied[:] = ff_torque + fb_torque
                 else:
                     data.qfrc_applied[:] = 0.0
                 
@@ -684,28 +681,28 @@ while replay:
                         print(f"     ⚠️ COLLISIONS DETECTED! Analyzing contact pairs...")
                         for i in range(min(data.ncon, 10)):  # Show first 10 contacts
                             contact = data.contact[i]
-                        geom1 = contact.geom1
-                        geom2 = contact.geom2
-                        
-                        # Get body IDs from geometry IDs
-                        body1_id = model.geom_bodyid[geom1]
-                        body2_id = model.geom_bodyid[geom2]
-                        
-                        # Get body names
-                        body1_name = model.body(body1_id).name if body1_id >= 0 else "world"
-                        body2_name = model.body(body2_id).name if body2_id >= 0 else "world"
-                        
-                        # Contact distance (negative = penetration)
-                        dist = contact.dist
-                        
-                        # Get contact force magnitude
-                        # contact.frame: contact frame (3x3 rotation matrix stored as 9 elements)
-                        # We need to compute force from constraint forces
-                        # For now, just show penetration depth
-                        
-                        print(f"       Contact {i+1}: {body1_name:25s} <-> {body2_name:25s}")
-                        print(f"                 Penetration: {-dist*1000:.2f} mm" + 
-                              (" 🔴 DEEP!" if dist < -0.005 else ""))
+                            geom1 = contact.geom1
+                            geom2 = contact.geom2
+                            
+                            # Get body IDs from geometry IDs
+                            body1_id = model.geom_bodyid[geom1]
+                            body2_id = model.geom_bodyid[geom2]
+                            
+                            # Get body names
+                            body1_name = model.body(body1_id).name if body1_id >= 0 else "world"
+                            body2_name = model.body(body2_id).name if body2_id >= 0 else "world"
+                            
+                            # Contact distance (negative = penetration)
+                            dist = contact.dist
+                            
+                            # Get contact force magnitude
+                            # contact.frame: contact frame (3x3 rotation matrix stored as 9 elements)
+                            # We need to compute force from constraint forces
+                            # For now, just show penetration depth
+                            
+                            print(f"       Contact {i+1}: {body1_name:25s} <-> {body2_name:25s}")
+                            print(f"                 Penetration: {-dist*1000:.2f} mm" + 
+                                  (" 🔴 DEEP!" if dist < -0.005 else ""))
                     
                     else:
                         print(f"     ✅ No collisions (collision exclusions working)")
@@ -846,46 +843,29 @@ while replay:
         
         print("")
         print("Simulation complete!")
+        print("Close the viewer window to see interactive visualization...")
         
-        # Store this run's data for final analysis
-        tracking_errors.extend(tracking_errors_run)
-        control_torques.extend(control_torques_run)
-        times.extend(times_run)
-        phase2_log.extend(phase2_log_run)
-        all_torque_data.extend(all_torque_data_run)
-        all_qpos_data.extend(all_qpos_data_run)
-        
-    except KeyboardInterrupt:
-        print("\n⚠️ Simulation interrupted by user")
-    
-    # Ask if user wants to replay
-    print("")
-    print("="*70)
-    print("🔄 REPLAY OPTIONS")
-    print("="*70)
-    print("  [R] Replay simulation from start")
-    print("  [Q] Quit and show final results")
-    print("")
-    
-    choice = input("Enter your choice (R/Q): ").strip().upper()
-    
-    if choice == 'R':
-        replay = True
-        print("\n🔄 Restarting simulation...")
-        # Clear previous run data from final analysis (keep only last run)
-        tracking_errors = []
-        control_torques = []
-        times = []
-        phase2_log = []
-        all_torque_data = []
-        all_qpos_data = []
-    else:
-        replay = False
-        print("\n📊 Generating interactive visualization...")
+except KeyboardInterrupt:
+    print("\n⚠️ Simulation interrupted by user")
+
+# Store data for final analysis
+tracking_errors = tracking_errors_run
+control_torques = control_torques_run
+times = times_run
+phase2_log = phase2_log_run
+all_torque_data = all_torque_data_run
+all_qpos_data = all_qpos_data_run
 
 # Convert lists to numpy arrays for easier indexing
 all_torque_data = np.array(all_torque_data)
 all_qpos_data = np.array(all_qpos_data)
+
+print("")
+print("="*70)
+print("📊 INTERACTIVE VISUALIZATION")
+print("="*70)
+print("Opening interactive visualization with time slider...")
+print("")
 
 # Interactive visualization with time slider
 if HAS_MATPLOTLIB and len(all_torque_data) > 0:
@@ -920,10 +900,18 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
             dof_adr = model.jnt_dofadr[jid]
             torque = torques_at_time[dof_adr]
             
+            # Extract joint info from name (e.g., "Thumb-1st-roll" -> "1st roll")
+            joint_label = jname
+            if '-' in jname:
+                parts = jname.split('-')
+                if len(parts) >= 3:
+                    # e.g., "1st-roll" or "2nd-pitch"
+                    joint_label = f"{parts[1]} {parts[2]}"
+            
             # Categorize by finger
             for finger_name in fingers.keys():
                 if finger_name in jname:
-                    fingers[finger_name].append((jname, torque))
+                    fingers[finger_name].append((jname, joint_label, torque))
                     break
         
         # Create 3D bar plot
@@ -945,10 +933,11 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
         }
         
         finger_idx = 0
+        joint_label_map = {}
         for finger_name, joint_list in fingers.items():
             if not joint_list:
                 continue
-            for joint_idx, (jname, torque) in enumerate(joint_list):
+            for joint_idx, (jname, joint_label, torque) in enumerate(joint_list):
                 x_pos.append(finger_idx)
                 y_pos.append(joint_idx)
                 z_pos.append(0)
@@ -956,7 +945,13 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
                 dy.append(0.8)
                 dz.append(torque)
                 colors.append(finger_colors[finger_name])
-                labels.append(f"{finger_name}-{joint_idx+1}")
+                labels.append(f"{finger_name}: {joint_label}")
+                # Store label for Y-axis
+                if finger_idx not in joint_label_map:
+                    joint_label_map[finger_idx] = []
+                if joint_idx >= len(joint_label_map[finger_idx]):
+                    joint_label_map[finger_idx].extend([''] * (joint_idx + 1 - len(joint_label_map[finger_idx])))
+                joint_label_map[finger_idx][joint_idx] = joint_label
             finger_idx += 1
         
         # Plot bars
@@ -970,6 +965,12 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
         # Set x-axis labels
         ax_3d.set_xticks(range(len(fingers)))
         ax_3d.set_xticklabels(list(fingers.keys()))
+        
+        # Set y-axis to show integer joint numbers (0, 1, 2, 3, ...)
+        if y_pos:
+            max_joints = max(y_pos) + 1
+            ax_3d.set_yticks(range(int(max_joints)))
+            ax_3d.set_yticklabels([str(i+1) for i in range(int(max_joints))])
         
         # Set reasonable z-axis limits
         max_torque = np.max(np.abs(all_torque_data))
@@ -996,14 +997,20 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     
     print("")
     print("="*70)
-    print("🎮 INTERACTIVE VISUALIZATION")
+    print("🎮 INTERACTIVE ANALYSIS MODE")
     print("="*70)
-    print("  - Use slider to scrub through time")
-    print("  - Graph shows: Finger (X) - Joint (Y) - Torque (Z)")
-    print("  - Colors represent different fingers")
+    print("  Two windows are now open:")
+    print("  1. Matplotlib: 3D bar chart with time slider")
+    print("     - Drag slider to move through time")
+    print("     - Chart shows: Finger (X) - Joint (Y) - Torque (Z)")
+    print("     - Colors: different fingers")
     print("")
-    print("  Opening MuJoCo viewer for pose visualization...")
-    print("  (Viewer will update when you move the slider)")
+    print("  2. MuJoCo Viewer: Robot pose synchronized with slider")
+    print("     - Automatically updates when you move slider")
+    print("     - Right-click drag: rotate camera")
+    print("     - Scroll: zoom in/out")
+    print("")
+    print("  👉 Close matplotlib window when done to see final results")
     print("="*70)
     
     # Launch MuJoCo viewer in passive mode for visualization
@@ -1016,8 +1023,7 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
             viewer.cam.lookat[:] = [0.0, 0.0, 0.3]
             
             # Keep viewer open while matplotlib is interactive
-            print("\n📹 MuJoCo viewer active. Move slider to see pose change.")
-            print("   Close matplotlib window to continue...")
+            print("\n✅ Both windows active. Move slider to analyze motion...")
             
             while plt.fignum_exists(fig_interactive.number):
                 viewer.sync()
@@ -1154,24 +1160,9 @@ if len(tracking_errors) > 0:
             # If error is growing rapidly, velocity is high
             max_velocities.append(np.rad2deg(tracking_errors[i]))  # Placeholder
         
-        axes[2].plot(times, max_velocities, 'r-', linewidth=1.5, label='Tracking Error Rate')
-        axes[2].set_xlabel('Time (s)')
-        axes[2].set_ylabel('Error (degrees)')
-        axes[2].set_title('Tracking Error Over Time (Shows Divergence)')
-        axes[2].grid(True, alpha=0.3)
-        axes[2].legend()
-        
-        plt.tight_layout()
-        plt.savefig('mode4_validation.png', dpi=150)
-        print("\n📊 Plot saved to: mode4_validation.png")
-        print("📊 Showing final results. Close window to exit...")
-        plt.show()
 
-# Cleanup temporary MJCF file
-try:
-    os.remove(temp_mjcf_path)
-    print(f"\nCleaned up temporary file: {os.path.basename(temp_mjcf_path)}")
-except:
-    pass
 
-print("\nMode 4 validation complete.")
+
+
+
+
