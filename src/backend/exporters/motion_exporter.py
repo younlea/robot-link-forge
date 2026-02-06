@@ -1641,31 +1641,19 @@ while replay:
         
     except KeyboardInterrupt:
         print("\\n⚠️ Simulation interrupted by user")
-    
-    # Ask if user wants to replay
-    print("")
-    print("="*70)
-    print("🔄 REPLAY OPTIONS")
-    print("="*70)
-    print("  [R] Replay simulation from start")
-    print("  [Q] Quit and show final results")
-    print("")
-    
-    choice = input("Enter your choice (R/Q): ").strip().upper()
-    
-    if choice == 'R':
-        replay = True
-        print("\\n🔄 Restarting simulation...")
-        # Clear previous run data from final analysis (keep only last run)
-        tracking_errors = []
-        control_torques = []
-        times = []
-        phase2_log = []
-        all_torque_data = []
-        all_qpos_data = []
-    else:
         replay = False
-        print("\\n📊 Generating interactive visualization...")
+    
+    # Auto-replay when simulation ends (viewer still open)
+    if replay:
+        print("")
+        print("="*70)
+        print("🔄 AUTO-REPLAY")
+        print("="*70)
+        print("  Simulation will restart automatically...")
+        print("  Close the viewer window to see final results")
+        print("="*70)
+        time.sleep(1)
+        # Keep data for final analysis
 
 # Convert lists to numpy arrays for easier indexing
 all_torque_data = np.array(all_torque_data)
@@ -1704,10 +1692,18 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
             dof_adr = model.jnt_dofadr[jid]
             torque = torques_at_time[dof_adr]
             
+            # Extract joint info from name (e.g., "Thumb-1st-roll" -> "1st roll")
+            joint_label = jname
+            if '-' in jname:
+                parts = jname.split('-')
+                if len(parts) >= 3:
+                    # e.g., "1st-roll" or "2nd-pitch"
+                    joint_label = f"{{parts[1]}} {{parts[2]}}"
+            
             # Categorize by finger
             for finger_name in fingers.keys():
                 if finger_name in jname:
-                    fingers[finger_name].append((jname, torque))
+                    fingers[finger_name].append((jname, joint_label, torque))
                     break
         
         # Create 3D bar plot
@@ -1729,10 +1725,11 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
         }}
         
         finger_idx = 0
+        joint_label_map = {{}}
         for finger_name, joint_list in fingers.items():
             if not joint_list:
                 continue
-            for joint_idx, (jname, torque) in enumerate(joint_list):
+            for joint_idx, (jname, joint_label, torque) in enumerate(joint_list):
                 x_pos.append(finger_idx)
                 y_pos.append(joint_idx)
                 z_pos.append(0)
@@ -1740,7 +1737,13 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
                 dy.append(0.8)
                 dz.append(torque)
                 colors.append(finger_colors[finger_name])
-                labels.append(f"{{finger_name}}-{{joint_idx+1}}")
+                labels.append(f"{{finger_name}}: {{joint_label}}")
+                # Store label for Y-axis
+                if finger_idx not in joint_label_map:
+                    joint_label_map[finger_idx] = []
+                if joint_idx >= len(joint_label_map[finger_idx]):
+                    joint_label_map[finger_idx].extend([''] * (joint_idx + 1 - len(joint_label_map[finger_idx])))
+                joint_label_map[finger_idx][joint_idx] = joint_label
             finger_idx += 1
         
         # Plot bars
@@ -1754,6 +1757,12 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
         # Set x-axis labels
         ax_3d.set_xticks(range(len(fingers)))
         ax_3d.set_xticklabels(list(fingers.keys()))
+        
+        # Set y-axis to show integer joint numbers (0, 1, 2, 3, ...)
+        if y_pos:
+            max_joints = max(y_pos) + 1
+            ax_3d.set_yticks(range(int(max_joints)))
+            ax_3d.set_yticklabels([str(i+1) for i in range(int(max_joints))])
         
         # Set reasonable z-axis limits
         max_torque = np.max(np.abs(all_torque_data))
