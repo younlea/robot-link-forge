@@ -1850,9 +1850,9 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     
     def start_animation():
         if anim_state['timer'] is None:
-            # Calculate interval: dt (in seconds) * 1000 (to ms) / speed
-            # This gives real-time playback at 1x speed
-            interval = int(dt * 1000 / anim_state['speed'])
+            # Fixed interval for smooth animation (update every 16ms = ~60fps)
+            # Speed is controlled by time advancement per step, not interval
+            interval = 16  # milliseconds (60 fps)
             anim_state['timer'] = fig_interactive.canvas.new_timer(interval=interval)
             anim_state['timer'].add_callback(animate_step)
             anim_state['timer'].start()
@@ -1862,8 +1862,9 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
             return
         
         current_time = time_slider.val
-        # Advance by simulation timestep
-        next_time = current_time + dt
+        # Advance by simulation timestep multiplied by speed
+        # 2x speed = 2x time advancement per step
+        next_time = current_time + (dt * anim_state['speed'])
         
         if next_time >= duration:
             # Loop back to start
