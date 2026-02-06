@@ -1370,6 +1370,36 @@ print("=" * 50)
 print("")
 print("Starting forward simulation...")
 
+# Create matplotlib figure BEFORE simulation starts
+# This will be displayed alongside MuJoCo during simulation
+if HAS_MATPLOTLIB:
+    from matplotlib.widgets import Slider, Button, RadioButtons
+    from mpl_toolkits.mplot3d import Axes3D
+    
+    print("")
+    print("="*70)
+    print("📊 Creating visualization window...")
+    print("="*70)
+    
+    # Create figure with 3D plot and controls
+    fig_interactive = plt.figure(figsize=(14, 10))
+    ax_3d = fig_interactive.add_subplot(111, projection='3d')
+    plt.subplots_adjust(bottom=0.2, right=0.85)
+    
+    # Add placeholder text
+    ax_3d.text(0.5, 0.5, 0.5, 'Simulating...\\nPlease wait', 
+              fontsize=20, ha='center', va='center',
+              transform=ax_3d.transAxes)
+    ax_3d.set_title('Simulation in progress...', fontsize=14, fontweight='bold')
+    
+    # Show matplotlib in non-blocking mode
+    plt.ion()
+    plt.show(block=False)
+    plt.pause(0.3)
+    
+    print("✅ Visualization window ready")
+    print("   (Will show interactive controls after simulation completes)")
+
 # Single simulation run (no replay loop)
 print("")
 print("="*70)
@@ -1624,12 +1654,18 @@ try:
                     print()
                     if saturated_joints:
                         print(f"    Large commands: {{', '.join(saturated_joints[:5])}}")
+                    
+                    # Update matplotlib window to show it's still alive
+                    if HAS_MATPLOTLIB:
+                        try:
+                            fig_interactive.canvas.flush_events()
+                        except:
+                            pass
                 
                 sim_step += 1  # Increment simulation step
         
         print("")
-        print("Simulation complete!")
-        print("Close the viewer window to see interactive visualization...")
+        print("✅ Simulation complete!")
         
 except KeyboardInterrupt:
     print("\\n⚠️ Simulation interrupted by user")
@@ -1646,22 +1682,16 @@ all_qpos_data = all_qpos_data_run
 all_torque_data = np.array(all_torque_data)
 all_qpos_data = np.array(all_qpos_data)
 
+# Now populate matplotlib with interactive controls
 print("")
 print("="*70)
-print("📊 INTERACTIVE VISUALIZATION")
+print("📊 Setting up interactive controls...")
 print("="*70)
-print("Opening interactive visualization with time slider...")
-print("")
 
 # Interactive visualization with time slider
 if HAS_MATPLOTLIB and len(all_torque_data) > 0:
-    from matplotlib.widgets import Slider, Button, RadioButtons
-    from mpl_toolkits.mplot3d import Axes3D
-    
-    # Create figure with 3D plot and slider
-    fig_interactive = plt.figure(figsize=(14, 10))
-    ax_3d = fig_interactive.add_subplot(111, projection='3d')
-    plt.subplots_adjust(bottom=0.2, right=0.85)
+    # Clear the placeholder text
+    ax_3d.cla()
     
     # Add slider for time control
     ax_slider = plt.axes([0.15, 0.1, 0.55, 0.03])
@@ -1876,7 +1906,7 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     print("="*70)
     print("🎮 INTERACTIVE ANALYSIS MODE")
     print("="*70)
-    print("  Two windows are now open:")
+    print("  Both windows are now ready:")
     print("  1. Matplotlib: 3D bar chart with time slider")
     print("     - Drag slider to move through time")
     print("     - Click 'Play' button to auto-play animation")
@@ -1894,19 +1924,12 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     print("  👉 Close matplotlib window when done to see final results")
     print("="*70)
     
-    # Show matplotlib in non-blocking mode
-    plt.ion()  # Turn on interactive mode
-    plt.show(block=False)
-    
-    # Give matplotlib sufficient time to fully render
-    print("\\n⏳ Rendering matplotlib window...")
-    plt.pause(0.5)  # Increased delay for proper rendering
-    
-    # Force draw to ensure window is visible
+    # Refresh matplotlib to show interactive controls
     fig_interactive.canvas.draw()
     fig_interactive.canvas.flush_events()
+    plt.pause(0.1)
     
-    print("✅ Matplotlib window ready")
+    print("\\n✅ Interactive controls ready")
     
     # Launch MuJoCo viewer in passive mode for visualization
     try:
