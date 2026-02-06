@@ -1703,10 +1703,10 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     
     # Add speed control radio buttons
     ax_speed = plt.axes([0.87, 0.3, 0.1, 0.15])
-    speed_radio = RadioButtons(ax_speed, ('0.1x', '0.5x', '1x', '1.5x', '2x'), active=2)
+    speed_radio = RadioButtons(ax_speed, ('1x', '5x', '10x', '15x', '20x'), active=2)
     
     # Animation state - store model, data, viewer reference for playback
-    anim_state = {{'is_playing': False, 'timer': None, 'speed': 1.0, 'viewer': None, 'model': model, 'data': data}}
+    anim_state = {{'is_playing': False, 'timer': None, 'speed': 10.0, 'viewer': None, 'model': model, 'data': data}}
     
     # Initial plot
     def plot_torques_at_time(time_val):
@@ -1823,7 +1823,7 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     
     # Speed control functionality
     def change_speed(label):
-        speed_map = {{'0.1x': 0.1, '0.5x': 0.5, '1x': 1.0, '1.5x': 1.5, '2x': 2.0}}
+        speed_map = {{'1x': 1.0, '5x': 5.0, '10x': 10.0, '15x': 15.0, '20x': 20.0}}
         anim_state['speed'] = speed_map[label]
         
         # Restart timer with new speed if playing
@@ -1912,7 +1912,7 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     print("     - Drag slider to move through time")
     print("     - Click 'Play' button to auto-play animation")
     print("     - Press SPACEBAR to play/pause")
-    print("     - Speed control: Select 0.1x / 0.5x / 1x / 1.5x / 2x on the right")
+    print("     - Speed control: Select 1x / 5x / 10x / 15x / 20x on the right")
     print("     - Animation loops automatically")
     print("     - Chart shows: Finger (X) - Joint (Y) - Torque (Z)")
     print("     - Colors: different fingers")
