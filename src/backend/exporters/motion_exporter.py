@@ -1655,24 +1655,28 @@ print("")
 
 # Interactive visualization with time slider
 if HAS_MATPLOTLIB and len(all_torque_data) > 0:
-    from matplotlib.widgets import Slider, Button
+    from matplotlib.widgets import Slider, Button, RadioButtons
     from mpl_toolkits.mplot3d import Axes3D
     
     # Create figure with 3D plot and slider
     fig_interactive = plt.figure(figsize=(14, 10))
     ax_3d = fig_interactive.add_subplot(111, projection='3d')
-    plt.subplots_adjust(bottom=0.2)
+    plt.subplots_adjust(bottom=0.2, right=0.85)
     
     # Add slider for time control
-    ax_slider = plt.axes([0.15, 0.1, 0.65, 0.03])
+    ax_slider = plt.axes([0.15, 0.1, 0.55, 0.03])
     time_slider = Slider(ax_slider, 'Time (s)', 0, duration, valinit=0, valstep=dt)
     
     # Add Play/Pause button
-    ax_button = plt.axes([0.82, 0.1, 0.08, 0.04])
+    ax_button = plt.axes([0.72, 0.1, 0.08, 0.04])
     play_button = Button(ax_button, 'Play')
     
+    # Add speed control radio buttons
+    ax_speed = plt.axes([0.87, 0.3, 0.1, 0.15])
+    speed_radio = RadioButtons(ax_speed, ('0.1x', '0.5x', '1x', '1.5x', '2x'), active=2)
+    
     # Animation state (use dict to avoid global variable issues in generated script)
-    anim_state = {{'is_playing': False, 'timer': None}}
+    anim_state = {{'is_playing': False, 'timer': None, 'speed': 1.0}}
     
     # Initial plot
     def plot_torques_at_time(time_val):
@@ -1785,6 +1789,20 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     
     time_slider.on_changed(update_time)
     
+    # Speed control functionality
+    def change_speed(label):
+        speed_map = {{'0.1x': 0.1, '0.5x': 0.5, '1x': 1.0, '1.5x': 1.5, '2x': 2.0}}
+        anim_state['speed'] = speed_map[label]
+        
+        # Restart timer with new speed if playing
+        if anim_state['is_playing']:
+            if anim_state['timer'] is not None:
+                anim_state['timer'].stop()
+                anim_state['timer'] = None
+            start_animation()
+    
+    speed_radio.on_clicked(change_speed)
+    
     # Play/Pause functionality
     def toggle_play(event):
         anim_state['is_playing'] = not anim_state['is_playing']
@@ -1800,7 +1818,9 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     
     def start_animation():
         if anim_state['timer'] is None:
-            anim_state['timer'] = fig_interactive.canvas.new_timer(interval=int(dt*1000))
+            # Calculate interval based on speed multiplier
+            interval = int(dt * 1000 / anim_state['speed'])
+            anim_state['timer'] = fig_interactive.canvas.new_timer(interval=interval)
             anim_state['timer'].add_callback(animate_step)
             anim_state['timer'].start()
     
@@ -1837,6 +1857,7 @@ if HAS_MATPLOTLIB and len(all_torque_data) > 0:
     print("     - Drag slider to move through time")
     print("     - Click 'Play' button to auto-play animation")
     print("     - Press SPACEBAR to play/pause")
+    print("     - Speed control: Select 0.1x / 0.5x / 1x / 1.5x / 2x on the right")
     print("     - Animation loops automatically")
     print("     - Chart shows: Finger (X) - Joint (Y) - Torque (Z)")
     print("     - Colors: different fingers")
