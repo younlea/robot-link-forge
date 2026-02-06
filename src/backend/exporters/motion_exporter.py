@@ -2534,15 +2534,15 @@ echo ""
 echo "1. Joint Torque Visualization"
 echo "   - Theoretical torque (inverse dynamics)"
 echo ""
-echo "2. Motor Sizing Validation"  
-echo "   - Set motor parameters and validate"
-echo ""
-echo "3. Fingertip Sensor Forces"
-echo "   - Contact force visualization"
-echo ""
-echo "4. Inverse-to-Forward Validation (NEW)"
+echo "2. Inverse-to-Forward Validation"
 echo "   - Use Mode 1 torques as motor limits"
 echo "   - Test if physics can actually track trajectory"
+echo ""
+echo "3. Motor Sizing Validation"  
+echo "   - Set motor parameters and validate"
+echo ""
+echo "4. Fingertip Sensor Forces"
+echo "   - Contact force visualization"
 echo ""
 echo "========================================"
 read -p "Enter choice [0/1/2/3/4]: " choice
@@ -2561,7 +2561,7 @@ if [ "$choice" = "0" ]; then
     if [ $exit_code -eq 42 ]; then
         echo ""
         echo "===================="
-        echo "Launching Mode 2..."
+        echo "Launching Mode 3..."
         echo "===================="
         sleep 1
         python3 replay_motor_validation.py {default_rec_idx}
@@ -2575,20 +2575,20 @@ if [ "$choice" = "0" ]; then
         exit $exit_code
     fi
 elif [ "$choice" = "2" ]; then
-    # Mode 2 uses separate script
-    SCRIPT="replay_motor_validation.py"
-    echo "Starting Motor Validation..."
-    python3 $SCRIPT {default_rec_idx}
-elif [ "$choice" = "3" ]; then
-    # Mode 3 uses original script with sensors mode
-    MODE="sensors"
-    echo "Starting Sensor Analysis in mode: $MODE..."
-    python3 $SCRIPT {default_rec_idx} --mode $MODE
-elif [ "$choice" = "4" ]; then
-    # Mode 4: Inverse-to-Forward validation
+    # Mode 2: Inverse-to-Forward validation
     SCRIPT="inverse_to_forward_validation.py"
     echo "Starting Inverse-to-Forward Validation..."
     python3 $SCRIPT {default_rec_idx}
+elif [ "$choice" = "3" ]; then
+    # Mode 3: Motor Sizing Validation
+    SCRIPT="replay_motor_validation.py"
+    echo "Starting Motor Validation..."
+    python3 $SCRIPT {default_rec_idx}
+elif [ "$choice" = "4" ]; then
+    # Mode 4: Sensor Analysis
+    MODE="sensors"
+    echo "Starting Sensor Analysis in mode: $MODE..."
+    python3 $SCRIPT {default_rec_idx} --mode $MODE
 else
     # Mode 1 (default) uses inverse dynamics
     echo "Starting Analysis in mode: $MODE..."
