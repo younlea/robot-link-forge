@@ -37,135 +37,204 @@ Recording: Recording 1768623534448 (index 0)
 ======================================================================
   Joint                          |   Peak(Nm) |    RMS(Nm) |  MaxVel(r/s)
   ----------------------------------------------------------------------
-  IndexFinger-1st-pitch          |     32.474 |     11.875 |        3.032  (gear=105:1, out=64.9Nm, 6.1r/s)
-  IndexFinger-2nd-pitch          |     11.132 |      3.500 |        0.000  (gear=80:1, out=22.3Nm, 3.9r/s)
-  IndexFinger-3rd-pitch          |      5.541 |      1.106 |        0.000  (gear=40:1, out=11.1Nm, 7.9r/s)
-  IndexFinger_1st_roll           |      0.260 |      0.043 |        0.000  (gear=10:1, out=0.5Nm, 31.4r/s)
-  LittleFinger-1st-pitch         |      0.006 |      0.006 |        0.000  (gear=10:1, out=0.5Nm, 31.4r/s)
-  LittleFinger-1st_roll          |      0.007 |      0.007 |        0.000  (gear=10:1, out=0.5Nm, 31.4r/s)
-  LittleFinger-2nd-pitch         |      0.001 |      0.001 |        0.000  (gear=10:1, out=0.5Nm, 31.4r/s)
-  LittleFinger-3rd-pitch         |      0.000 |      0.000 |        0.000  (gear=10:1, out=0.5Nm, 31.4r/s)
-  MiddleFinger-1st-pitch         |     38.822 |     13.270 |        1.444  (gear=220:1, out=77.6Nm, 2.9r/s)
-  MiddleFinger-2nd-pitch         |     10.092 |      1.929 |        0.203  (gear=75:1, out=20.2Nm, 4.2r/s)
-  MiddleFinger-3rd-pitch         |      1.953 |      1.726 |        0.000  (gear=15:1, out=3.9Nm, 20.9r/s)
-  MiddleFinger_1st_roll          |      0.425 |      0.071 |        0.023  (gear=10:1, out=0.8Nm, 31.4r/s)
-  RingFinger-1st-pitch           |      0.006 |      0.006 |        0.000  (gear=10:1, out=0.5Nm, 31.4r/s)
-  RingFinger-1st_roll            |      0.004 |      0.004 |        0.000  (gear=10:1, out=0.5Nm, 31.4r/s)
-  RingFinger-2nd-pitch           |      0.001 |      0.001 |        0.000  (gear=10:1, out=0.5Nm, 31.4r/s)
-  RingFinger-3rd-pitch           |      0.001 |      0.001 |        0.000  (gear=10:1, out=0.5Nm, 31.4r/s)
-  Thumb-1st-pitch                |     25.138 |      5.914 |        1.947  (gear=160:1, out=50.3Nm, 3.9r/s)
-  Thumb-2nd-pitch                |     12.692 |      2.977 |        0.000  (gear=95:1, out=25.4Nm, 3.3r/s)
-  Thumb-3rd-pitch                |      6.188 |      1.448 |        0.000  (gear=45:1, out=12.4Nm, 7.0r/s)
-  thumb_1st_yaw                  |      1.936 |      0.438 |        0.362  (gear=15:1, out=3.9Nm, 20.9r/s)
+  IndexFinger-1st-pitch          |     32.474 |     11.875 |        3.032  (gear=125:1, out=48.7Nm, 5.0r/s)
+  IndexFinger-2nd-pitch          |     11.132 |      3.500 |        0.000  (gear=60:1, out=16.7Nm, 5.2r/s)
+  IndexFinger-3rd-pitch          |      5.541 |      1.106 |        0.000  (gear=30:1, out=8.3Nm, 10.5r/s)
+  IndexFinger_1st_roll           |      0.260 |      0.043 |        0.000  (gear=5:1, out=0.5Nm, 62.8r/s)
+  LittleFinger-1st-pitch         |      0.006 |      0.006 |        0.000  (gear=5:1, out=0.5Nm, 62.8r/s)
+  LittleFinger-1st_roll          |      0.007 |      0.007 |        0.000  (gear=5:1, out=0.5Nm, 62.8r/s)
+  LittleFinger-2nd-pitch         |      0.001 |      0.001 |        0.000  (gear=5:1, out=0.5Nm, 62.8r/s)
+  LittleFinger-3rd-pitch         |      0.000 |      0.000 |        0.000  (gear=5:1, out=0.5Nm, 62.8r/s)
+  MiddleFinger-1st-pitch         |     38.822 |     13.270 |        1.444  (gear=125:1, out=58.2Nm, 5.0r/s)
+  MiddleFinger-2nd-pitch         |     10.092 |      1.929 |        0.203  (gear=55:1, out=15.1Nm, 5.7r/s)
+  MiddleFinger-3rd-pitch         |      1.953 |      1.726 |        0.000  (gear=10:1, out=2.9Nm, 31.4r/s)
+  MiddleFinger_1st_roll          |      0.425 |      0.071 |        0.023  (gear=5:1, out=0.6Nm, 62.8r/s)
+  RingFinger-1st-pitch           |      0.006 |      0.006 |        0.000  (gear=5:1, out=0.5Nm, 62.8r/s)
+  RingFinger-1st_roll            |      0.004 |      0.004 |        0.000  (gear=5:1, out=0.5Nm, 62.8r/s)
+  RingFinger-2nd-pitch           |      0.001 |      0.001 |        0.000  (gear=5:1, out=0.5Nm, 62.8r/s)
+  RingFinger-3rd-pitch           |      0.001 |      0.001 |        0.000  (gear=5:1, out=0.5Nm, 62.8r/s)
+  Thumb-1st-pitch                |     25.138 |      5.914 |        1.947  (gear=125:1, out=37.7Nm, 5.0r/s)
+  Thumb-2nd-pitch                |     12.692 |      2.977 |        0.000  (gear=70:1, out=19.0Nm, 5.0r/s)
+  Thumb-3rd-pitch                |      6.188 |      1.448 |        0.000  (gear=35:1, out=9.3Nm, 9.0r/s)
+  thumb_1st_yaw                  |      1.936 |      0.438 |        0.362  (gear=10:1, out=2.9Nm, 31.4r/s)
 
-  Global defaults: stall=0.6873Nm, rated=0.3436Nm, speed=6080RPM, gear=220:1
+  Global defaults: stall=0.5176Nm, rated=0.2877Nm, speed=5968RPM, gear=125:1
 
 ======================================================================
   PHASE 2: Forward Simulation — Motor Physics Pipeline
   FF(100%) + PID(correction) → T-N Curve → Efficiency → Friction → MuJoCo
 ======================================================================
 Created 20 motor physics engines
+
+  Per-joint motor specs:
+    IndexFinger-1st-pitch         : stall=0.4330Nm × gear=125 → out=48.7Nm, 5.0r/s
+    IndexFinger-2nd-pitch         : stall=0.3092Nm × gear=60 → out=16.7Nm, 5.2r/s
+    IndexFinger-3rd-pitch         : stall=0.3078Nm × gear=30 → out=8.3Nm, 10.5r/s
+    IndexFinger_1st_roll          : stall=0.1111Nm × gear=5 → out=0.5Nm, 62.8r/s
+    LittleFinger-1st-pitch        : stall=0.1111Nm × gear=5 → out=0.5Nm, 62.8r/s
+    LittleFinger-1st_roll         : stall=0.1111Nm × gear=5 → out=0.5Nm, 62.8r/s
+    LittleFinger-2nd-pitch        : stall=0.1111Nm × gear=5 → out=0.5Nm, 62.8r/s
+    LittleFinger-3rd-pitch        : stall=0.1111Nm × gear=5 → out=0.5Nm, 62.8r/s
+    MiddleFinger-1st-pitch        : stall=0.5176Nm × gear=125 → out=58.2Nm, 5.0r/s
+    MiddleFinger-2nd-pitch        : stall=0.3058Nm × gear=55 → out=15.1Nm, 5.7r/s
+    MiddleFinger-3rd-pitch        : stall=0.3255Nm × gear=10 → out=2.9Nm, 31.4r/s
+    MiddleFinger_1st_roll         : stall=0.1416Nm × gear=5 → out=0.6Nm, 62.8r/s
+    RingFinger-1st-pitch          : stall=0.1111Nm × gear=5 → out=0.5Nm, 62.8r/s
+    RingFinger-1st_roll           : stall=0.1111Nm × gear=5 → out=0.5Nm, 62.8r/s
+    RingFinger-2nd-pitch          : stall=0.1111Nm × gear=5 → out=0.5Nm, 62.8r/s
+    RingFinger-3rd-pitch          : stall=0.1111Nm × gear=5 → out=0.5Nm, 62.8r/s
+    Thumb-1st-pitch               : stall=0.3352Nm × gear=125 → out=37.7Nm, 5.0r/s
+    Thumb-2nd-pitch               : stall=0.3022Nm × gear=70 → out=19.0Nm, 5.0r/s
+    Thumb-3rd-pitch               : stall=0.2947Nm × gear=35 → out=9.3Nm, 9.0r/s
+    thumb_1st_yaw                 : stall=0.3226Nm × gear=10 → out=2.9Nm, 31.4r/s
 UI created — ▶Play / ⏸Pause / Timeline slider / Hover for joint name
 
   SIMULATION STARTED — ⏸Pause to inspect, hover graph for joint names
   Close MuJoCo viewer to stop & see final report.
-▶ [T=0.00s] Worst: MiddleFinger-3rd-pitch margin=50% OK | Loop#0
-▶ [T=0.71s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#0
-▶ [T=1.21s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#0
-▶ [T=1.92s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#0
-▶ [T=2.62s] Worst: MiddleFinger-2nd-pitch margin=-100% OVER! | Loop#0
-▶ [T=3.13s] Worst: IndexFinger-1st-pitch margin=-100% OVER! | Loop#0
-▶ [T=3.86s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#0
-▶ [T=4.57s] Worst: Thumb-1st-pitch margin=-100% OVER! | Loop#0
-▶ [T=5.07s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#0
-▶ [T=5.58s] Worst: Thumb-1st-pitch margin=-100% OVER! | Loop#0
-▶ [T=6.28s] Worst: MiddleFinger-2nd-pitch margin=-100% OVER! | Loop#0
-▶ [T=0.00s] Worst: MiddleFinger-3rd-pitch margin=50% OK | Loop#1
-▶ [T=0.73s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#1
-▶ [T=1.46s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#1
-▶ [T=2.15s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#1
-▶ [T=2.65s] Worst: MiddleFinger-2nd-pitch margin=-100% OVER! | Loop#1
-▶ [T=3.38s] Worst: IndexFinger-1st-pitch margin=-100% OVER! | Loop#1
-▶ [T=4.12s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#1
-▶ [T=4.82s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#1
-▶ [T=5.45s] Worst: LittleFinger-3rd-pitch margin=0% OVER! | Loop#1
-▶ [T=6.05s] Worst: MiddleFinger-2nd-pitch margin=-100% OVER! | Loop#1
-▶ [T=6.56s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#1
-▶ [T=0.00s] Worst: MiddleFinger-3rd-pitch margin=50% OK | Loop#2
-▶ [T=0.72s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#2
-▶ [T=2.37s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#2
-▶ [T=4.47s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#2
-[APPLY] Updated ALL joints
-▶ [T=6.41s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#2
-▶ [T=0.00s] Worst: IndexFinger-2nd-pitch margin=98% OK | Loop#3
-▶ [T=0.71s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#3
-▶ [T=1.45s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#3
-▶ [T=1.95s] Worst: MiddleFinger-2nd-pitch margin=-100% OVER! | Loop#3
-▶ [T=2.70s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#3
-▶ [T=3.41s] Worst: LittleFinger-3rd-pitch margin=-100% OVER! | Loop#3
-▶ [T=3.92s] Worst: LittleFinger-3rd-pitch margin=-100% OVER! | Loop#3
-▶ [T=4.65s] Worst: LittleFinger-3rd-pitch margin=-100% OVER! | Loop#3
-▶ [T=5.39s] Worst: LittleFinger-2nd-pitch margin=-100% OVER! | Loop#3
-▶ [T=6.11s] Worst: LittleFinger-2nd-pitch margin=-100% OVER! | Loop#3
-▶ [T=6.62s] Worst: LittleFinger-1st-pitch margin=-100% OVER! | Loop#3
-▶ [T=0.24s] Worst: MiddleFinger-1st-pitch margin=0% OVER! | Loop#4
-▶ [T=0.75s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#4
-▶ [T=3.73s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#4
-▶ [T=4.45s] Worst: MiddleFinger_1st_roll margin=-100% OVER! | Loop#4
-▶ [T=4.97s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#4
-▶ [T=5.72s] Worst: MiddleFinger_1st_roll margin=-100% OVER! | Loop#4
-▶ [T=6.48s] Worst: LittleFinger-3rd-pitch margin=-100% OVER! | Loop#4
-▶ [T=0.25s] Worst: MiddleFinger-1st-pitch margin=0% OVER! | Loop#5
+▶ [T=0.00s] Worst: MiddleFinger-3rd-pitch margin=34% OK | Loop#0
+▶ [T=0.74s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#0
+▶ [T=1.27s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#0
+▶ [T=2.03s] Worst: MiddleFinger_1st_roll margin=0% OVER! | Loop#0
+▶ [T=2.76s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#0
+▶ [T=3.27s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#0
+▶ [T=3.79s] Worst: IndexFinger-1st-pitch margin=-100% OVER! | Loop#0
+▶ [T=4.53s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#0
+▶ [T=5.06s] Worst: Thumb-2nd-pitch margin=-100% OVER! | Loop#0
+▶ [T=5.83s] Worst: LittleFinger-2nd-pitch margin=0% OVER! | Loop#0
+▶ [T=6.57s] Worst: IndexFinger-1st-pitch margin=-100% OVER! | Loop#0
+▶ [T=0.24s] Worst: MiddleFinger_1st_roll margin=0% OVER! | Loop#1
+▶ [T=0.76s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#1
+▶ [T=1.48s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#1
+▶ [T=2.00s] Worst: MiddleFinger-1st-pitch margin=0% OVER! | Loop#1
+▶ [T=2.75s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#1
+▶ [T=3.50s] Worst: Thumb-1st-pitch margin=-100% OVER! | Loop#1
+▶ [T=4.02s] Worst: IndexFinger-1st-pitch margin=-100% OVER! | Loop#1
+▶ [T=4.68s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#1
+▶ [T=5.19s] Worst: Thumb-2nd-pitch margin=-100% OVER! | Loop#1
+▶ [T=5.74s] Worst: LittleFinger-2nd-pitch margin=0% OVER! | Loop#1
+▶ [T=6.48s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#1
+▶ [T=0.00s] Worst: MiddleFinger-3rd-pitch margin=34% OK | Loop#2
+▶ [T=0.75s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#2
+▶ [T=1.52s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#2
+▶ [T=2.24s] Worst: MiddleFinger-2nd-pitch margin=-100% OVER! | Loop#2
+▶ [T=2.75s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#2
+▶ [T=3.49s] Worst: Thumb-1st-pitch margin=-100% OVER! | Loop#2
+▶ [T=4.21s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#2
+▶ [T=4.74s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#2
+▶ [T=5.26s] Worst: Thumb-1st-pitch margin=-100% OVER! | Loop#2
+▶ [T=6.00s] Worst: LittleFinger-2nd-pitch margin=0% OVER! | Loop#2
+▶ [T=6.52s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#2
+▶ [T=0.27s] Worst: MiddleFinger_1st_roll margin=0% OVER! | Loop#3
+▶ [T=1.04s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#3
+▶ [T=1.77s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#3
+▶ [T=2.29s] Worst: MiddleFinger-2nd-pitch margin=-100% OVER! | Loop#3
+▶ [T=3.04s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#3
+▶ [T=3.76s] Worst: IndexFinger-1st-pitch margin=-100% OVER! | Loop#3
+▶ [T=4.29s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#3
+▶ [T=5.06s] Worst: LittleFinger-2nd-pitch margin=0% OVER! | Loop#3
+▶ [T=5.83s] Worst: Thumb-2nd-pitch margin=-100% OVER! | Loop#3
+▶ [T=6.57s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#3
+▶ [T=0.25s] Worst: MiddleFinger_1st_roll margin=0% OVER! | Loop#4
+▶ [T=1.00s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#4
+▶ [T=1.76s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#4
+▶ [T=2.50s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#4
+▶ [T=3.00s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#4
+▶ [T=3.77s] Worst: IndexFinger-1st-pitch margin=-100% OVER! | Loop#4
+▶ [T=4.50s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#4
+▶ [T=5.02s] Worst: Thumb-2nd-pitch margin=-100% OVER! | Loop#4
+▶ [T=5.80s] Worst: LittleFinger-2nd-pitch margin=0% OVER! | Loop#4
+▶ [T=6.57s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#4
+▶ [T=0.24s] Worst: MiddleFinger_1st_roll margin=0% OVER! | Loop#5
 ▶ [T=0.76s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#5
-▶ [T=1.50s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#5
-▶ [T=3.60s] Worst: MiddleFinger-2nd-pitch margin=-100% OVER! | Loop#5
-▶ [T=4.30s] Worst: MiddleFinger_1st_roll margin=-100% OVER! | Loop#5
-▶ [T=5.03s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#5
-▶ [T=5.54s] Worst: LittleFinger-3rd-pitch margin=-100% OVER! | Loop#5
-▶ [T=6.24s] Worst: LittleFinger-2nd-pitch margin=-100% OVER! | Loop#5
-▶ [T=6.74s] Worst: LittleFinger-2nd-pitch margin=-100% OVER! | Loop#5
-▶ [T=0.27s] Worst: MiddleFinger-1st-pitch margin=0% OVER! | Loop#6
-▶ [T=0.98s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#6
-▶ [T=1.48s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#6
-▶ [T=2.95s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#6
-▶ [T=3.47s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#6
-[APPLY] Updated ALL joints
-[APPLY] Updated ALL joints
-[APPLY] Updated ALL joints
-[APPLY] Updated ALL joints
-[APPLY] Updated ALL joints
-[APPLY] Updated ALL joints
-[APPLY] Updated ALL joints
-[APPLY] Updated ALL joints
-[APPLY] Updated ALL joints
-▶ [T=0.00s] Worst: IndexFinger-2nd-pitch margin=99% OK | Loop#7
-▶ [T=0.63s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#7
-▶ [T=1.25s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#7
-▶ [T=2.04s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#7
-▶ [T=2.75s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#7
-▶ [T=3.26s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#7
-▶ [T=4.00s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#7
-▶ [T=4.77s] Worst: LittleFinger-3rd-pitch margin=-100% OVER! | Loop#7
-▶ [T=5.49s] Worst: LittleFinger-2nd-pitch margin=-100% OVER! | Loop#7
-▶ [T=5.99s] Worst: LittleFinger-3rd-pitch margin=-100% OVER! | Loop#7
-▶ [T=6.72s] Worst: LittleFinger-1st-pitch margin=-100% OVER! | Loop#7
-▶ [T=0.47s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#8
-▶ [T=0.98s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#8
-▶ [T=1.49s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#8
-▶ [T=2.20s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#8
-▶ [T=2.70s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#8
-▶ [T=3.44s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#8
-▶ [T=4.18s] Worst: LittleFinger-3rd-pitch margin=-100% OVER! | Loop#8
-▶ [T=4.89s] Worst: LittleFinger-2nd-pitch margin=-100% OVER! | Loop#8
-▶ [T=5.53s] Worst: LittleFinger-3rd-pitch margin=-100% OVER! | Loop#8
-▶ [T=6.14s] Worst: LittleFinger-2nd-pitch margin=-100% OVER! | Loop#8
-▶ [T=6.77s] Worst: LittleFinger-1st-pitch margin=-100% OVER! | Loop#8
-▶ [T=0.48s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#9
-▶ [T=0.98s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#9
-▶ [T=1.49s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#9
-▶ [T=2.20s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#9
-▶ [T=2.70s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#9
-▶ [T=3.45s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#9
+▶ [T=1.53s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#5
+▶ [T=2.30s] Worst: MiddleFinger-2nd-pitch margin=-100% OVER! | Loop#5
+▶ [T=3.02s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#5
+▶ [T=3.53s] Worst: Thumb-1st-pitch margin=-100% OVER! | Loop#5
+▶ [T=4.30s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#5
+▶ [T=5.04s] Worst: Thumb-2nd-pitch margin=-100% OVER! | Loop#5
+▶ [T=5.57s] Worst: LittleFinger-2nd-pitch margin=0% OVER! | Loop#5
+▶ [T=6.37s] Worst: Thumb-2nd-pitch margin=-100% OVER! | Loop#5
+▶ [T=0.00s] Worst: MiddleFinger-3rd-pitch margin=34% OK | Loop#6
+▶ [T=0.51s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#6
+▶ [T=1.24s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#6
+▶ [T=1.76s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#6
+▶ [T=2.52s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#6
+▶ [T=3.27s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#6
+▶ [T=3.99s] Worst: IndexFinger-1st-pitch margin=-100% OVER! | Loop#6
+▶ [T=4.51s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#6
+▶ [T=5.27s] Worst: Thumb-1st-pitch margin=-100% OVER! | Loop#6
+▶ [T=6.02s] Worst: Thumb-2nd-pitch margin=-100% OVER! | Loop#6
+▶ [T=6.56s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#6
+▶ [T=0.00s] Worst: MiddleFinger-3rd-pitch margin=34% OK | Loop#7
+▶ [T=0.73s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#7
+▶ [T=1.27s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#7
+▶ [T=2.05s] Worst: MiddleFinger_1st_roll margin=0% OVER! | Loop#7
+▶ [T=2.77s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#7
+▶ [T=3.29s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#7
+▶ [T=4.05s] Worst: IndexFinger-1st-pitch margin=-100% OVER! | Loop#7
+▶ [T=4.82s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#7
+▶ [T=5.55s] Worst: LittleFinger-2nd-pitch margin=0% OVER! | Loop#7
+▶ [T=6.07s] Worst: Thumb-1st-pitch margin=-100% OVER! | Loop#7
+▶ [T=6.57s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#7
+▶ [T=0.24s] Worst: MiddleFinger_1st_roll margin=0% OVER! | Loop#8
+▶ [T=0.99s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#8
+▶ [T=1.75s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#8
+▶ [T=2.47s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#8
+▶ [T=2.98s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#8
+▶ [T=3.74s] Worst: IndexFinger-1st-pitch margin=-100% OVER! | Loop#8
+▶ [T=4.47s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#8
+▶ [T=4.99s] Worst: Thumb-2nd-pitch margin=-100% OVER! | Loop#8
+▶ [T=5.52s] Worst: Thumb-1st-pitch margin=-100% OVER! | Loop#8
+▶ [T=6.27s] Worst: LittleFinger-2nd-pitch margin=0% OVER! | Loop#8
+▶ [T=6.81s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#8
+▶ [T=0.52s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#9
+▶ [T=1.28s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#9
+▶ [T=2.03s] Worst: MiddleFinger_1st_roll margin=0% OVER! | Loop#9
+▶ [T=2.54s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#9
+▶ [T=3.30s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#9
+▶ [T=4.03s] Worst: IndexFinger-1st-pitch margin=-100% OVER! | Loop#9
+▶ [T=4.55s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#9
+▶ [T=5.32s] Worst: RingFinger-1st-pitch margin=0% OVER! | Loop#9
+▶ [T=5.82s] Worst: Thumb-2nd-pitch margin=-100% OVER! | Loop#9
+▶ [T=6.35s] Worst: LittleFinger-2nd-pitch margin=0% OVER! | Loop#9
+▶ [T=0.00s] Worst: MiddleFinger-3rd-pitch margin=34% OK | Loop#10
+▶ [T=0.52s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#10
+▶ [T=1.02s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#10
+▶ [T=1.54s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#10
+▶ [T=2.07s] Worst: MiddleFinger_1st_roll margin=0% OVER! | Loop#10
+▶ [T=2.80s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#10
+▶ [T=3.33s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#10
+▶ [T=4.09s] Worst: IndexFinger-1st-pitch margin=-100% OVER! | Loop#10
+▶ [T=4.84s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#10
+▶ [T=5.37s] Worst: RingFinger-1st-pitch margin=0% OVER! | Loop#10
+▶ [T=5.91s] Worst: Thumb-2nd-pitch margin=-100% OVER! | Loop#10
+▶ [T=6.65s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#10
+▶ [T=0.24s] Worst: MiddleFinger_1st_roll margin=0% OVER! | Loop#11
+▶ [T=0.99s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#11
+▶ [T=1.74s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#11
+▶ [T=2.26s] Worst: MiddleFinger-2nd-pitch margin=-100% OVER! | Loop#11
+▶ [T=2.77s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#11
+▶ [T=3.49s] Worst: Thumb-1st-pitch margin=-100% OVER! | Loop#11
+▶ [T=4.00s] Worst: IndexFinger-1st-pitch margin=-100% OVER! | Loop#11
+▶ [T=4.76s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#11
+▶ [T=5.49s] Worst: LittleFinger-2nd-pitch margin=0% OVER! | Loop#11
+▶ [T=6.03s] Worst: Thumb-2nd-pitch margin=-100% OVER! | Loop#11
+▶ [T=6.56s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#11
+▶ [T=0.25s] Worst: MiddleFinger_1st_roll margin=0% OVER! | Loop#12
+▶ [T=0.76s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#12
+▶ [T=1.52s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#12
+▶ [T=2.26s] Worst: MiddleFinger-2nd-pitch margin=-100% OVER! | Loop#12
+▶ [T=2.77s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#12
+▶ [T=3.28s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#12
+▶ [T=4.00s] Worst: IndexFinger-1st-pitch margin=-100% OVER! | Loop#12
+▶ [T=4.53s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#12
+▶ [T=5.03s] Worst: Thumb-2nd-pitch margin=-100% OVER! | Loop#12
+▶ [T=5.56s] Worst: LittleFinger-2nd-pitch margin=0% OVER! | Loop#12
+▶ [T=6.32s] Worst: LittleFinger-2nd-pitch margin=0% OVER! | Loop#12
+▶ [T=0.00s] Worst: MiddleFinger-3rd-pitch margin=34% OK | Loop#13
+▶ [T=0.72s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#13
+▶ [T=1.25s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#13
+▶ [T=1.75s] Worst: MiddleFinger-1st-pitch margin=-100% OVER! | Loop#13
 
 Simulation ended
 CSV log: motor_validation_log.csv
@@ -177,228 +246,227 @@ CSV log: motor_validation_log.csv
 
 ────────────────────────────────────────────────────────────
   Motor: IndexFinger-1st-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.4330Nm × gear=125 × eff=90% → out=48.71Nm
+  Spec: 5968RPM / gear=125 → out=5.00rad/s
 ────────────────────────────────────────────────────────────
   ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=15% (<80%)
-  ❌ Tracking            : max=1.1173rad (64.02°)
-  ❌ Speed Margin        : -3016% (EXCEEDED)
-  ❌ Saturation          : 95.3% (frequent!)
+  ✅ Thermal Load        : avg=31% (<80%)
+  ❌ Tracking            : max=0.9688rad (55.51°)
+  ❌ Speed Margin        : -126% (EXCEEDED)
+  ❌ Saturation          : 96.2% (frequent!)
 
 ────────────────────────────────────────────────────────────
   Motor: IndexFinger-2nd-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.3092Nm × gear=60 × eff=90% → out=16.70Nm
+  Spec: 3000RPM / gear=60 → out=5.24rad/s
 ────────────────────────────────────────────────────────────
-  ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=50% (<80%)
-  ❌ Tracking            : max=0.3995rad (22.89°)
-  ❌ Speed Margin        : -7170% (EXCEEDED)
-  ❌ Saturation          : 78.3% (frequent!)
+  ❌ Torque Margin       : min=0% (SATURATED)
+  ❌ Thermal Load        : avg=173% (OVERLOAD)
+  ✅ Tracking            : max=0.0075rad (0.43°)
+  ✅ Speed Margin        : 40%
+  ❌ Saturation          : 74.5% (frequent!)
 
 ────────────────────────────────────────────────────────────
   Motor: IndexFinger-3rd-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.3078Nm × gear=30 × eff=90% → out=8.31Nm
+  Spec: 3000RPM / gear=30 → out=10.47rad/s
 ────────────────────────────────────────────────────────────
-  ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=34% (<80%)
-  ⚠️  Tracking            : max=0.1112rad (6.37°)
-  ❌ Speed Margin        : -2806% (EXCEEDED)
-  ❌ Saturation          : 65.1% (frequent!)
+  ❌ Torque Margin       : min=0% (SATURATED)
+  ❌ Thermal Load        : avg=158% (OVERLOAD)
+  ✅ Tracking            : max=0.0051rad (0.29°)
+  ✅ Speed Margin        : 42%
+  ❌ Saturation          : 77.0% (frequent!)
 
 ────────────────────────────────────────────────────────────
-  Motor: IndexFinger_1st_roll  ⚠️  WARN
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Motor: IndexFinger_1st_roll  ❌ FAIL
+  Spec: stall=0.1111Nm × gear=5 × eff=90% → out=0.50Nm
+  Spec: 3000RPM / gear=5 → out=62.83rad/s
 ────────────────────────────────────────────────────────────
-  ⚠️  Torque Margin       : min=5% (tight!)
-  ✅ Thermal Load        : avg=12% (<80%)
+  ❌ Torque Margin       : min=0% (SATURATED)
+  ✅ Thermal Load        : avg=54% (<80%)
   ✅ Tracking            : max=0.0001rad (0.00°)
-  ✅ Speed Margin        : 94%
-  ✅ Saturation          : 0.0%
+  ✅ Speed Margin        : 100%
+  ✅ Saturation          : 1.4%
 
 ────────────────────────────────────────────────────────────
   Motor: LittleFinger-1st-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.1111Nm × gear=5 × eff=90% → out=0.50Nm
+  Spec: 3000RPM / gear=5 → out=62.83rad/s
 ────────────────────────────────────────────────────────────
-  ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=12% (<80%)
-  ✅ Tracking            : max=0.0088rad (0.50°)
-  ❌ Speed Margin        : -385% (EXCEEDED)
-  ✅ Saturation          : 3.3%
+  ❌ Torque Margin       : min=0% (SATURATED)
+  ✅ Thermal Load        : avg=60% (<80%)
+  ✅ Tracking            : max=0.0001rad (0.01°)
+  ✅ Speed Margin        : 100%
+  ⚠️  Saturation          : 7.1%
 
 ────────────────────────────────────────────────────────────
   Motor: LittleFinger-1st_roll  ✅ PASS
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.1111Nm × gear=5 × eff=90% → out=0.50Nm
+  Spec: 3000RPM / gear=5 → out=62.83rad/s
 ────────────────────────────────────────────────────────────
   ✅ Torque Margin       : min=98% (>20%)
-  ✅ Thermal Load        : avg=1% (<80%)
+  ✅ Thermal Load        : avg=4% (<80%)
   ✅ Tracking            : max=0.0000rad (0.00°)
   ✅ Speed Margin        : 100%
   ✅ Saturation          : 0.0%
 
 ────────────────────────────────────────────────────────────
   Motor: LittleFinger-2nd-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.1111Nm × gear=5 × eff=90% → out=0.50Nm
+  Spec: 3000RPM / gear=5 → out=62.83rad/s
 ────────────────────────────────────────────────────────────
-  ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=26% (<80%)
-  ✅ Tracking            : max=0.0437rad (2.51°)
-  ❌ Speed Margin        : -1917% (EXCEEDED)
-  ⚠️  Saturation          : 18.9%
+  ❌ Torque Margin       : min=0% (SATURATED)
+  ❌ Thermal Load        : avg=121% (OVERLOAD)
+  ✅ Tracking            : max=0.0002rad (0.01°)
+  ✅ Speed Margin        : 100%
+  ❌ Saturation          : 40.5% (frequent!)
 
 ────────────────────────────────────────────────────────────
   Motor: LittleFinger-3rd-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.1111Nm × gear=5 × eff=90% → out=0.50Nm
+  Spec: 3000RPM / gear=5 → out=62.83rad/s
 ────────────────────────────────────────────────────────────
-  ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=44% (<80%)
-  ⚠️  Tracking            : max=0.0937rad (5.37°)
-  ❌ Speed Margin        : -1767% (EXCEEDED)
-  ❌ Saturation          : 42.5% (frequent!)
+  ❌ Torque Margin       : min=0% (SATURATED)
+  ❌ Thermal Load        : avg=148% (OVERLOAD)
+  ✅ Tracking            : max=0.0002rad (0.01°)
+  ✅ Speed Margin        : 100%
+  ❌ Saturation          : 37.0% (frequent!)
 
 ────────────────────────────────────────────────────────────
   Motor: MiddleFinger-1st-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.5176Nm × gear=125 × eff=90% → out=58.23Nm
+  Spec: 5968RPM / gear=125 → out=5.00rad/s
 ────────────────────────────────────────────────────────────
   ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=14% (<80%)
-  ❌ Tracking            : max=1.9033rad (109.05°)
-  ❌ Speed Margin        : -2637% (EXCEEDED)
-  ❌ Saturation          : 93.9% (frequent!)
+  ✅ Thermal Load        : avg=25% (<80%)
+  ❌ Tracking            : max=1.5867rad (90.91°)
+  ❌ Speed Margin        : -125% (EXCEEDED)
+  ❌ Saturation          : 96.2% (frequent!)
 
 ────────────────────────────────────────────────────────────
   Motor: MiddleFinger-2nd-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.3058Nm × gear=55 × eff=90% → out=15.14Nm
+  Spec: 3000RPM / gear=55 → out=5.71rad/s
 ────────────────────────────────────────────────────────────
   ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=22% (<80%)
-  ❌ Tracking            : max=0.3974rad (22.77°)
-  ❌ Speed Margin        : -2890% (EXCEEDED)
-  ❌ Saturation          : 90.6% (frequent!)
+  ⚠️  Thermal Load        : avg=89% (near limit)
+  ❌ Tracking            : max=0.2079rad (11.91°)
+  ❌ Speed Margin        : -50% (EXCEEDED)
+  ❌ Saturation          : 96.2% (frequent!)
 
 ────────────────────────────────────────────────────────────
   Motor: MiddleFinger-3rd-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.3255Nm × gear=10 × eff=90% → out=2.93Nm
+  Spec: 3000RPM / gear=10 → out=31.42rad/s
 ────────────────────────────────────────────────────────────
   ❌ Torque Margin       : min=0% (SATURATED)
-  ✅ Thermal Load        : avg=23% (<80%)
-  ✅ Tracking            : max=0.0069rad (0.40°)
-  ✅ Speed Margin        : 32%
-  ⚠️  Saturation          : 6.1%
+  ⚠️  Thermal Load        : avg=81% (near limit)
+  ✅ Tracking            : max=0.0077rad (0.44°)
+  ✅ Speed Margin        : 95%
+  ❌ Saturation          : 23.0% (frequent!)
 
 ────────────────────────────────────────────────────────────
   Motor: MiddleFinger_1st_roll  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.1416Nm × gear=5 × eff=90% → out=0.64Nm
+  Spec: 3000RPM / gear=5 → out=62.83rad/s
 ────────────────────────────────────────────────────────────
-  ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=59% (<80%)
-  ⚠️  Tracking            : max=0.0511rad (2.93°)
-  ❌ Speed Margin        : -737% (EXCEEDED)
-  ❌ Saturation          : 47.6% (frequent!)
+  ❌ Torque Margin       : min=0% (SATURATED)
+  ❌ Thermal Load        : avg=230% (OVERLOAD)
+  ✅ Tracking            : max=0.0265rad (1.52°)
+  ✅ Speed Margin        : 99%
+  ❌ Saturation          : 91.0% (frequent!)
 
 ────────────────────────────────────────────────────────────
   Motor: RingFinger-1st-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.1111Nm × gear=5 × eff=90% → out=0.50Nm
+  Spec: 3000RPM / gear=5 → out=62.83rad/s
 ────────────────────────────────────────────────────────────
-  ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=20% (<80%)
-  ✅ Tracking            : max=0.0208rad (1.19°)
-  ❌ Speed Margin        : -604% (EXCEEDED)
-  ⚠️  Saturation          : 8.0%
+  ❌ Torque Margin       : min=0% (SATURATED)
+  ✅ Thermal Load        : avg=77% (<80%)
+  ✅ Tracking            : max=0.0001rad (0.01°)
+  ✅ Speed Margin        : 100%
+  ⚠️  Saturation          : 7.1%
 
 ────────────────────────────────────────────────────────────
   Motor: RingFinger-1st_roll  ✅ PASS
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.1111Nm × gear=5 × eff=90% → out=0.50Nm
+  Spec: 3000RPM / gear=5 → out=62.83rad/s
 ────────────────────────────────────────────────────────────
   ✅ Torque Margin       : min=99% (>20%)
-  ✅ Thermal Load        : avg=0% (<80%)
+  ✅ Thermal Load        : avg=2% (<80%)
   ✅ Tracking            : max=0.0000rad (0.00°)
   ✅ Speed Margin        : 100%
   ✅ Saturation          : 0.0%
 
 ────────────────────────────────────────────────────────────
   Motor: RingFinger-2nd-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.1111Nm × gear=5 × eff=90% → out=0.50Nm
+  Spec: 3000RPM / gear=5 → out=62.83rad/s
 ────────────────────────────────────────────────────────────
-  ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=32% (<80%)
-  ⚠️  Tracking            : max=0.0540rad (3.09°)
-  ❌ Speed Margin        : -1676% (EXCEEDED)
-  ❌ Saturation          : 29.7% (frequent!)
+  ❌ Torque Margin       : min=0% (SATURATED)
+  ❌ Thermal Load        : avg=144% (OVERLOAD)
+  ✅ Tracking            : max=0.0002rad (0.01°)
+  ✅ Speed Margin        : 100%
+  ❌ Saturation          : 40.5% (frequent!)
 
 ────────────────────────────────────────────────────────────
   Motor: RingFinger-3rd-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.1111Nm × gear=5 × eff=90% → out=0.50Nm
+  Spec: 3000RPM / gear=5 → out=62.83rad/s
 ────────────────────────────────────────────────────────────
-  ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=45% (<80%)
-  ⚠️  Tracking            : max=0.1131rad (6.48°)
-  ❌ Speed Margin        : -2391% (EXCEEDED)
-  ❌ Saturation          : 42.5% (frequent!)
+  ❌ Torque Margin       : min=0% (SATURATED)
+  ❌ Thermal Load        : avg=133% (OVERLOAD)
+  ✅ Tracking            : max=0.0002rad (0.01°)
+  ✅ Speed Margin        : 100%
+  ❌ Saturation          : 26.3% (frequent!)
 
 ────────────────────────────────────────────────────────────
   Motor: Thumb-1st-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.3352Nm × gear=125 × eff=90% → out=37.71Nm
+  Spec: 5968RPM / gear=125 → out=5.00rad/s
 ────────────────────────────────────────────────────────────
   ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=16% (<80%)
-  ❌ Tracking            : max=0.7906rad (45.30°)
-  ❌ Speed Margin        : -3030% (EXCEEDED)
-  ❌ Saturation          : 95.3% (frequent!)
+  ✅ Thermal Load        : avg=54% (<80%)
+  ❌ Tracking            : max=0.5001rad (28.65°)
+  ❌ Speed Margin        : -103% (EXCEEDED)
+  ❌ Saturation          : 96.2% (frequent!)
 
 ────────────────────────────────────────────────────────────
   Motor: Thumb-2nd-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.3022Nm × gear=70 × eff=90% → out=19.04Nm
+  Spec: 3342RPM / gear=70 → out=5.00rad/s
 ────────────────────────────────────────────────────────────
   ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=15% (<80%)
-  ❌ Tracking            : max=0.1654rad (9.48°)
-  ❌ Speed Margin        : -3092% (EXCEEDED)
-  ❌ Saturation          : 87.7% (frequent!)
+  ✅ Thermal Load        : avg=57% (<80%)
+  ✅ Tracking            : max=0.0201rad (1.15°)
+  ❌ Speed Margin        : -103% (EXCEEDED)
+  ❌ Saturation          : 91.5% (frequent!)
 
 ────────────────────────────────────────────────────────────
   Motor: Thumb-3rd-pitch  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.2947Nm × gear=35 × eff=90% → out=9.28Nm
+  Spec: 3000RPM / gear=35 → out=8.98rad/s
 ────────────────────────────────────────────────────────────
-  ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=25% (<80%)
-  ⚠️  Tracking            : max=0.1263rad (7.24°)
-  ❌ Speed Margin        : -2755% (EXCEEDED)
-  ❌ Saturation          : 56.6% (frequent!)
+  ❌ Torque Margin       : min=0% (SATURATED)
+  ❌ Thermal Load        : avg=123% (OVERLOAD)
+  ✅ Tracking            : max=0.0070rad (0.40°)
+  ✅ Speed Margin        : 24%
+  ❌ Saturation          : 57.5% (frequent!)
 
 ────────────────────────────────────────────────────────────
   Motor: thumb_1st_yaw  ❌ FAIL
-  Spec: stall=1.4304Nm × gear=265 × eff=90% → out=341.14Nm
-  Spec: 5820RPM / gear=265 → out=2.30rad/s
+  Spec: stall=0.3226Nm × gear=10 × eff=90% → out=2.90Nm
+  Spec: 3000RPM / gear=10 → out=31.42rad/s
 ────────────────────────────────────────────────────────────
-  ❌ Torque Margin       : min=-100% (SATURATED)
-  ✅ Thermal Load        : avg=58% (<80%)
-  ❌ Tracking            : max=0.4694rad (26.89°)
-  ❌ Speed Margin        : -2164% (EXCEEDED)
-  ❌ Saturation          : 91.0% (frequent!)
+  ❌ Torque Margin       : min=0% (SATURATED)
+  ❌ Thermal Load        : avg=218% (OVERLOAD)
+  ❌ Tracking            : max=0.4015rad (23.00°)
+  ✅ Speed Margin        : 89%
+  ❌ Saturation          : 92.9% (frequent!)
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   ❌ OVERALL: SOME MOTORS NEED ATTENTION
-     FAIL: IndexFinger-1st-pitch, IndexFinger-2nd-pitch, IndexFinger-3rd-pitch, LittleFinger-1st-pitch, LittleFinger-2nd-pitch, LittleFinger-3rd-pitch, MiddleFinger-1st-pitch, MiddleFinger-2nd-pitch, MiddleFinger-3rd-pitch, MiddleFinger_1st_roll, RingFinger-1st-pitch, RingFinger-2nd-pitch, RingFinger-3rd-pitch, Thumb-1st-pitch, Thumb-2nd-pitch, Thumb-3rd-pitch, thumb_1st_yaw
-     WARN: IndexFinger_1st_roll
+     FAIL: IndexFinger-1st-pitch, IndexFinger-2nd-pitch, IndexFinger-3rd-pitch, IndexFinger_1st_roll, LittleFinger-1st-pitch, LittleFinger-2nd-pitch, LittleFinger-3rd-pitch, MiddleFinger-1st-pitch, MiddleFinger-2nd-pitch, MiddleFinger-3rd-pitch, MiddleFinger_1st_roll, RingFinger-1st-pitch, RingFinger-2nd-pitch, RingFinger-3rd-pitch, Thumb-1st-pitch, Thumb-2nd-pitch, Thumb-3rd-pitch, thumb_1st_yaw
 
   💡 Recommendations:
      IndexFinger-1st-pitch: Increase stall torque or gear ratio
@@ -406,18 +474,18 @@ CSV log: motor_validation_log.csv
      IndexFinger-1st-pitch: Increase motor speed or reduce gear ratio
      IndexFinger-1st-pitch: Increase stall torque or gear ratio
      IndexFinger-2nd-pitch: Increase stall torque or gear ratio
-     IndexFinger-2nd-pitch: Increase PID gains or motor torque
-     IndexFinger-2nd-pitch: Increase motor speed or reduce gear ratio
+     IndexFinger-2nd-pitch: Increase rated torque (larger motor)
      IndexFinger-2nd-pitch: Increase stall torque or gear ratio
      IndexFinger-3rd-pitch: Increase stall torque or gear ratio
-     IndexFinger-3rd-pitch: Increase motor speed or reduce gear ratio
+     IndexFinger-3rd-pitch: Increase rated torque (larger motor)
      IndexFinger-3rd-pitch: Increase stall torque or gear ratio
+     IndexFinger_1st_roll: Increase stall torque or gear ratio
      LittleFinger-1st-pitch: Increase stall torque or gear ratio
-     LittleFinger-1st-pitch: Increase motor speed or reduce gear ratio
      LittleFinger-2nd-pitch: Increase stall torque or gear ratio
-     LittleFinger-2nd-pitch: Increase motor speed or reduce gear ratio
+     LittleFinger-2nd-pitch: Increase rated torque (larger motor)
+     LittleFinger-2nd-pitch: Increase stall torque or gear ratio
      LittleFinger-3rd-pitch: Increase stall torque or gear ratio
-     LittleFinger-3rd-pitch: Increase motor speed or reduce gear ratio
+     LittleFinger-3rd-pitch: Increase rated torque (larger motor)
      LittleFinger-3rd-pitch: Increase stall torque or gear ratio
      MiddleFinger-1st-pitch: Increase stall torque or gear ratio
      MiddleFinger-1st-pitch: Increase PID gains or motor torque
@@ -428,31 +496,30 @@ CSV log: motor_validation_log.csv
      MiddleFinger-2nd-pitch: Increase motor speed or reduce gear ratio
      MiddleFinger-2nd-pitch: Increase stall torque or gear ratio
      MiddleFinger-3rd-pitch: Increase stall torque or gear ratio
+     MiddleFinger-3rd-pitch: Increase stall torque or gear ratio
      MiddleFinger_1st_roll: Increase stall torque or gear ratio
-     MiddleFinger_1st_roll: Increase motor speed or reduce gear ratio
+     MiddleFinger_1st_roll: Increase rated torque (larger motor)
      MiddleFinger_1st_roll: Increase stall torque or gear ratio
      RingFinger-1st-pitch: Increase stall torque or gear ratio
-     RingFinger-1st-pitch: Increase motor speed or reduce gear ratio
      RingFinger-2nd-pitch: Increase stall torque or gear ratio
-     RingFinger-2nd-pitch: Increase motor speed or reduce gear ratio
+     RingFinger-2nd-pitch: Increase rated torque (larger motor)
      RingFinger-2nd-pitch: Increase stall torque or gear ratio
      RingFinger-3rd-pitch: Increase stall torque or gear ratio
-     RingFinger-3rd-pitch: Increase motor speed or reduce gear ratio
+     RingFinger-3rd-pitch: Increase rated torque (larger motor)
      RingFinger-3rd-pitch: Increase stall torque or gear ratio
      Thumb-1st-pitch: Increase stall torque or gear ratio
      Thumb-1st-pitch: Increase PID gains or motor torque
      Thumb-1st-pitch: Increase motor speed or reduce gear ratio
      Thumb-1st-pitch: Increase stall torque or gear ratio
      Thumb-2nd-pitch: Increase stall torque or gear ratio
-     Thumb-2nd-pitch: Increase PID gains or motor torque
      Thumb-2nd-pitch: Increase motor speed or reduce gear ratio
      Thumb-2nd-pitch: Increase stall torque or gear ratio
      Thumb-3rd-pitch: Increase stall torque or gear ratio
-     Thumb-3rd-pitch: Increase motor speed or reduce gear ratio
+     Thumb-3rd-pitch: Increase rated torque (larger motor)
      Thumb-3rd-pitch: Increase stall torque or gear ratio
      thumb_1st_yaw: Increase stall torque or gear ratio
+     thumb_1st_yaw: Increase rated torque (larger motor)
      thumb_1st_yaw: Increase PID gains or motor torque
-     thumb_1st_yaw: Increase motor speed or reduce gear ratio
      thumb_1st_yaw: Increase stall torque or gear ratio
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
