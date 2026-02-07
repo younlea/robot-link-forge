@@ -2958,16 +2958,16 @@ csv_file.close()
 def generate_mujoco_motor_validation_script(model_filename: str) -> str:
     """Generates Mode 3: Advanced Motor Sizing Validation Script.
     
-    v4: Play/Pause/Seek + 4-plot layout (motor margin bar chart restored)
+    v6: Editable text boxes + removed speed (physics-correct) + hover tooltips
     """
     return f"""#!/usr/bin/env python3
 \"\"\"
-Mode 3: Advanced Motor Sizing Validation (v4)
+Mode 3: Advanced Motor Sizing Validation (v6)
 ==============================================
 Phase 1: Inverse dynamics → auto-detect defaults
 Phase 2: Forward sim with motor physics pipeline
 
-v4: Play/Pause/Seek controls + Motor Margin bar chart restored
+v6: Editable text boxes, removed speed toggle (physics-correct), hover tooltips
 \"\"\"
 import time
 import json
@@ -2993,7 +2993,7 @@ try:
     import matplotlib
     matplotlib.use('TkAgg')
     import matplotlib.pyplot as plt
-    from matplotlib.widgets import Slider, Button, RadioButtons
+    from matplotlib.widgets import Slider, Button, RadioButtons, TextBox
     HAS_MATPLOTLIB = True
 except ImportError:
     print("Warning: matplotlib not found. Install: pip install matplotlib")
@@ -3355,9 +3355,7 @@ if os.path.exists(motor_params_file):
 # ═══════════════════════════════════════════════════════════════
 sim_time = 0.0          # 시뮬레이션 시간 (0 ~ duration)
 is_playing = True       # True=재생 중, False=일시정지
-playback_speed = 1.0    # 재생 속도 배율 (0.5, 1, 2, 4)
-SPEED_OPTIONS = [0.5, 1.0, 2.0, 4.0]
-speed_index = 1         # 기본 x1.0
+playback_speed = 1.0    # 재생 속도 (x1 고정)
 
 joint_history = {{}}
 for jname in engines:
@@ -3419,7 +3417,7 @@ def seek_to_time(target_t):
 if HAS_MATPLOTLIB:
     plt.ion()
     fig = plt.figure(figsize=(24, 14))
-    fig.suptitle('Mode 3: Motor Sizing Validation (v4)', fontsize=13, fontweight='bold')
+    fig.suptitle('Mode 3: Motor Sizing Validation (v6)', fontsize=13, fontweight='bold')
     try: fig.canvas.manager.window.attributes('-topmost', False)
     except: pass
 
@@ -3467,15 +3465,47 @@ if HAS_MATPLOTLIB:
         ('kd', 'PID Kd', 1, 200, DEFAULT_KD),
     ]
     sliders = {{}}
+    textboxes = {{}}
+    _slider_textbox_updating = [False]  # guard against infinite loop
     y_pos = 0.90
     for key, label, vmin, vmax, vinit in slider_specs:
-        ax_s = plt.axes([0.09, y_pos, 0.28, 0.014])
+        ax_s = plt.axes([0.09, y_pos, 0.22, 0.014])
         if key in ('gear_efficiency', 'gear_ratio', 'rated_speed_rpm'):
             sliders[key] = Slider(ax_s, label, vmin, vmax, valinit=vinit, valstep=1)
         else:
             sliders[key] = Slider(ax_s, label, vmin, vmax, valinit=vinit,
                                   valstep=max((vmax-vmin)/500.0, 0.0001))
+        # Editable text box next to slider
+        ax_tb = plt.axes([0.32, y_pos, 0.055, 0.014])
+        tb = TextBox(ax_tb, '', initial=f'{{vinit:.4g}}')
+        textboxes[key] = tb
         y_pos -= 0.035
+
+    def _make_slider_changed_cb(skey):
+        def _on_slider_changed(val):
+            if _slider_textbox_updating[0]: return
+            _slider_textbox_updating[0] = True
+            try:
+                textboxes[skey].set_val(f'{{val:.4g}}')
+            except: pass
+            _slider_textbox_updating[0] = False
+        return _on_slider_changed
+
+    def _make_textbox_submit_cb(skey):
+        def _on_textbox_submit(text):
+            if _slider_textbox_updating[0]: return
+            try:
+                val = float(text)
+                _slider_textbox_updating[0] = True
+                sliders[skey].set_val(np.clip(val, sliders[skey].valmin, sliders[skey].valmax))
+                _slider_textbox_updating[0] = False
+            except ValueError:
+                pass
+        return _on_textbox_submit
+
+    for skey in sliders:
+        sliders[skey].on_changed(_make_slider_changed_cb(skey))
+        textboxes[skey].on_submit(_make_textbox_submit_cb(skey))
 
     # Info text
     ax_info_box = plt.axes([0.09, y_pos - 0.005, 0.28, 0.02])
@@ -3499,17 +3529,6 @@ if HAS_MATPLOTLIB:
     ax_restart_btn = plt.axes([0.175, btn_y2, 0.07, 0.022])
     btn_restart_btn = Button(ax_restart_btn, 'Restart')
 
-    # === Speed toggle buttons: x0.5  x1  x2  x4 ===
-    speed_btn_x = 0.255
-    speed_btns = []
-    speed_btn_labels = ['x0.5', 'x1', 'x2', 'x4']
-    for _si, _sl in enumerate(speed_btn_labels):
-        _ax = plt.axes([speed_btn_x + _si * 0.04, btn_y2, 0.038, 0.022])
-        _btn = Button(_ax, _sl)
-        if _si == 1:  # x1 기본 선택 강조
-            _ax.set_facecolor('#c0e0ff')
-        speed_btns.append((_ax, _btn))
-
     # === Timeline Slider ===
     timeline_y = btn_y2 - 0.035
     ax_timeline = plt.axes([0.09, timeline_y, 0.28, 0.016])
@@ -3529,11 +3548,23 @@ if HAS_MATPLOTLIB:
     btn_next = Button(ax_next, 'Next >')
 
     def update_sliders_from_engine(eng):
+        _slider_textbox_updating[0] = True
         for key in sliders:
-            if key == 'gear_efficiency': sliders[key].set_val(eng.gear_efficiency * 100.0)
-            elif hasattr(eng, key): sliders[key].set_val(getattr(eng, key))
-            elif key == 'kp': sliders[key].set_val(eng.pid.kp)
-            elif key == 'kd': sliders[key].set_val(eng.pid.kd)
+            if key == 'gear_efficiency':
+                v = eng.gear_efficiency * 100.0
+                sliders[key].set_val(v)
+                textboxes[key].set_val(f'{{v:.4g}}')
+            elif hasattr(eng, key):
+                v = getattr(eng, key)
+                sliders[key].set_val(v)
+                textboxes[key].set_val(f'{{v:.4g}}')
+            elif key == 'kp':
+                sliders[key].set_val(eng.pid.kp)
+                textboxes[key].set_val(f'{{eng.pid.kp:.4g}}')
+            elif key == 'kd':
+                sliders[key].set_val(eng.pid.kd)
+                textboxes[key].set_val(f'{{eng.pid.kd:.4g}}')
+        _slider_textbox_updating[0] = False
 
     def get_slider_values():
         vals = {{k: s.val for k, s in sliders.items()}}
@@ -3581,22 +3612,10 @@ if HAS_MATPLOTLIB:
         is_playing = not is_playing
         btn_playpause.label.set_text('⏸ Pause' if is_playing else '▶ Play')
         if is_playing:
-            print(f"[PLAY] t={{sim_time:.2f}}s x{{playback_speed}}")
+            print(f"[PLAY] t={{sim_time:.2f}}s")
         else:
             print(f"[PAUSE] t={{sim_time:.2f}}s")
         fig.canvas.draw_idle()
-
-    def make_speed_callback(idx):
-        def on_speed(event):
-            global playback_speed, speed_index
-            speed_index = idx
-            playback_speed = SPEED_OPTIONS[idx]
-            # 선택된 버튼 강조
-            for si, (sax, sbtn) in enumerate(speed_btns):
-                sax.set_facecolor('#c0e0ff' if si == idx else '#f0f0f0')
-            print(f"[SPEED] x{{playback_speed}}")
-            fig.canvas.draw_idle()
-        return on_speed
 
     def on_restart(event):
         global is_playing, sim_time
@@ -3669,8 +3688,6 @@ if HAS_MATPLOTLIB:
     btn_save.on_clicked(on_save)
     btn_playpause.on_clicked(on_playpause)
     btn_restart_btn.on_clicked(on_restart)
-    for _si, (_sax, _sbtn) in enumerate(speed_btns):
-        _sbtn.on_clicked(make_speed_callback(_si))
     timeline_slider.on_changed(on_timeline_changed)
     radio.on_clicked(on_joint_select)
     btn_prev.on_clicked(on_prev)
@@ -3678,14 +3695,13 @@ if HAS_MATPLOTLIB:
 
     def update_info():
         play_icon = "▶" if is_playing else "⏸"
-        spd = f"x{{playback_speed:.3g}}"
         if current_mode == 'global':
-            info_text.set_text(f"{{play_icon}} {{spd}} [GLOBAL] t={{sim_time:.2f}}/{{duration:.1f}}s | {{len(engines)}} motors")
+            info_text.set_text(f"{{play_icon}} [GLOBAL] t={{sim_time:.2f}}/{{duration:.1f}}s | {{len(engines)}} motors")
         elif selected_joint and selected_joint in engines:
             eng = engines[selected_joint]
             out_rpm = eng._output_speed_rads * 60.0 / (2.0 * np.pi)
             info_text.set_text(
-                f"{{play_icon}} {{spd}} [{{selected_joint}}] Out: {{eng._output_stall:.2f}}Nm, {{out_rpm:.0f}}RPM\\n"
+                f"{{play_icon}} [{{selected_joint}}] Out: {{eng._output_stall:.2f}}Nm, {{out_rpm:.0f}}RPM\\n"
                 f"  t={{sim_time:.2f}}/{{duration:.1f}}s"
             )
 
@@ -3811,11 +3827,67 @@ if HAS_MATPLOTLIB:
             ax_margin.set_title('Motor Margin (green=OK, orange=tight, red=OVER)')
             ax_margin.grid(True, alpha=0.3, axis='x')
 
+        # ── Hover annotations 재생성 (clear() 후 필요) ──
+        for _hax in [ax_tracking, ax_torque, ax_tn]:
+            ann = _hax.annotate('', xy=(0,0), xytext=(15,15), textcoords='offset points',
+                                bbox=dict(boxstyle='round,pad=0.3', fc='lightyellow', ec='gray', alpha=0.9),
+                                fontsize=8, fontweight='bold', visible=False)
+            _hover_annot[_hax] = ann
+
+    # ── Hover tooltip for graph lines ──
+    _hover_annot = {{}}
+
+    def _on_hover(event):
+        if event.inaxes not in _hover_annot:
+            for ann in _hover_annot.values(): ann.set_visible(False)
+            return
+        ax_h = event.inaxes
+        ann = _hover_annot[ax_h]
+        found = False
+        # Check lines (tracking, torque plots)
+        for line in ax_h.get_lines():
+            lb = line.get_label()
+            if lb.startswith('_') or lb in ('Reference', 'Actual', 'T_cmd', 'T_limited',
+                                            'T_final', 'Friction', 'T-N Limit') or lb.startswith('Stall') or lb.startswith('Rated'):
+                continue
+            contains, _ = line.contains(event)
+            if contains:
+                ann.xy = (event.xdata, event.ydata)
+                lc = line.get_color()
+                ann.get_bbox_patch().set_edgecolor(lc)
+                ann.set_text(lb)
+                ann.set_visible(True)
+                found = True
+                break
+        # Check scatter collections (T-N plot)
+        if not found:
+            for coll in ax_h.collections:
+                lb = coll.get_label()
+                if lb.startswith('_'): continue
+                contains, ind = coll.contains(event)
+                if contains:
+                    ann.xy = (event.xdata, event.ydata)
+                    try:
+                        fc = coll.get_facecolor()[0]
+                        ann.get_bbox_patch().set_edgecolor(fc)
+                    except: pass
+                    ann.set_text(lb)
+                    ann.set_visible(True)
+                    found = True
+                    break
+        if not found:
+            ann.set_visible(False)
+        try:
+            fig.canvas.draw_idle()
+        except: pass
+
+    fig.canvas.mpl_connect('motion_notify_event', _on_hover)
+
     _add_color_indicators()
     on_joint_select('[GLOBAL]')
     plt.show(block=False); plt.pause(0.3)
     fig.canvas.draw(); fig.canvas.flush_events()
-    print("UI created — ▶Play / ⏸Pause / x0.5~x4 speed / Timeline slider")
+    print("UI created — ▶Play / ⏸Pause / Timeline slider / Hover for joint name")
 
 # ═══════════════════════════════════════════════════════════════
 # Initialize + CSV
@@ -3837,7 +3909,7 @@ csv_w.writerow(csv_header)
 # ═══════════════════════════════════════════════════════════════
 # Main Loop
 # ═══════════════════════════════════════════════════════════════
-print("\\n  SIMULATION STARTED — ⏸Pause to inspect, x0.5~x4 to change speed")
+print("\\n  SIMULATION STARTED — ⏸Pause to inspect, hover graph for joint names")
 print("  Close MuJoCo viewer to stop & see final report.")
 
 try:
@@ -3854,7 +3926,7 @@ try:
 
             # ── 재생 상태일 때만 시뮬레이션 진행 ──
             if is_playing:
-                sim_time += wall_dt * playback_speed
+                sim_time += wall_dt
                 if sim_time > duration:
                     loop_count += 1
                     sim_time = 0.0
@@ -3920,7 +3992,7 @@ try:
                         if m < worst_margin: worst_margin = m; worst_joint = jname
                 status = "OK" if worst_margin > 0 else "OVER!"
                 play_str = "▶" if is_playing else "⏸"
-                print(f"{{play_str}} [T={{sim_time:.2f}}s x{{playback_speed}}] Worst: {{worst_joint}} margin={{worst_margin:.0f}}% {{status}} | Loop#{{loop_count}}")
+                print(f"{{play_str}} [T={{sim_time:.2f}}s] Worst: {{worst_joint}} margin={{worst_margin:.0f}}% {{status}} | Loop#{{loop_count}}")
                 last_print = now
 
             # Plots 5Hz
