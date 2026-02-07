@@ -3836,14 +3836,25 @@ if HAS_MATPLOTLIB:
 
     # ── Hover tooltip for graph lines ──
     _hover_annot = {{}}
+    _hover_prev_label = ['']  # track previous state to avoid unnecessary redraws
+    _hover_last_time = [0.0]  # throttle: min interval between hover checks
 
     def _on_hover(event):
+        now = time.time()
+        if now - _hover_last_time[0] < 0.05:  # 20Hz throttle
+            return
+        _hover_last_time[0] = now
+
         if event.inaxes not in _hover_annot:
-            for ann in _hover_annot.values(): ann.set_visible(False)
+            if _hover_prev_label[0]:
+                for ann in _hover_annot.values(): ann.set_visible(False)
+                _hover_prev_label[0] = ''
+                try: fig.canvas.draw_idle()
+                except: pass
             return
         ax_h = event.inaxes
         ann = _hover_annot[ax_h]
-        found = False
+        found_label = ''
         # Check lines (tracking, torque plots)
         for line in ax_h.get_lines():
             lb = line.get_label()
@@ -3857,10 +3868,10 @@ if HAS_MATPLOTLIB:
                 ann.get_bbox_patch().set_edgecolor(lc)
                 ann.set_text(lb)
                 ann.set_visible(True)
-                found = True
+                found_label = lb
                 break
         # Check scatter collections (T-N plot)
-        if not found:
+        if not found_label:
             for coll in ax_h.collections:
                 lb = coll.get_label()
                 if lb.startswith('_'): continue
@@ -3873,13 +3884,15 @@ if HAS_MATPLOTLIB:
                     except: pass
                     ann.set_text(lb)
                     ann.set_visible(True)
-                    found = True
+                    found_label = lb
                     break
-        if not found:
+        if not found_label:
             ann.set_visible(False)
-        try:
-            fig.canvas.draw_idle()
-        except: pass
+        # Only redraw if state actually changed
+        if found_label != _hover_prev_label[0]:
+            _hover_prev_label[0] = found_label
+            try: fig.canvas.draw_idle()
+            except: pass
 
     fig.canvas.mpl_connect('motion_notify_event', _on_hover)
 
