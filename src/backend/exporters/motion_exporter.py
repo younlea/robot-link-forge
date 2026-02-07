@@ -2957,7 +2957,7 @@ csv_file.close()
 
 def generate_mujoco_motor_validation_script(model_filename: str) -> str:
     """Generates Mode 3: Advanced Motor Sizing Validation Script.
-    
+
     v6: Editable text boxes + removed speed (physics-correct) + hover tooltips
     """
     return f"""#!/usr/bin/env python3
@@ -3475,6 +3475,8 @@ if HAS_MATPLOTLIB:
         else:
             sliders[key] = Slider(ax_s, label, vmin, vmax, valinit=vinit,
                                   valstep=max((vmax-vmin)/500.0, 0.0001))
+        # Hide slider's built-in value text (replaced by editable TextBox)
+        sliders[key].valtext.set_visible(False)
         # Editable text box next to slider
         ax_tb = plt.axes([0.32, y_pos, 0.055, 0.014])
         tb = TextBox(ax_tb, '', initial=f'{{vinit:.4g}}')
@@ -3838,19 +3840,23 @@ if HAS_MATPLOTLIB:
     _hover_annot = {{}}
     _hover_prev_label = ['']  # track previous state to avoid unnecessary redraws
     _hover_last_time = [0.0]  # throttle: min interval between hover checks
+    _hover_axes = {{ax_tracking, ax_torque, ax_tn}}  # only check on plot axes
 
     def _on_hover(event):
-        now = time.time()
-        if now - _hover_last_time[0] < 0.05:  # 20Hz throttle
-            return
-        _hover_last_time[0] = now
-
-        if event.inaxes not in _hover_annot:
+        # Only process when mouse is on one of the 3 plot axes
+        if event.inaxes not in _hover_axes:
             if _hover_prev_label[0]:
                 for ann in _hover_annot.values(): ann.set_visible(False)
                 _hover_prev_label[0] = ''
                 try: fig.canvas.draw_idle()
                 except: pass
+            return
+        now = time.time()
+        if now - _hover_last_time[0] < 0.2:  # 5Hz throttle (200ms)
+            return
+        _hover_last_time[0] = now
+
+        if event.inaxes not in _hover_annot:
             return
         ax_h = event.inaxes
         ann = _hover_annot[ax_h]
