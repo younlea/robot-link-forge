@@ -3355,7 +3355,9 @@ if os.path.exists(motor_params_file):
 # ═══════════════════════════════════════════════════════════════
 sim_time = 0.0          # 시뮬레이션 시간 (0 ~ duration)
 is_playing = True       # True=재생 중, False=일시정지
-seek_requested = False  # 타임라인 슬라이더 조작 중
+playback_speed = 1.0    # 재생 속도 배율 (0.5, 1, 2, 4)
+SPEED_OPTIONS = [0.5, 1.0, 2.0, 4.0]
+speed_index = 1         # 기본 x1.0
 
 joint_history = {{}}
 for jname in engines:
@@ -3436,7 +3438,17 @@ if HAS_MATPLOTLIB:
     selected_joint = None; current_mode = 'global'
     joint_page = 0; joints_per_page = 8
 
-    joint_list_full = ['[GLOBAL]'] + sorted([j for j in joint_ids.keys() if j in actuator_ids])
+    # 관절별 고유 색상 팔레트
+    _COLOR_PALETTE = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728', '#9467bd',
+                      '#8c564b', '#e377c2', '#7f7f7f', '#bcbd22', '#17becf',
+                      '#aec7e8', '#ffbb78', '#98df8a', '#ff9896', '#c5b0d5',
+                      '#c49c94', '#f7b6d2', '#c7c7c7', '#dbdb8d', '#9edae5']
+    _sorted_joints = sorted([j for j in joint_ids.keys() if j in actuator_ids])
+    joint_colors = {{}}
+    for _ci, _jn in enumerate(_sorted_joints):
+        joint_colors[_jn] = _COLOR_PALETTE[_ci % len(_COLOR_PALETTE)]
+
+    joint_list_full = ['[GLOBAL]'] + _sorted_joints
     total_pages = max(1, (len(joint_list_full) + joints_per_page - 1) // joints_per_page)
     def get_page_joints():
         s = joint_page * joints_per_page
@@ -3480,16 +3492,23 @@ if HAS_MATPLOTLIB:
     ax_save = plt.axes([0.22, btn_y1, 0.06, 0.022])
     btn_save = Button(ax_save, 'Save')
 
-    # === Buttons row 2: Playback — ◀◀  ▶/⏸  ▶▶  Restart ===
+    # === Buttons row 2: Playback — ▶/⏸  Restart ===
     btn_y2 = btn_y1 - 0.035
-    ax_stepb = plt.axes([0.09, btn_y2, 0.045, 0.022])
-    btn_step_back = Button(ax_stepb, '◀◀')
-    ax_playpause = plt.axes([0.14, btn_y2, 0.06, 0.022])
+    ax_playpause = plt.axes([0.09, btn_y2, 0.08, 0.022])
     btn_playpause = Button(ax_playpause, '⏸ Pause')
-    ax_stepf = plt.axes([0.205, btn_y2, 0.045, 0.022])
-    btn_step_fwd = Button(ax_stepf, '▶▶')
-    ax_restart_btn = plt.axes([0.255, btn_y2, 0.06, 0.022])
+    ax_restart_btn = plt.axes([0.175, btn_y2, 0.07, 0.022])
     btn_restart_btn = Button(ax_restart_btn, 'Restart')
+
+    # === Speed toggle buttons: x0.5  x1  x2  x4 ===
+    speed_btn_x = 0.255
+    speed_btns = []
+    speed_btn_labels = ['x0.5', 'x1', 'x2', 'x4']
+    for _si, _sl in enumerate(speed_btn_labels):
+        _ax = plt.axes([speed_btn_x + _si * 0.04, btn_y2, 0.038, 0.022])
+        _btn = Button(_ax, _sl)
+        if _si == 1:  # x1 기본 선택 강조
+            _ax.set_facecolor('#c0e0ff')
+        speed_btns.append((_ax, _btn))
 
     # === Timeline Slider ===
     timeline_y = btn_y2 - 0.035
@@ -3562,28 +3581,22 @@ if HAS_MATPLOTLIB:
         is_playing = not is_playing
         btn_playpause.label.set_text('⏸ Pause' if is_playing else '▶ Play')
         if is_playing:
-            print(f"[PLAY] t={{sim_time:.2f}}s")
+            print(f"[PLAY] t={{sim_time:.2f}}s x{{playback_speed}}")
         else:
             print(f"[PAUSE] t={{sim_time:.2f}}s")
         fig.canvas.draw_idle()
 
-    def on_step_fwd(event):
-        global is_playing, sim_time
-        is_playing = False
-        btn_playpause.label.set_text('▶ Play')
-        seek_to_time(sim_time + 0.1)  # +100ms
-        timeline_slider.set_val(sim_time)
-        update_info(); update_plots()
-        fig.canvas.draw_idle(); fig.canvas.flush_events()
-
-    def on_step_back(event):
-        global is_playing, sim_time
-        is_playing = False
-        btn_playpause.label.set_text('▶ Play')
-        seek_to_time(sim_time - 0.1)  # -100ms
-        timeline_slider.set_val(sim_time)
-        update_info(); update_plots()
-        fig.canvas.draw_idle(); fig.canvas.flush_events()
+    def make_speed_callback(idx):
+        def on_speed(event):
+            global playback_speed, speed_index
+            speed_index = idx
+            playback_speed = SPEED_OPTIONS[idx]
+            # 선택된 버튼 강조
+            for si, (sax, sbtn) in enumerate(speed_btns):
+                sax.set_facecolor('#c0e0ff' if si == idx else '#f0f0f0')
+            print(f"[SPEED] x{{playback_speed}}")
+            fig.canvas.draw_idle()
+        return on_speed
 
     def on_restart(event):
         global is_playing, sim_time
@@ -3607,12 +3620,33 @@ if HAS_MATPLOTLIB:
 
     def on_joint_select(label):
         global selected_joint, current_mode
-        if label == '[GLOBAL]':
+        # 색상 인디케이터 prefix 제거 (██ prefix)
+        clean_label = label.replace('██ ', '').strip()
+        if clean_label == '[GLOBAL]':
             current_mode = 'global'; selected_joint = None
         else:
-            current_mode = 'per_joint'; selected_joint = label
-            if label in engines: update_sliders_from_engine(engines[label])
+            current_mode = 'per_joint'; selected_joint = clean_label
+            if clean_label in engines: update_sliders_from_engine(engines[clean_label])
         update_info()
+
+    def _add_color_indicators():
+        # 라디오 버튼 옆에 관절별 색상 인디케이터 추가
+        try:
+            labels = [t.get_text() for t in radio.labels]
+            for i, lbl in enumerate(labels):
+                jn = lbl.strip()
+                if jn in joint_colors:
+                    color = joint_colors[jn]
+                    # 라디오 버튼 라벨 텍스트에 색상 표시 (██ prefix)
+                    radio.labels[i].set_text(f'██ {{jn}}')
+                    radio.labels[i].set_color(color)
+                    radio.labels[i].set_fontweight('bold')
+                    radio.labels[i].set_fontsize(8)
+                elif jn == '[GLOBAL]':
+                    radio.labels[i].set_fontweight('bold')
+                    radio.labels[i].set_fontsize(8)
+                    radio.labels[i].set_color('black')
+        except: pass
 
     def update_radio():
         global radio, ax_radio
@@ -3620,6 +3654,7 @@ if HAS_MATPLOTLIB:
         ax_radio.set_position([0.09, 0.05, 0.29, radio_h])
         radio = RadioButtons(ax_radio, get_page_joints(), activecolor='blue')
         radio.on_clicked(on_joint_select)
+        _add_color_indicators()
         pg_text.set_text(f'{{joint_page+1}}/{{total_pages}}')
         fig.canvas.draw_idle()
     def on_prev(event):
@@ -3633,9 +3668,9 @@ if HAS_MATPLOTLIB:
     btn_reset.on_clicked(on_reset)
     btn_save.on_clicked(on_save)
     btn_playpause.on_clicked(on_playpause)
-    btn_step_fwd.on_clicked(on_step_fwd)
-    btn_step_back.on_clicked(on_step_back)
     btn_restart_btn.on_clicked(on_restart)
+    for _si, (_sax, _sbtn) in enumerate(speed_btns):
+        _sbtn.on_clicked(make_speed_callback(_si))
     timeline_slider.on_changed(on_timeline_changed)
     radio.on_clicked(on_joint_select)
     btn_prev.on_clicked(on_prev)
@@ -3643,13 +3678,14 @@ if HAS_MATPLOTLIB:
 
     def update_info():
         play_icon = "▶" if is_playing else "⏸"
+        spd = f"x{{playback_speed:.3g}}"
         if current_mode == 'global':
-            info_text.set_text(f"{{play_icon}} [GLOBAL] t={{sim_time:.2f}}/{{duration:.1f}}s | {{len(engines)}} motors")
+            info_text.set_text(f"{{play_icon}} {{spd}} [GLOBAL] t={{sim_time:.2f}}/{{duration:.1f}}s | {{len(engines)}} motors")
         elif selected_joint and selected_joint in engines:
             eng = engines[selected_joint]
             out_rpm = eng._output_speed_rads * 60.0 / (2.0 * np.pi)
             info_text.set_text(
-                f"{{play_icon}} [{{selected_joint}}] Out: {{eng._output_stall:.2f}}Nm, {{out_rpm:.0f}}RPM\\n"
+                f"{{play_icon}} {{spd}} [{{selected_joint}}] Out: {{eng._output_stall:.2f}}Nm, {{out_rpm:.0f}}RPM\\n"
                 f"  t={{sim_time:.2f}}/{{duration:.1f}}s"
             )
 
@@ -3672,7 +3708,8 @@ if HAS_MATPLOTLIB:
             for jname in sorted(joint_history.keys()):
                 h = joint_history[jname]; t_arr = h['time'].to_array()
                 if len(t_arr) > 0:
-                    ax_tracking.plot(t_arr, h['error'].to_array(), lw=1, alpha=0.7, label=jname[:15])
+                    jc = joint_colors.get(jname, '#333')
+                    ax_tracking.plot(t_arr, h['error'].to_array(), lw=1, alpha=0.8, label=jname[:15], color=jc)
             ax_tracking.set_ylabel('|Error| (rad)')
             ax_tracking.set_title('All Joints Tracking Error')
             if len(engines) <= 10: ax_tracking.legend(loc='upper right', fontsize=6)
@@ -3701,7 +3738,8 @@ if HAS_MATPLOTLIB:
             for jname in sorted(joint_history.keys()):
                 h = joint_history[jname]; t_arr = h['time'].to_array()
                 if len(t_arr) > 0:
-                    ax_torque.plot(t_arr, h['tau_final'].to_array(), lw=1, alpha=0.7, label=jname[:15])
+                    jc = joint_colors.get(jname, '#333')
+                    ax_torque.plot(t_arr, h['tau_final'].to_array(), lw=1, alpha=0.8, label=jname[:15], color=jc)
             ax_torque.set_title('All Joints: Actual Torque')
             if len(engines) <= 10: ax_torque.legend(loc='upper right', fontsize=6)
         ax_torque.set_xlim(win_start, win_end)
@@ -3734,7 +3772,8 @@ if HAS_MATPLOTLIB:
                 h = joint_history[jname]
                 rpm_arr = h['v_act_rpm'].to_array(); tf_arr = h['tau_final'].to_array()
                 if len(rpm_arr) > 0 and len(tf_arr) > 0:
-                    ax_tn.scatter(np.abs(rpm_arr), np.abs(tf_arr), s=3, alpha=0.4, label=jname[:12])
+                    jc = joint_colors.get(jname, '#333')
+                    ax_tn.scatter(np.abs(rpm_arr), np.abs(tf_arr), s=3, alpha=0.5, label=jname[:12], color=jc)
                     plotted_any = True
             if plotted_any:
                 ref_eng = max(engines.values(), key=lambda e: e._output_stall)
@@ -3767,14 +3806,16 @@ if HAS_MATPLOTLIB:
             ax_margin.set_yticklabels(short_names, fontsize=7)
             ax_margin.axvline(x=0, color='red', lw=1)
             ax_margin.axvline(x=20, color='orange', ls='--', lw=0.8)
+            ax_margin.set_xlim(-100, 100)
             ax_margin.set_xlabel('Torque Margin (%)')
             ax_margin.set_title('Motor Margin (green=OK, orange=tight, red=OVER)')
             ax_margin.grid(True, alpha=0.3, axis='x')
 
+    _add_color_indicators()
     on_joint_select('[GLOBAL]')
     plt.show(block=False); plt.pause(0.3)
     fig.canvas.draw(); fig.canvas.flush_events()
-    print("UI created — ▶Play / ⏸Pause / ◀◀◀▶▶ Step / Timeline slider")
+    print("UI created — ▶Play / ⏸Pause / x0.5~x4 speed / Timeline slider")
 
 # ═══════════════════════════════════════════════════════════════
 # Initialize + CSV
@@ -3796,7 +3837,7 @@ csv_w.writerow(csv_header)
 # ═══════════════════════════════════════════════════════════════
 # Main Loop
 # ═══════════════════════════════════════════════════════════════
-print("\\n  SIMULATION STARTED — ⏸Pause to inspect snapshots, ◀◀/▶▶ to step")
+print("\\n  SIMULATION STARTED — ⏸Pause to inspect, x0.5~x4 to change speed")
 print("  Close MuJoCo viewer to stop & see final report.")
 
 try:
@@ -3813,7 +3854,7 @@ try:
 
             # ── 재생 상태일 때만 시뮬레이션 진행 ──
             if is_playing:
-                sim_time += wall_dt
+                sim_time += wall_dt * playback_speed
                 if sim_time > duration:
                     loop_count += 1
                     sim_time = 0.0
@@ -3879,7 +3920,7 @@ try:
                         if m < worst_margin: worst_margin = m; worst_joint = jname
                 status = "OK" if worst_margin > 0 else "OVER!"
                 play_str = "▶" if is_playing else "⏸"
-                print(f"{{play_str}} [T={{sim_time:.2f}}s] Worst: {{worst_joint}} margin={{worst_margin:.0f}}% {{status}} | Loop#{{loop_count}}")
+                print(f"{{play_str}} [T={{sim_time:.2f}}s x{{playback_speed}}] Worst: {{worst_joint}} margin={{worst_margin:.0f}}% {{status}} | Loop#{{loop_count}}")
                 last_print = now
 
             # Plots 5Hz
