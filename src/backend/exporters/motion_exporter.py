@@ -3229,29 +3229,49 @@ print("="*70)
 print(f"  {{'Joint':<30s}} | {{'Peak(Nm)':>10s}} | {{'RMS(Nm)':>10s}} | {{'MaxVel(r/s)':>12s}}")
 print("  " + "-"*70)
 
-SAFETY_MARGIN = 5.0
+SAFETY_MARGIN = 2.0
 default_motor_params = {{}}
 for jname in sorted(joint_ids.keys()):
     peak = max_torques.get(jname, 0.0)
     rms_val = rms_torques.get(jname, 0.0)
     max_v = max_vels.get(jname, 0.0)
-    output_needed = max(peak * SAFETY_MARGIN, 1.0)
-    assumed_eff = 0.90
-    typical_motor_stall = 0.3
-    calc_gear = output_needed / (typical_motor_stall * assumed_eff)
-    assumed_gear = max(30, min(300, round(calc_gear / 10) * 10))
-    motor_stall = output_needed / (assumed_gear * assumed_eff)
-    motor_rated = max(rms_val * SAFETY_MARGIN, output_needed * 0.6) / (assumed_gear * assumed_eff)
+    output_torque_needed = max(peak * SAFETY_MARGIN, 0.5)
     output_speed_needed = max(max_v * SAFETY_MARGIN, 2.0)
+    assumed_eff = 0.90
+
+    # Balance gear ratio: satisfy BOTH torque AND speed simultaneously
+    # Higher gear → more torque but less speed
+    # Choose a motor class, then find gear that satisfies both
+    typical_motor_stall = 0.3  # Nm (motor side)
+    typical_motor_rpm = 6000   # RPM (motor side, no load)
+
+    # Gear from torque requirement
+    gear_from_torque = output_torque_needed / (typical_motor_stall * assumed_eff)
+    # Gear from speed requirement (motor_rpm / gear >= output_speed)
+    gear_from_speed = (typical_motor_rpm * 2.0 * np.pi / 60.0) / output_speed_needed
+
+    # Use the MINIMUM of both to satisfy both constraints
+    # If torque demands high gear but speed demands low gear → pick lower gear + bigger motor
+    if gear_from_torque > gear_from_speed:
+        # Speed is the bottleneck, limit gear ratio and increase motor size
+        assumed_gear = max(10, min(300, round(gear_from_speed / 5) * 5))
+        motor_stall = output_torque_needed / (assumed_gear * assumed_eff)
+    else:
+        assumed_gear = max(10, min(300, round(gear_from_torque / 5) * 5))
+        motor_stall = output_torque_needed / (assumed_gear * assumed_eff)
+
+    motor_rated = max(rms_val * SAFETY_MARGIN, output_torque_needed * 0.5) / (assumed_gear * assumed_eff)
     motor_rpm = max(output_speed_needed * assumed_gear * 60.0 / (2.0 * np.pi), 3000)
-    friction = round(output_needed * 0.01, 4)
+    friction = round(output_torque_needed * 0.005, 4)
     default_motor_params[jname] = {{
         'stall_torque_nm': round(motor_stall, 4), 'rated_torque_nm': round(motor_rated, 4),
         'rated_speed_rpm': round(motor_rpm, 1), 'gear_ratio': assumed_gear,
         'gear_efficiency': assumed_eff, 'rotor_inertia_kgcm2': 0.005,
         'friction_torque_nm': friction,
     }}
-    print(f"  {{jname:<30s}} | {{peak:>10.3f}} | {{rms_val:>10.3f}} | {{max_v:>12.3f}}  (gear={{assumed_gear:.0f}}:1)")
+    out_stall = motor_stall * assumed_gear * assumed_eff
+    out_speed = motor_rpm / assumed_gear * 2.0 * np.pi / 60.0
+    print(f"  {{jname:<30s}} | {{peak:>10.3f}} | {{rms_val:>10.3f}} | {{max_v:>12.3f}}  (gear={{assumed_gear:.0f}}:1, out={{out_stall:.1f}}Nm, {{out_speed:.1f}}r/s)")
 
 all_stall = [p['stall_torque_nm'] for p in default_motor_params.values()]
 all_rated_t = [p['rated_torque_nm'] for p in default_motor_params.values()]
