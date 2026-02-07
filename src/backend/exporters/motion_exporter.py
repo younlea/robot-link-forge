@@ -3229,40 +3229,47 @@ print("="*70)
 print(f"  {{'Joint':<30s}} | {{'Peak(Nm)':>10s}} | {{'RMS(Nm)':>10s}} | {{'MaxVel(r/s)':>12s}}")
 print("  " + "-"*70)
 
-SAFETY_MARGIN = 2.0
+SAFETY_MARGIN = 1.5
 default_motor_params = {{}}
 for jname in sorted(joint_ids.keys()):
     peak = max_torques.get(jname, 0.0)
     rms_val = rms_torques.get(jname, 0.0)
     max_v = max_vels.get(jname, 0.0)
-    output_torque_needed = max(peak * SAFETY_MARGIN, 0.5)
-    output_speed_needed = max(max_v * SAFETY_MARGIN, 2.0)
     assumed_eff = 0.90
 
-    # Balance gear ratio: satisfy BOTH torque AND speed simultaneously
-    # Higher gear → more torque but less speed
-    # Choose a motor class, then find gear that satisfies both
+    # ── Determine output requirements ──
+    output_torque_needed = max(peak * SAFETY_MARGIN, 0.5)
+    # PID correction needs headroom: even "static" joints need speed for error recovery
+    # Minimum 5 rad/s output speed ensures PID can always correct
+    pid_speed_headroom = 5.0  # rad/s at output
+    output_speed_needed = max(max_v * SAFETY_MARGIN, pid_speed_headroom)
+
+    # ── Pick motor + gear combo ──
+    # Motor spec: choose from a reasonable motor (stall 0.3Nm, 6000RPM)
     typical_motor_stall = 0.3  # Nm (motor side)
     typical_motor_rpm = 6000   # RPM (motor side, no load)
+    motor_max_speed_rads = typical_motor_rpm * 2.0 * np.pi / 60.0  # ~628 rad/s
 
-    # Gear from torque requirement
-    gear_from_torque = output_torque_needed / (typical_motor_stall * assumed_eff)
-    # Gear from speed requirement (motor_rpm / gear >= output_speed)
-    gear_from_speed = (typical_motor_rpm * 2.0 * np.pi / 60.0) / output_speed_needed
+    # Max gear ratio limited by speed requirement
+    max_gear_from_speed = motor_max_speed_rads / output_speed_needed
+    # Min gear ratio needed for torque
+    min_gear_from_torque = output_torque_needed / (typical_motor_stall * assumed_eff)
 
-    # Use the MINIMUM of both to satisfy both constraints
-    # If torque demands high gear but speed demands low gear → pick lower gear + bigger motor
-    if gear_from_torque > gear_from_speed:
-        # Speed is the bottleneck, limit gear ratio and increase motor size
-        assumed_gear = max(10, min(300, round(gear_from_speed / 5) * 5))
+    if min_gear_from_torque <= max_gear_from_speed:
+        # Can satisfy both with one motor — pick gear for torque (speed is fine)
+        assumed_gear = max(5, min(300, round(min_gear_from_torque / 5) * 5))
+        if assumed_gear < 5: assumed_gear = 5
         motor_stall = output_torque_needed / (assumed_gear * assumed_eff)
     else:
-        assumed_gear = max(10, min(300, round(gear_from_torque / 5) * 5))
+        # Speed is bottleneck — cap gear at speed limit, use bigger motor
+        assumed_gear = max(5, min(300, round(max_gear_from_speed / 5) * 5))
+        if assumed_gear < 5: assumed_gear = 5
         motor_stall = output_torque_needed / (assumed_gear * assumed_eff)
 
-    motor_rated = max(rms_val * SAFETY_MARGIN, output_torque_needed * 0.5) / (assumed_gear * assumed_eff)
+    # Ensure motor RPM covers the required output speed through the gear
     motor_rpm = max(output_speed_needed * assumed_gear * 60.0 / (2.0 * np.pi), 3000)
-    friction = round(output_torque_needed * 0.005, 4)
+    motor_rated = max(rms_val * SAFETY_MARGIN, output_torque_needed * 0.4) / (assumed_gear * assumed_eff)
+    friction = round(output_torque_needed * 0.003, 4)
     default_motor_params[jname] = {{
         'stall_torque_nm': round(motor_stall, 4), 'rated_torque_nm': round(motor_rated, 4),
         'rated_speed_rpm': round(motor_rpm, 1), 'gear_ratio': assumed_gear,
@@ -3362,16 +3369,29 @@ for jname in joint_ids.keys():
     )
 print(f"Created {{len(engines)}} motor physics engines")
 
+# Print per-joint specs for verification
+print("\\n  Per-joint motor specs:")
+for jname in sorted(engines.keys()):
+    eng = engines[jname]
+    out_rpm = eng._output_speed_rads * 60.0 / (2.0 * np.pi)
+    print(f"    {{jname:<30s}}: stall={{eng.stall_torque_nm:.4f}}Nm × gear={{eng.gear_ratio:.0f}} → out={{eng._output_stall:.1f}}Nm, {{eng._output_speed_rads:.1f}}r/s")
+
 motor_params_file = "motor_parameters_v3.json"
 if os.path.exists(motor_params_file):
     try:
         with open(motor_params_file, 'r') as f:
             loaded = json.load(f)
         if 'per_joint' in loaded:
-            for jname, params in loaded['per_joint'].items():
-                if jname in engines:
-                    engines[jname].update_from_datasheet(**{{k: v for k, v in params.items() if hasattr(engines[jname], k)}})
-        print(f"Loaded parameters from {{motor_params_file}}")
+            # Only load if user explicitly saved (check for matching joint count)
+            loaded_joints = set(loaded['per_joint'].keys())
+            engine_joints = set(engines.keys())
+            if loaded_joints == engine_joints:
+                for jname, params in loaded['per_joint'].items():
+                    if jname in engines:
+                        engines[jname].update_from_datasheet(**{{k: v for k, v in params.items() if hasattr(engines[jname], k)}})
+                print(f"Loaded saved parameters from {{motor_params_file}}")
+            else:
+                print(f"Skipping {{motor_params_file}} (joint mismatch, using fresh defaults)")
     except Exception as e:
         print(f"Warning: Could not load {{motor_params_file}}: {{e}}")
 
