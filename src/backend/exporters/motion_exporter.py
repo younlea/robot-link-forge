@@ -2958,27 +2958,16 @@ csv_file.close()
 def generate_mujoco_motor_validation_script(model_filename: str) -> str:
     """Generates Mode 3: Advanced Motor Sizing Validation Script.
     
-    Phase 1: Inverse dynamics → find required torques → set defaults that WORK
-    Phase 2: Forward sim with motor physics pipeline + real datasheet UI
-    
-    v3 fixes:
-    1. Smarter default estimation: per-joint gear ratio from torque/speed, higher PID+FF gain
-    2. Fixed 2ms interval data collection with sliding window plots
-    3. Per-joint Torque/RPM (T-N) curve with RPM x-axis
-    4. Comprehensive pass/fail analysis report on exit
+    v4: Play/Pause/Seek + 4-plot layout (motor margin bar chart restored)
     """
     return f"""#!/usr/bin/env python3
 \"\"\"
-Mode 3: Advanced Motor Sizing Validation (v3)
+Mode 3: Advanced Motor Sizing Validation (v4)
 ==============================================
-Phase 1: Inverse dynamics → find required torques (auto-detect defaults)
-Phase 2: Forward simulation with full motor physics pipeline:
-         PID+FF → T-N Curve Limit → Efficiency → Friction → MuJoCo
+Phase 1: Inverse dynamics → auto-detect defaults
+Phase 2: Forward sim with motor physics pipeline
 
-v3 improvements:
-  - Per-joint gear ratio estimation from inverse dynamics
-  - Fixed 2ms data interval + sliding window plots
-  - Torque/RPM (T-N) curve per joint
+v4: Play/Pause/Seek controls + Motor Margin bar chart restored
 \"\"\"
 import time
 import json
@@ -3011,15 +3000,11 @@ except ImportError:
     HAS_MATPLOTLIB = False
 
 EPSILON = 1e-6
-PLOT_DT = 0.002  # 2ms 고정 간격으로 데이터 수집
-PLOT_WINDOW_SEC = 6.0  # 슬라이딩 윈도우 크기 (초)
-PLOT_MAX_POINTS = int(PLOT_WINDOW_SEC / PLOT_DT)  # 윈도우 내 최대 포인트 수 (3000)
+PLOT_DT = 0.002
+PLOT_WINDOW_SEC = 6.0
+PLOT_MAX_POINTS = int(PLOT_WINDOW_SEC / PLOT_DT)
 
-# ═══════════════════════════════════════════════════════════════
-# Ring Buffer for fixed-interval plotting
-# ═══════════════════════════════════════════════════════════════
 class RingBuffer:
-    \"\"\"고정 크기 링 버퍼 — 슬라이딩 윈도우 플롯용\"\"\"
     def __init__(self, maxlen):
         self.maxlen = maxlen
         self.data = collections.deque(maxlen=maxlen)
@@ -3035,81 +3020,57 @@ class RingBuffer:
         return len(self.data) > 0
 
 # ═══════════════════════════════════════════════════════════════
-# Motor Physics Pipeline (inline embedded)
+# Motor Physics Pipeline
 # ═══════════════════════════════════════════════════════════════
-
 def smooth_sign(velocity, epsilon=EPSILON):
-    arg = np.clip(velocity / epsilon, -20.0, 20.0)
-    return float(np.tanh(arg))
+    return float(np.tanh(np.clip(velocity / epsilon, -20.0, 20.0)))
 
 def compute_friction_torque(velocity, friction_torque_nm):
-    \"\"\"마찰 토크: 쿨롱(일정) + 점성(속도비례)\"\"\"
     sign_v = smooth_sign(velocity)
     coulomb = friction_torque_nm * 0.7 * sign_v
     viscous_coeff = friction_torque_nm * 0.3 / max(1.0, abs(velocity) + 0.1)
-    viscous = viscous_coeff * velocity
-    return coulomb + viscous
+    return coulomb + viscous_coeff * velocity
 
 def compute_output_torque_limit(velocity_rads, stall_torque, rated_speed_rads):
-    \"\"\"T-N 커브 (출력축 기준): 속도에 따른 가용 토크\"\"\"
     no_load_speed = rated_speed_rads * 1.2
     abs_v = abs(velocity_rads)
-    if abs_v >= no_load_speed:
-        return 0.0
+    if abs_v >= no_load_speed: return 0.0
     return max(stall_torque * (1.0 - abs_v / no_load_speed), 0.0)
 
 def apply_torque_limit(tau_cmd, velocity, stall_torque, rated_speed_rads):
-    \"\"\"스톨 토크 클램핑 + T-N 커브 속도 제한\"\"\"
     tau = float(np.clip(tau_cmd, -stall_torque, stall_torque))
     t_avail = compute_output_torque_limit(velocity, stall_torque, rated_speed_rads)
     return float(np.clip(tau, -t_avail, t_avail))
 
 def apply_efficiency(tau_limited, velocity, gear_efficiency, epsilon=EPSILON):
-    \"\"\"방향성 효율 (구동: ×η, 피구동: ÷η)\"\"\"
     power = tau_limited * velocity
-    eta_drive = gear_efficiency
-    eta_driven = 1.0 / max(gear_efficiency, EPSILON)
     threshold = max(abs(tau_limited) * 0.01, epsilon)
     blend = float(np.tanh(np.clip(power / threshold, -20.0, 20.0)))
     alpha = (blend + 1.0) / 2.0
-    eff = alpha * eta_drive + (1.0 - alpha) * eta_driven
+    eff = alpha * gear_efficiency + (1.0 - alpha) * (1.0 / max(gear_efficiency, EPSILON))
     return tau_limited * eff
-
 
 class PIDController:
     def __init__(self, kp=100.0, ki=0.0, kd=10.0, i_max=100.0, d_filter=0.05):
         self.kp, self.ki, self.kd = kp, ki, kd
         self.i_max, self.d_filter = i_max, d_filter
-        self._integral = 0.0
-        self._prev_error = 0.0
-        self._filtered_deriv = 0.0
-        self._init = False
-
+        self._integral = 0.0; self._prev_error = 0.0
+        self._filtered_deriv = 0.0; self._init = False
     def reset(self):
-        self._integral = 0.0
-        self._prev_error = 0.0
-        self._filtered_deriv = 0.0
-        self._init = False
-
+        self._integral = 0.0; self._prev_error = 0.0
+        self._filtered_deriv = 0.0; self._init = False
     def compute(self, q_ref, q_act, dt, ff_torque=0.0):
-        dt_safe = max(dt, EPSILON)
-        error = q_ref - q_act
+        dt_safe = max(dt, EPSILON); error = q_ref - q_act
         p = self.kp * error
         self._integral = float(np.clip(self._integral + error * dt_safe, -self.i_max, self.i_max))
         i = self.ki * self._integral
-        if not self._init:
-            raw_d = 0.0
-            self._init = True
-        else:
-            raw_d = (error - self._prev_error) / dt_safe
+        if not self._init: raw_d = 0.0; self._init = True
+        else: raw_d = (error - self._prev_error) / dt_safe
         self._filtered_deriv = self.d_filter * raw_d + (1.0 - self.d_filter) * self._filtered_deriv
-        d = self.kd * self._filtered_deriv
         self._prev_error = error
-        return p + i + d + ff_torque
-
+        return p + i + self.kd * self._filtered_deriv + ff_torque
 
 class MotorPhysicsEngine:
-    \"\"\"모터 물리 파이프라인 (데이터시트 파라미터 기반)\"\"\"
     def __init__(self, stall_torque_nm, rated_torque_nm, rated_speed_rpm, gear_ratio,
                  gear_efficiency=0.85, rotor_inertia_kgcm2=0.01, friction_torque_nm=0.1,
                  kp=100.0, ki=0.0, kd=10.0):
@@ -3121,67 +3082,50 @@ class MotorPhysicsEngine:
         self.rotor_inertia_kgcm2 = rotor_inertia_kgcm2
         self.friction_torque_nm = friction_torque_nm
         self.pid = PIDController(kp=kp, ki=ki, kd=kd)
-        self._recalc()
-        self.log = []
-        self.per_step = {{}}
-
+        self._recalc(); self.log = []; self.per_step = {{}}
     def _recalc(self):
         self._output_stall = self.stall_torque_nm * self.gear_ratio * self.gear_efficiency
         self._output_rated = self.rated_torque_nm * self.gear_ratio * self.gear_efficiency
         self._output_speed_rads = (self.rated_speed_rpm / self.gear_ratio) * (2.0 * np.pi / 60.0)
         self._reflected_inertia = (self.rotor_inertia_kgcm2 / 10000.0) * (self.gear_ratio ** 2)
-
     def reset(self):
-        self.pid.reset()
-        self.log.clear()
-        self.per_step = {{}}
-
+        self.pid.reset(); self.log.clear(); self.per_step = {{}}
     def update_from_datasheet(self, **kwargs):
         for k, v in kwargs.items():
-            if hasattr(self, k):
-                setattr(self, k, v)
+            if hasattr(self, k): setattr(self, k, v)
         self._recalc()
-
     def update_pid(self, kp=None, ki=None, kd=None):
         if kp is not None: self.pid.kp = kp
         if ki is not None: self.pid.ki = ki
         if kd is not None: self.pid.kd = kd
-
     def compute(self, t, q_ref, q_act, v_act, dt, ff_torque=0.0):
         tau_cmd = self.pid.compute(q_ref, q_act, dt, ff_torque)
-        tau_limited = apply_torque_limit(tau_cmd, v_act,
-                                         self._output_stall, self._output_speed_rads)
+        tau_limited = apply_torque_limit(tau_cmd, v_act, self._output_stall, self._output_speed_rads)
         tau_eff = apply_efficiency(tau_limited, v_act, self.gear_efficiency)
         tau_friction = compute_friction_torque(v_act, self.friction_torque_nm)
         tau_final = tau_eff - tau_friction
         t_avail = compute_output_torque_limit(v_act, self._output_stall, self._output_speed_rads)
         torque_margin = (t_avail - abs(tau_limited)) / max(t_avail, EPSILON) * 100.0 if t_avail > EPSILON else -100.0
         thermal_ratio = abs(tau_final) / max(self._output_rated, EPSILON) * 100.0
-
         state = {{
             'time': t, 'q_ref': q_ref, 'q_act': q_act, 'v_act': v_act,
             'tau_cmd': tau_cmd, 'tau_limited': tau_limited,
             'tau_eff': tau_eff, 'tau_friction': tau_friction, 'tau_final': tau_final,
-            'torque_margin': torque_margin, 'thermal_ratio': thermal_ratio,
-            't_avail': t_avail,
+            'torque_margin': torque_margin, 'thermal_ratio': thermal_ratio, 't_avail': t_avail,
         }}
-        self.log.append(state)
-        self.per_step = state
+        self.log.append(state); self.per_step = state
         return state
-
 
 # ═══════════════════════════════════════════════════════════════
 # Configuration
 # ═══════════════════════════════════════════════════════════════
 MODEL_XML = "{model_filename}"
 RECORDINGS_JSON = "recordings.json"
-
 if not os.path.exists(MODEL_XML):
-    print(f"Error: Model file {{MODEL_XML}} not found.")
-    exit(1)
+    print(f"Error: Model file {{MODEL_XML}} not found."); exit(1)
 
 # ═══════════════════════════════════════════════════════════════
-# PHASE 1: Inverse Dynamics — Required Torques
+# PHASE 1: Inverse Dynamics
 # ═══════════════════════════════════════════════════════════════
 print("="*70)
 print("  PHASE 1: Inverse Dynamics — Detecting Required Torques")
@@ -3192,9 +3136,7 @@ with open(MODEL_XML, 'r') as f:
 mjcf_no_act = re.sub(r'<actuator>.*?</actuator>', '', mjcf_content, flags=re.DOTALL)
 temp_dir = os.path.dirname(os.path.abspath(MODEL_XML))
 temp_mjcf = tempfile.NamedTemporaryFile(mode='w', suffix='.xml', delete=False, dir=temp_dir)
-temp_mjcf.write(mjcf_no_act)
-temp_mjcf_path = temp_mjcf.name
-temp_mjcf.close()
+temp_mjcf.write(mjcf_no_act); temp_mjcf_path = temp_mjcf.name; temp_mjcf.close()
 model_inv = mujoco.MjModel.from_xml_path(temp_mjcf_path)
 data_inv = mujoco.MjData(model_inv)
 
@@ -3235,11 +3177,9 @@ for kf in kf_joints:
     joints_in_recording.update(kf['joints'].keys())
 
 for jname, jid in joint_ids.items():
-    qadr = model_inv.jnt_qposadr[jid]
-    dof_adr = model_inv.jnt_dofadr[jid]
+    qadr = model_inv.jnt_qposadr[jid]; dof_adr = model_inv.jnt_dofadr[jid]
     if jname in joints_in_recording:
-        y_pts = []
-        prev_val = kf_joints[0]['joints'].get(jname, 0.0)
+        y_pts = []; prev_val = kf_joints[0]['joints'].get(jname, 0.0)
         for kf in kf_joints:
             val = kf['joints'].get(jname, prev_val); y_pts.append(val); prev_val = val
         if HAS_SCIPY and len(kf_times) >= 4:
@@ -3255,11 +3195,7 @@ for jname, jid in joint_ids.items():
     else:
         qpos_traj_inv[:, qadr] = model_inv.qpos0[qadr] if qadr < len(model_inv.qpos0) else 0.0
 
-# Inverse dynamics
-inv_torques = {{}}
-max_torques = {{}}
-rms_torques = {{}}
-max_vels = {{}}
+inv_torques = {{}}; max_torques = {{}}; rms_torques = {{}}; max_vels = {{}}
 data_inv.qpos[:] = qpos_traj_inv[0]; data_inv.qvel[:] = 0.0
 mujoco.mj_forward(model_inv, data_inv)
 
@@ -3270,12 +3206,9 @@ for step in range(n_steps):
     mujoco.mj_inverse(model_inv, data_inv)
     for jname, jid in joint_ids.items():
         dof_adr = model_inv.jnt_dofadr[jid]
-        torque = data_inv.qfrc_inverse[dof_adr]
-        if jname not in inv_torques:
-            inv_torques[jname] = []
-        inv_torques[jname].append(torque)
+        if jname not in inv_torques: inv_torques[jname] = []
+        inv_torques[jname].append(data_inv.qfrc_inverse[dof_adr])
 
-# Feedforward 토크 배열 생성 + 통계
 ff_torques = {{}}
 for jname in joint_ids.keys():
     arr = np.array(inv_torques.get(jname, [0.0]))
@@ -3284,66 +3217,37 @@ for jname in joint_ids.keys():
     rms_torques[jname] = float(np.sqrt(np.mean(arr**2)))
     max_vels[jname] = float(np.max(np.abs(qvel_traj_inv[:, model_inv.jnt_dofadr[joint_ids[jname]]])))
 
-# ═══════════════════════════════════════════════════════════════
-# 디폴트 모터 파라미터 결정 (역동역학 결과 기반)
-# ═══════════════════════════════════════════════════════════════
-# 핵심 전략:
-#   1. 역동역학으로 실제 필요 토크를 정확히 파악
-#   2. 해당 토크를 낼 수 있는 가상 모터 스펙을 역산
-#   3. 여유 있는 마진(5×)으로 기본값에서 확실히 동작하도록 보장
-#   4. FF(feedforward) 토크를 100% 사용 → PID는 보정 역할만
+# Default motor params
 print("\\n" + "="*70)
 print("  Phase 1 Results: Required Motor Specifications")
 print("="*70)
 print(f"  {{'Joint':<30s}} | {{'Peak(Nm)':>10s}} | {{'RMS(Nm)':>10s}} | {{'MaxVel(r/s)':>12s}}")
 print("  " + "-"*70)
 
-SAFETY_MARGIN = 5.0  # 매우 넉넉한 마진 → 기본값에서 반드시 동작
-
+SAFETY_MARGIN = 5.0
 default_motor_params = {{}}
 for jname in sorted(joint_ids.keys()):
     peak = max_torques.get(jname, 0.0)
     rms_val = rms_torques.get(jname, 0.0)
     max_v = max_vels.get(jname, 0.0)
-
-    # ── 스마트 감속비 추정 ──
-    # 전형적 서보 모터 축 스톨 토크 범위: 0.05 ~ 2.0 Nm
-    # 필요한 출력 토크에서 역산하여 적절한 감속비를 구함
-    output_needed = max(peak * SAFETY_MARGIN, 1.0)  # 최소 1.0 Nm 출력 보장
-    assumed_eff = 0.90  # 감속기 효율
-
-    # 목표: motor_stall(~0.3Nm) × gear × eff = output_needed
-    # → gear = output_needed / (motor_stall × eff)
-    typical_motor_stall = 0.3  # 전형적 소형 서보 스톨 토크
+    output_needed = max(peak * SAFETY_MARGIN, 1.0)
+    assumed_eff = 0.90
+    typical_motor_stall = 0.3
     calc_gear = output_needed / (typical_motor_stall * assumed_eff)
-    # 감속비를 합리적 범위로 클램프 (10 ~ 300)
-    assumed_gear = max(10, min(300, round(calc_gear / 10) * 10))  # 10단위 반올림
-    if assumed_gear < 30: assumed_gear = 30  # 최소 30:1
-
-    # 실제 모터 축 스펙 역산
+    assumed_gear = max(30, min(300, round(calc_gear / 10) * 10))
     motor_stall = output_needed / (assumed_gear * assumed_eff)
     motor_rated = max(rms_val * SAFETY_MARGIN, output_needed * 0.6) / (assumed_gear * assumed_eff)
-
-    # 모터 축 정격 속도 (RPM) = 출력축 속도 × 감속비 × 60/(2π) × 마진
-    output_speed_needed = max(max_v * SAFETY_MARGIN, 2.0)  # 최소 2.0 rad/s
-    motor_rpm = output_speed_needed * assumed_gear * 60.0 / (2.0 * np.pi)
-    motor_rpm = max(motor_rpm, 3000)  # 최소 3000 RPM
-
-    # 마찰은 필요 토크의 1%로 매우 작게 (기본값에서 움직임 방해 최소화)
+    output_speed_needed = max(max_v * SAFETY_MARGIN, 2.0)
+    motor_rpm = max(output_speed_needed * assumed_gear * 60.0 / (2.0 * np.pi), 3000)
     friction = round(output_needed * 0.01, 4)
-
     default_motor_params[jname] = {{
-        'stall_torque_nm': round(motor_stall, 4),
-        'rated_torque_nm': round(motor_rated, 4),
-        'rated_speed_rpm': round(motor_rpm, 1),
-        'gear_ratio': assumed_gear,
-        'gear_efficiency': assumed_eff,
-        'rotor_inertia_kgcm2': 0.005,
+        'stall_torque_nm': round(motor_stall, 4), 'rated_torque_nm': round(motor_rated, 4),
+        'rated_speed_rpm': round(motor_rpm, 1), 'gear_ratio': assumed_gear,
+        'gear_efficiency': assumed_eff, 'rotor_inertia_kgcm2': 0.005,
         'friction_torque_nm': friction,
     }}
     print(f"  {{jname:<30s}} | {{peak:>10.3f}} | {{rms_val:>10.3f}} | {{max_v:>12.3f}}  (gear={{assumed_gear:.0f}}:1)")
 
-# 글로벌 대표값
 all_stall = [p['stall_torque_nm'] for p in default_motor_params.values()]
 all_rated_t = [p['rated_torque_nm'] for p in default_motor_params.values()]
 all_rpm = [p['rated_speed_rpm'] for p in default_motor_params.values()]
@@ -3352,12 +3256,10 @@ g_stall = max(all_stall) if all_stall else 0.3
 g_rated = max(all_rated_t) if all_rated_t else 0.15
 g_rpm = max(all_rpm) if all_rpm else 5000
 g_gear = max(all_gear) if all_gear else 100
-print(f"\\n  Global motor defaults: stall={{g_stall:.4f}} Nm, rated={{g_rated:.4f}} Nm, speed={{g_rpm:.0f}} RPM, gear={{g_gear:.0f}}:1")
+print(f"\\n  Global defaults: stall={{g_stall:.4f}}Nm, rated={{g_rated:.4f}}Nm, speed={{g_rpm:.0f}}RPM, gear={{g_gear:.0f}}:1")
 
-try:
-    os.unlink(temp_mjcf_path)
-except:
-    pass
+try: os.unlink(temp_mjcf_path)
+except: pass
 
 # ═══════════════════════════════════════════════════════════════
 # PHASE 2: Forward Simulation
@@ -3367,14 +3269,12 @@ print("  PHASE 2: Forward Simulation — Motor Physics Pipeline")
 print("  FF(100%) + PID(correction) → T-N Curve → Efficiency → Friction → MuJoCo")
 print("="*70)
 
-model = model_orig
-data = data_orig
+model = model_orig; data = data_orig
 joint_ids = {{mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_JOINT, i): i for i in range(model.njnt)}}
 actuator_ids = {{}}
 for i in range(model.nu):
     name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, i)
-    if name and name.endswith("_act"):
-        actuator_ids[name[:-4]] = i
+    if name and name.endswith("_act"): actuator_ids[name[:-4]] = i
 
 dt = model.opt.timestep
 trajectory_times = np.arange(0, duration, dt)
@@ -3383,11 +3283,9 @@ qpos_traj = np.zeros((n_steps, model.nq))
 qvel_traj_fwd = np.zeros((n_steps, model.nv))
 
 for jname, jid in joint_ids.items():
-    qadr = model.jnt_qposadr[jid]
-    dof_adr = model.jnt_dofadr[jid]
+    qadr = model.jnt_qposadr[jid]; dof_adr = model.jnt_dofadr[jid]
     if jname in joints_in_recording:
-        y_pts = []
-        prev_val = kf_joints[0]['joints'].get(jname, 0.0)
+        y_pts = []; prev_val = kf_joints[0]['joints'].get(jname, 0.0)
         for kf in kf_joints:
             val = kf['joints'].get(jname, prev_val); y_pts.append(val); prev_val = val
         if HAS_SCIPY and len(kf_times) >= 4:
@@ -3403,7 +3301,6 @@ for jname, jid in joint_ids.items():
 
 initial_qpos = qpos_traj[0, :].copy()
 
-# 액추에이터를 토크 직접 제어 모드로
 for jname, aid in actuator_ids.items():
     model.actuator_gainprm[aid, 0] = 1.0
     model.actuator_biasprm[aid, :] = 0.0
@@ -3412,29 +3309,21 @@ for jname, aid in actuator_ids.items():
     model.actuator_forcerange[aid, :] = [-9999, 9999]
     model.actuator_ctrllimited[aid] = 0
 
-# Feedforward 토크 배열을 forward model 크기로 맞춤
 ff_torques_fwd = {{}}
 for jname in joint_ids.keys():
     if jname in ff_torques and jname in actuator_ids:
         arr = ff_torques[jname]
-        if len(arr) == n_steps:
-            ff_torques_fwd[jname] = arr
+        if len(arr) == n_steps: ff_torques_fwd[jname] = arr
         else:
             old_t = np.linspace(0, duration, len(arr))
             ff_torques_fwd[jname] = np.interp(trajectory_times, old_t, arr)
     else:
         ff_torques_fwd[jname] = np.zeros(n_steps)
 
-# 관절별 MotorPhysicsEngine 생성
-# PID는 보정 역할만 — FF가 대부분의 토크를 담당
-# Kp=500, Ki=50, Kd=50: 높은 게인으로 남은 에러 빠르게 수정
-DEFAULT_KP = 500.0
-DEFAULT_KI = 50.0
-DEFAULT_KD = 50.0
+DEFAULT_KP = 500.0; DEFAULT_KI = 50.0; DEFAULT_KD = 50.0
 engines = {{}}
 for jname in joint_ids.keys():
-    if jname not in actuator_ids:
-        continue
+    if jname not in actuator_ids: continue
     mp = default_motor_params.get(jname, {{}})
     engines[jname] = MotorPhysicsEngine(
         stall_torque_nm=mp.get('stall_torque_nm', g_stall),
@@ -3447,10 +3336,7 @@ for jname in joint_ids.keys():
         kp=DEFAULT_KP, ki=DEFAULT_KI, kd=DEFAULT_KD,
     )
 print(f"Created {{len(engines)}} motor physics engines")
-print(f"  PID defaults: Kp={{DEFAULT_KP}}, Ki={{DEFAULT_KI}}, Kd={{DEFAULT_KD}}")
-print(f"  FF torque: 100% of inverse dynamics (PID corrects residual only)")
 
-# 저장된 파라미터 로드
 motor_params_file = "motor_parameters_v3.json"
 if os.path.exists(motor_params_file):
     try:
@@ -3465,53 +3351,90 @@ if os.path.exists(motor_params_file):
         print(f"Warning: Could not load {{motor_params_file}}: {{e}}")
 
 # ═══════════════════════════════════════════════════════════════
-# Interactive UI
+# Playback State
 # ═══════════════════════════════════════════════════════════════
-elapsed = 0.0
+sim_time = 0.0          # 시뮬레이션 시간 (0 ~ duration)
+is_playing = True       # True=재생 중, False=일시정지
+seek_requested = False  # 타임라인 슬라이더 조작 중
 
-# 관절별 실시간 히스토리 — RingBuffer 사용 (고정 2ms 간격)
 joint_history = {{}}
 for jname in engines:
     joint_history[jname] = {{
-        'time': RingBuffer(PLOT_MAX_POINTS),
-        'q_ref': RingBuffer(PLOT_MAX_POINTS),
-        'q_act': RingBuffer(PLOT_MAX_POINTS),
-        'error': RingBuffer(PLOT_MAX_POINTS),
-        'tau_cmd': RingBuffer(PLOT_MAX_POINTS),
-        'tau_limited': RingBuffer(PLOT_MAX_POINTS),
-        'tau_final': RingBuffer(PLOT_MAX_POINTS),
-        'tau_friction': RingBuffer(PLOT_MAX_POINTS),
-        'v_act': RingBuffer(PLOT_MAX_POINTS),
-        't_avail': RingBuffer(PLOT_MAX_POINTS),
-        'v_act_rpm': RingBuffer(PLOT_MAX_POINTS),  # RPM으로 변환된 속도 (T-N 커브용)
+        'time': RingBuffer(PLOT_MAX_POINTS), 'q_ref': RingBuffer(PLOT_MAX_POINTS),
+        'q_act': RingBuffer(PLOT_MAX_POINTS), 'error': RingBuffer(PLOT_MAX_POINTS),
+        'tau_cmd': RingBuffer(PLOT_MAX_POINTS), 'tau_limited': RingBuffer(PLOT_MAX_POINTS),
+        'tau_final': RingBuffer(PLOT_MAX_POINTS), 'tau_friction': RingBuffer(PLOT_MAX_POINTS),
+        'v_act': RingBuffer(PLOT_MAX_POINTS), 't_avail': RingBuffer(PLOT_MAX_POINTS),
+        'v_act_rpm': RingBuffer(PLOT_MAX_POINTS),
     }}
 
+def seek_to_time(target_t):
+    \"\"\"시뮬레이션을 특정 시간으로 이동 (처음부터 다시 시뮬)\"\"\"
+    global sim_time
+    target_t = max(0, min(target_t, duration))
+    # 처음부터 target_t까지 빠르게 시뮬
+    data.qpos[:] = initial_qpos; data.qvel[:] = 0; data.ctrl[:] = 0
+    mujoco.mj_forward(model, data)
+    for eng in engines.values(): eng.pid.reset()
+    for jh in joint_history.values():
+        for v in jh.values(): v.clear()
+
+    target_step = min(int(target_t / dt), n_steps - 1)
+    for si in range(target_step + 1):
+        t_now = si * dt
+        for jname in sorted(engines.keys()):
+            jid = joint_ids[jname]; aid = actuator_ids[jname]
+            qadr = model.jnt_qposadr[jid]; dof_adr = model.jnt_dofadr[jid]
+            q_ref = qpos_traj[si, qadr]; q_act = data.qpos[qadr]; v_act = data.qvel[dof_adr]
+            ff = ff_torques_fwd[jname][si] if jname in ff_torques_fwd else 0.0
+            state = engines[jname].compute(t_now, q_ref, q_act, v_act, dt, ff_torque=ff)
+            data.ctrl[aid] = state['tau_final']
+        mujoco.mj_step(model, data)
+
+    # 히스토리 채우기 (seek 지점 주변 데이터)
+    start_fill = max(0, target_step - PLOT_MAX_POINTS)
+    for si in range(start_fill, target_step + 1):
+        t_now = si * dt
+        for jname in engines:
+            eng = engines[jname]
+            if si < len(eng.log):
+                s = eng.log[si]
+            else:
+                continue
+            h = joint_history[jname]
+            h['time'].append(s['time']); h['q_ref'].append(s['q_ref'])
+            h['q_act'].append(s['q_act']); h['error'].append(abs(s['q_ref'] - s['q_act']))
+            h['tau_cmd'].append(s['tau_cmd']); h['tau_limited'].append(s['tau_limited'])
+            h['tau_final'].append(s['tau_final']); h['tau_friction'].append(abs(s['tau_friction']))
+            h['v_act'].append(s['v_act']); h['t_avail'].append(s.get('t_avail', 0))
+            h['v_act_rpm'].append(abs(s['v_act']) * eng.gear_ratio * 60.0 / (2.0 * np.pi))
+
+    sim_time = target_t
+
+# ═══════════════════════════════════════════════════════════════
+# Interactive UI
+# ═══════════════════════════════════════════════════════════════
 if HAS_MATPLOTLIB:
     plt.ion()
-    fig = plt.figure(figsize=(22, 12))
-    fig.suptitle('Mode 3: Motor Sizing Validation (v3)', fontsize=13, fontweight='bold')
-    try:
-        fig.canvas.manager.window.attributes('-topmost', False)
-    except:
-        pass
+    fig = plt.figure(figsize=(24, 14))
+    fig.suptitle('Mode 3: Motor Sizing Validation (v4)', fontsize=13, fontweight='bold')
+    try: fig.canvas.manager.window.attributes('-topmost', False)
+    except: pass
 
-    # Layout: 왼쪽 = 슬라이더+조인트 선택, 오른쪽 = 3 plots
-    gs = fig.add_gridspec(3, 2, height_ratios=[1, 1, 1], width_ratios=[1, 1.6],
-                          hspace=0.35, wspace=0.3, left=0.07, right=0.97, top=0.92, bottom=0.05)
+    # Layout: 왼쪽 = 컨트롤, 오른쪽 = 4 plots (tracking, torque, T-N curve, margin bar)
+    gs = fig.add_gridspec(4, 2, height_ratios=[1, 1, 1, 0.7], width_ratios=[1, 1.6],
+                          hspace=0.40, wspace=0.3, left=0.07, right=0.97, top=0.93, bottom=0.08)
 
     ax_tracking = fig.add_subplot(gs[0, 1])
     ax_torque = fig.add_subplot(gs[1, 1])
     ax_tn = fig.add_subplot(gs[2, 1])
+    ax_margin = fig.add_subplot(gs[3, 1])
 
-    for ax_dummy_gs in [gs[0, 0], gs[1, 0], gs[2, 0]]:
-        ax_d = fig.add_subplot(ax_dummy_gs)
-        ax_d.axis('off')
+    for row in range(4):
+        ax_d = fig.add_subplot(gs[row, 0]); ax_d.axis('off')
 
-    # State
-    selected_joint = None
-    current_mode = 'global'
-    joint_page = 0
-    joints_per_page = 8
+    selected_joint = None; current_mode = 'global'
+    joint_page = 0; joints_per_page = 8
 
     joint_list_full = ['[GLOBAL]'] + sorted([j for j in joint_ids.keys() if j in actuator_ids])
     total_pages = max(1, (len(joint_list_full) + joints_per_page - 1) // joints_per_page)
@@ -3519,7 +3442,7 @@ if HAS_MATPLOTLIB:
         s = joint_page * joints_per_page
         return joint_list_full[s:s+joints_per_page]
 
-    # === 모터 데이터시트 슬라이더 ===
+    # === 모터 슬라이더 ===
     slider_specs = [
         ('stall_torque_nm', 'Stall Torque (Nm)', 0.001, max(g_stall*10, 1.0), g_stall),
         ('rated_torque_nm', 'Rated Torque (Nm)', 0.001, max(g_rated*10, 0.5), g_rated),
@@ -3531,39 +3454,51 @@ if HAS_MATPLOTLIB:
         ('kp', 'PID Kp', 10, 2000, DEFAULT_KP),
         ('kd', 'PID Kd', 1, 200, DEFAULT_KD),
     ]
-
     sliders = {{}}
-    y_pos = 0.88
+    y_pos = 0.90
     for key, label, vmin, vmax, vinit in slider_specs:
-        ax_s = plt.axes([0.09, y_pos, 0.28, 0.016])
-        if key == 'gear_efficiency':
-            sliders[key] = Slider(ax_s, label, vmin, vmax, valinit=vinit, valstep=1)
-        elif key in ('gear_ratio', 'rated_speed_rpm'):
+        ax_s = plt.axes([0.09, y_pos, 0.28, 0.014])
+        if key in ('gear_efficiency', 'gear_ratio', 'rated_speed_rpm'):
             sliders[key] = Slider(ax_s, label, vmin, vmax, valinit=vinit, valstep=1)
         else:
             sliders[key] = Slider(ax_s, label, vmin, vmax, valinit=vinit,
                                   valstep=max((vmax-vmin)/500.0, 0.0001))
-        y_pos -= 0.04
+        y_pos -= 0.035
 
     # Info text
-    ax_info_box = plt.axes([0.09, y_pos - 0.01, 0.28, 0.025])
+    ax_info_box = plt.axes([0.09, y_pos - 0.005, 0.28, 0.02])
     ax_info_box.axis('off')
     info_text = ax_info_box.text(0.0, 0.5, "", fontsize=8, va='center',
                                   fontfamily='monospace', color='#333')
 
-    # Buttons
-    btn_y = y_pos - 0.04
-    ax_apply = plt.axes([0.09, btn_y, 0.065, 0.025])
+    # === Buttons row 1: Apply, Reset, Save ===
+    btn_y1 = y_pos - 0.035
+    ax_apply = plt.axes([0.09, btn_y1, 0.06, 0.022])
     btn_apply = Button(ax_apply, 'Apply')
-    ax_reset = plt.axes([0.16, btn_y, 0.065, 0.025])
+    ax_reset = plt.axes([0.155, btn_y1, 0.06, 0.022])
     btn_reset = Button(ax_reset, 'Reset')
-    ax_restart = plt.axes([0.23, btn_y, 0.065, 0.025])
-    btn_restart_btn = Button(ax_restart, 'Restart')
-    ax_save = plt.axes([0.30, btn_y, 0.065, 0.025])
+    ax_save = plt.axes([0.22, btn_y1, 0.06, 0.022])
     btn_save = Button(ax_save, 'Save')
 
+    # === Buttons row 2: Playback — ◀◀  ▶/⏸  ▶▶  Restart ===
+    btn_y2 = btn_y1 - 0.035
+    ax_stepb = plt.axes([0.09, btn_y2, 0.045, 0.022])
+    btn_step_back = Button(ax_stepb, '◀◀')
+    ax_playpause = plt.axes([0.14, btn_y2, 0.06, 0.022])
+    btn_playpause = Button(ax_playpause, '⏸ Pause')
+    ax_stepf = plt.axes([0.205, btn_y2, 0.045, 0.022])
+    btn_step_fwd = Button(ax_stepf, '▶▶')
+    ax_restart_btn = plt.axes([0.255, btn_y2, 0.06, 0.022])
+    btn_restart_btn = Button(ax_restart_btn, 'Restart')
+
+    # === Timeline Slider ===
+    timeline_y = btn_y2 - 0.035
+    ax_timeline = plt.axes([0.09, timeline_y, 0.28, 0.016])
+    timeline_slider = Slider(ax_timeline, 'Time(s)', 0, duration, valinit=0,
+                              valstep=max(dt, 0.01), color='lightblue')
+
     # Joint selector
-    radio_h = max(0.05, btn_y - 0.08)
+    radio_h = max(0.04, timeline_y - 0.09)
     ax_radio = plt.axes([0.09, 0.05, 0.29, radio_h])
     radio = RadioButtons(ax_radio, get_page_joints(), activecolor='blue')
     ax_prev = plt.axes([0.09, 0.02, 0.07, 0.02])
@@ -3576,14 +3511,10 @@ if HAS_MATPLOTLIB:
 
     def update_sliders_from_engine(eng):
         for key in sliders:
-            if key == 'gear_efficiency':
-                sliders[key].set_val(eng.gear_efficiency * 100.0)
-            elif hasattr(eng, key):
-                sliders[key].set_val(getattr(eng, key))
-            elif key == 'kp':
-                sliders[key].set_val(eng.pid.kp)
-            elif key == 'kd':
-                sliders[key].set_val(eng.pid.kd)
+            if key == 'gear_efficiency': sliders[key].set_val(eng.gear_efficiency * 100.0)
+            elif hasattr(eng, key): sliders[key].set_val(getattr(eng, key))
+            elif key == 'kp': sliders[key].set_val(eng.pid.kp)
+            elif key == 'kd': sliders[key].set_val(eng.pid.kd)
 
     def get_slider_values():
         vals = {{k: s.val for k, s in sliders.items()}}
@@ -3599,8 +3530,7 @@ if HAS_MATPLOTLIB:
     def on_apply(event):
         vals = get_slider_values()
         if current_mode == 'global':
-            for eng in engines.values():
-                apply_slider_to_engine(eng, vals)
+            for eng in engines.values(): apply_slider_to_engine(eng, vals)
             print("[APPLY] Updated ALL joints")
         elif selected_joint and selected_joint in engines:
             apply_slider_to_engine(engines[selected_joint], vals)
@@ -3613,18 +3543,6 @@ if HAS_MATPLOTLIB:
             engines[selected_joint].update_from_datasheet(**mp)
             engines[selected_joint].update_pid(kp=DEFAULT_KP, kd=DEFAULT_KD)
             update_sliders_from_engine(engines[selected_joint])
-            print(f"[RESET] {{selected_joint}} → Phase 1 defaults")
-
-    def on_restart(event):
-        global start_time
-        start_time = time.time()
-        data.qpos[:] = initial_qpos; data.qvel[:] = 0; data.ctrl[:] = 0
-        mujoco.mj_forward(model, data)
-        for eng in engines.values():
-            eng.reset()
-        for jh in joint_history.values():
-            for v in jh.values(): v.clear()
-        print("[RESTART] t=0")
 
     def on_save(event):
         save_data = {{'per_joint': {{}}}}
@@ -3633,12 +3551,59 @@ if HAS_MATPLOTLIB:
                 'stall_torque_nm': eng.stall_torque_nm, 'rated_torque_nm': eng.rated_torque_nm,
                 'rated_speed_rpm': eng.rated_speed_rpm, 'gear_ratio': eng.gear_ratio,
                 'gear_efficiency': eng.gear_efficiency, 'rotor_inertia_kgcm2': eng.rotor_inertia_kgcm2,
-                'friction_torque_nm': eng.friction_torque_nm,
-                'kp': eng.pid.kp, 'kd': eng.pid.kd,
+                'friction_torque_nm': eng.friction_torque_nm, 'kp': eng.pid.kp, 'kd': eng.pid.kd,
             }}
-        with open(motor_params_file, 'w') as f:
-            json.dump(save_data, f, indent=2)
+        with open(motor_params_file, 'w') as f: json.dump(save_data, f, indent=2)
         print(f"[SAVE] → {{motor_params_file}}")
+
+    # ── Playback controls ──
+    def on_playpause(event):
+        global is_playing
+        is_playing = not is_playing
+        btn_playpause.label.set_text('⏸ Pause' if is_playing else '▶ Play')
+        if is_playing:
+            print(f"[PLAY] t={{sim_time:.2f}}s")
+        else:
+            print(f"[PAUSE] t={{sim_time:.2f}}s")
+        fig.canvas.draw_idle()
+
+    def on_step_fwd(event):
+        global is_playing, sim_time
+        is_playing = False
+        btn_playpause.label.set_text('▶ Play')
+        seek_to_time(sim_time + 0.1)  # +100ms
+        timeline_slider.set_val(sim_time)
+        update_info(); update_plots()
+        fig.canvas.draw_idle(); fig.canvas.flush_events()
+
+    def on_step_back(event):
+        global is_playing, sim_time
+        is_playing = False
+        btn_playpause.label.set_text('▶ Play')
+        seek_to_time(sim_time - 0.1)  # -100ms
+        timeline_slider.set_val(sim_time)
+        update_info(); update_plots()
+        fig.canvas.draw_idle(); fig.canvas.flush_events()
+
+    def on_restart(event):
+        global is_playing, sim_time
+        is_playing = True
+        btn_playpause.label.set_text('⏸ Pause')
+        seek_to_time(0.0)
+        timeline_slider.set_val(0)
+        update_info(); update_plots()
+        fig.canvas.draw_idle(); fig.canvas.flush_events()
+        print("[RESTART] t=0")
+
+    _timeline_dragging = [False]
+    def on_timeline_changed(val):
+        global sim_time
+        if not is_playing:
+            seek_to_time(val)
+            update_info(); update_plots()
+            try:
+                fig.canvas.draw_idle(); fig.canvas.flush_events()
+            except: pass
 
     def on_joint_select(label):
         global selected_joint, current_mode
@@ -3646,8 +3611,7 @@ if HAS_MATPLOTLIB:
             current_mode = 'global'; selected_joint = None
         else:
             current_mode = 'per_joint'; selected_joint = label
-            if label in engines:
-                update_sliders_from_engine(engines[label])
+            if label in engines: update_sliders_from_engine(engines[label])
         update_info()
 
     def update_radio():
@@ -3667,159 +3631,150 @@ if HAS_MATPLOTLIB:
 
     btn_apply.on_clicked(on_apply)
     btn_reset.on_clicked(on_reset)
-    btn_restart_btn.on_clicked(on_restart)
     btn_save.on_clicked(on_save)
+    btn_playpause.on_clicked(on_playpause)
+    btn_step_fwd.on_clicked(on_step_fwd)
+    btn_step_back.on_clicked(on_step_back)
+    btn_restart_btn.on_clicked(on_restart)
+    timeline_slider.on_changed(on_timeline_changed)
     radio.on_clicked(on_joint_select)
     btn_prev.on_clicked(on_prev)
     btn_next.on_clicked(on_next)
 
     def update_info():
+        play_icon = "▶" if is_playing else "⏸"
         if current_mode == 'global':
-            info_text.set_text(f"[GLOBAL] t={{elapsed:.1f}}/{{duration:.1f}}s | {{len(engines)}} motors")
+            info_text.set_text(f"{{play_icon}} [GLOBAL] t={{sim_time:.2f}}/{{duration:.1f}}s | {{len(engines)}} motors")
         elif selected_joint and selected_joint in engines:
             eng = engines[selected_joint]
-            out_stall = eng._output_stall
-            out_speed = eng._output_speed_rads
-            out_rpm = out_speed * 60.0 / (2.0 * np.pi)
+            out_rpm = eng._output_speed_rads * 60.0 / (2.0 * np.pi)
             info_text.set_text(
-                f"[{{selected_joint}}] Out: {{out_stall:.2f}}Nm stall, {{out_rpm:.0f}}RPM\\n"
-                f"  t={{elapsed:.1f}}/{{duration:.1f}}s"
+                f"{{play_icon}} [{{selected_joint}}] Out: {{eng._output_stall:.2f}}Nm, {{out_rpm:.0f}}RPM\\n"
+                f"  t={{sim_time:.2f}}/{{duration:.1f}}s"
             )
 
     def update_plots():
-        # ── 슬라이딩 윈도우 X축 범위 계산 ──
-        # 윈도우 시작/끝을 2ms 간격에 맞춤
-        win_end = max(elapsed, PLOT_WINDOW_SEC)
+        win_end = max(sim_time, PLOT_WINDOW_SEC)
         win_start = max(0, win_end - PLOT_WINDOW_SEC)
 
-        # ── Plot 1: Position(rad) — 고정 2ms 간격 슬라이딩 윈도우 ──
+        # ── Plot 1: Position ──
         ax_tracking.clear()
         if current_mode == 'per_joint' and selected_joint and selected_joint in joint_history:
             h = joint_history[selected_joint]
             t_arr = h['time'].to_array()
             if len(t_arr) > 0:
-                ref_arr = h['q_ref'].to_array()
-                act_arr = h['q_act'].to_array()
-                ax_tracking.plot(t_arr, ref_arr, 'g--', lw=1.5, label='Reference')
-                ax_tracking.plot(t_arr, act_arr, 'b-', lw=1.5, label='Actual')
+                ax_tracking.plot(t_arr, h['q_ref'].to_array(), 'g--', lw=1.5, label='Reference')
+                ax_tracking.plot(t_arr, h['q_act'].to_array(), 'b-', lw=1.5, label='Actual')
                 ax_tracking.set_ylabel('Position (rad)')
-                ax_tracking.set_title(f'Position Tracking: {{selected_joint}}  (2ms interval)')
+                ax_tracking.set_title(f'Position: {{selected_joint}}')
                 ax_tracking.legend(loc='upper right', fontsize=7)
-                ax_tracking.grid(True, alpha=0.3)
-                ax_tracking.set_xlim(win_start, win_end)
         else:
             for jname in sorted(joint_history.keys()):
-                h = joint_history[jname]
-                t_arr = h['time'].to_array()
-                err_arr = h['error'].to_array()
+                h = joint_history[jname]; t_arr = h['time'].to_array()
                 if len(t_arr) > 0:
-                    ax_tracking.plot(t_arr, err_arr, lw=1, alpha=0.7, label=jname[:15])
+                    ax_tracking.plot(t_arr, h['error'].to_array(), lw=1, alpha=0.7, label=jname[:15])
             ax_tracking.set_ylabel('|Error| (rad)')
-            ax_tracking.set_title('All Joints Tracking Error  (2ms interval)')
-            if len(engines) <= 10:
-                ax_tracking.legend(loc='upper right', fontsize=6)
-            ax_tracking.grid(True, alpha=0.3)
-            ax_tracking.set_xlim(win_start, win_end)
-        ax_tracking.set_xlabel('Time (s)')
+            ax_tracking.set_title('All Joints Tracking Error')
+            if len(engines) <= 10: ax_tracking.legend(loc='upper right', fontsize=6)
+        ax_tracking.set_xlim(win_start, win_end)
+        ax_tracking.axvline(x=sim_time, color='red', lw=0.8, ls='--', alpha=0.5)
+        ax_tracking.grid(True, alpha=0.3); ax_tracking.set_xlabel('Time (s)')
 
-        # ── Plot 2: Torque(Nm) — 고정 2ms 간격 슬라이딩 윈도우 ──
+        # ── Plot 2: Torque ──
         ax_torque.clear()
         if current_mode == 'per_joint' and selected_joint and selected_joint in joint_history:
-            h = joint_history[selected_joint]
-            eng = engines.get(selected_joint)
+            h = joint_history[selected_joint]; eng = engines.get(selected_joint)
             t_arr = h['time'].to_array()
             if len(t_arr) > 0:
-                ax_torque.plot(t_arr, h['tau_cmd'].to_array(), 'gray', lw=0.8, label='T_cmd (PID+FF)', alpha=0.6)
-                ax_torque.plot(t_arr, h['tau_limited'].to_array(), 'orange', lw=1.2, label='T_limited (T-N)')
-                ax_torque.plot(t_arr, h['tau_final'].to_array(), 'r-', lw=1.5, label='T_final (actual)')
+                ax_torque.plot(t_arr, h['tau_cmd'].to_array(), 'gray', lw=0.8, label='T_cmd', alpha=0.6)
+                ax_torque.plot(t_arr, h['tau_limited'].to_array(), 'orange', lw=1.2, label='T_limited')
+                ax_torque.plot(t_arr, h['tau_final'].to_array(), 'r-', lw=1.5, label='T_final')
                 ax_torque.fill_between(t_arr, 0, h['tau_friction'].to_array(), alpha=0.3, color='purple', label='Friction')
                 if eng:
                     ax_torque.axhline(y=eng._output_stall, color='red', ls=':', lw=1, label=f'Stall({{eng._output_stall:.1f}})')
                     ax_torque.axhline(y=-eng._output_stall, color='red', ls=':', lw=1)
                     ax_torque.axhline(y=eng._output_rated, color='green', ls=':', lw=1, label=f'Rated({{eng._output_rated:.1f}})')
                     ax_torque.axhline(y=-eng._output_rated, color='green', ls=':', lw=1)
-                ax_torque.set_title(f'Torque Pipeline: {{selected_joint}}  (2ms interval)')
+                ax_torque.set_title(f'Torque: {{selected_joint}}')
                 ax_torque.legend(loc='upper right', fontsize=6)
-                ax_torque.grid(True, alpha=0.3)
-                ax_torque.set_xlim(win_start, win_end)
         else:
             for jname in sorted(joint_history.keys()):
-                h = joint_history[jname]
-                t_arr = h['time'].to_array()
-                tf_arr = h['tau_final'].to_array()
+                h = joint_history[jname]; t_arr = h['time'].to_array()
                 if len(t_arr) > 0:
-                    ax_torque.plot(t_arr, tf_arr, lw=1, alpha=0.7, label=jname[:15])
-            ax_torque.set_title('All Joints: Actual Torque  (2ms interval)')
-            if len(engines) <= 10:
-                ax_torque.legend(loc='upper right', fontsize=6)
-            ax_torque.grid(True, alpha=0.3)
-            ax_torque.set_xlim(win_start, win_end)
-        ax_torque.set_ylabel('Torque (Nm)')
+                    ax_torque.plot(t_arr, h['tau_final'].to_array(), lw=1, alpha=0.7, label=jname[:15])
+            ax_torque.set_title('All Joints: Actual Torque')
+            if len(engines) <= 10: ax_torque.legend(loc='upper right', fontsize=6)
+        ax_torque.set_xlim(win_start, win_end)
+        ax_torque.axvline(x=sim_time, color='red', lw=0.8, ls='--', alpha=0.5)
+        ax_torque.set_ylabel('Torque (Nm)'); ax_torque.grid(True, alpha=0.3)
         ax_torque.set_xlabel('Time (s)')
 
-        # ── Plot 3: Torque vs RPM (T-N Curve) ──
+        # ── Plot 3: T-N Curve (Torque vs RPM) ──
         ax_tn.clear()
         if current_mode == 'per_joint' and selected_joint and selected_joint in engines:
-            eng = engines[selected_joint]
-            h = joint_history[selected_joint]
-
-            # T-N 경계선 (RPM 단위)
-            out_no_load_speed = eng._output_speed_rads * 1.2
-            out_no_load_rpm = out_no_load_speed * 60.0 / (2.0 * np.pi)
+            eng = engines[selected_joint]; h = joint_history[selected_joint]
+            out_no_load_rpm = eng._output_speed_rads * 1.2 * 60.0 / (2.0 * np.pi)
             rpm_range = np.linspace(0, out_no_load_rpm, 100)
             rads_range = rpm_range * 2.0 * np.pi / 60.0
             t_boundary = [compute_output_torque_limit(v, eng._output_stall, eng._output_speed_rads) for v in rads_range]
             ax_tn.plot(rpm_range, t_boundary, 'r--', lw=2, label='T-N Limit')
-            ax_tn.axhline(y=eng._output_rated, color='green', ls=':', lw=1.5,
-                          label=f'Rated({{eng._output_rated:.1f}}Nm)')
-
-            # 운전점 산점도 (RPM vs Torque)
-            rpm_arr = h['v_act_rpm'].to_array()
-            tf_arr = h['tau_final'].to_array()
+            ax_tn.axhline(y=eng._output_rated, color='green', ls=':', lw=1.5, label=f'Rated({{eng._output_rated:.1f}}Nm)')
+            rpm_arr = h['v_act_rpm'].to_array(); tf_arr = h['tau_final'].to_array()
             if len(rpm_arr) > 0 and len(tf_arr) > 0:
-                rpm_pts = np.abs(rpm_arr)
-                t_pts = np.abs(tf_arr)
+                rpm_pts = np.abs(rpm_arr); t_pts = np.abs(tf_arr)
                 rads_pts = rpm_pts * 2.0 * np.pi / 60.0
                 colors = ['red' if t > compute_output_torque_limit(v, eng._output_stall, eng._output_speed_rads)
                           else 'blue' for v, t in zip(rads_pts, t_pts)]
                 ax_tn.scatter(rpm_pts, t_pts, c=colors, s=5, alpha=0.5)
-            ax_tn.set_xlabel('Speed (RPM)')
-            ax_tn.set_ylabel('|Torque| (Nm)')
-            ax_tn.set_title(f'T-N Curve: {{selected_joint}}  (blue=OK, red=over limit)')
+            ax_tn.set_title(f'T-N Curve: {{selected_joint}}')
             ax_tn.legend(loc='upper right', fontsize=7)
-            ax_tn.grid(True, alpha=0.3)
         else:
-            # Global: 모든 관절 T-N 커브 오버레이
             plotted_any = False
             for jname in sorted(engines.keys()):
-                eng = engines[jname]
                 h = joint_history[jname]
-                rpm_arr = h['v_act_rpm'].to_array()
-                tf_arr = h['tau_final'].to_array()
+                rpm_arr = h['v_act_rpm'].to_array(); tf_arr = h['tau_final'].to_array()
                 if len(rpm_arr) > 0 and len(tf_arr) > 0:
                     ax_tn.scatter(np.abs(rpm_arr), np.abs(tf_arr), s=3, alpha=0.4, label=jname[:12])
                     plotted_any = True
             if plotted_any:
-                # 가장 큰 엔진 기준 T-N 경계선 표시
                 ref_eng = max(engines.values(), key=lambda e: e._output_stall)
-                out_no_load_speed = ref_eng._output_speed_rads * 1.2
-                out_no_load_rpm = out_no_load_speed * 60.0 / (2.0 * np.pi)
+                out_no_load_rpm = ref_eng._output_speed_rads * 1.2 * 60.0 / (2.0 * np.pi)
                 rpm_range = np.linspace(0, out_no_load_rpm, 100)
                 rads_range = rpm_range * 2.0 * np.pi / 60.0
                 t_boundary = [compute_output_torque_limit(v, ref_eng._output_stall, ref_eng._output_speed_rads)
                               for v in rads_range]
-                ax_tn.plot(rpm_range, t_boundary, 'r--', lw=2, alpha=0.5, label='T-N Limit (max)')
-            ax_tn.set_xlabel('Speed (RPM)')
-            ax_tn.set_ylabel('|Torque| (Nm)')
-            ax_tn.set_title('All Joints: Torque vs RPM (T-N Curve)')
-            if len(engines) <= 10:
-                ax_tn.legend(loc='upper right', fontsize=6)
-            ax_tn.grid(True, alpha=0.3)
+                ax_tn.plot(rpm_range, t_boundary, 'r--', lw=2, alpha=0.5, label='T-N Limit')
+            ax_tn.set_title('All Joints: T-N Curve')
+            if len(engines) <= 10: ax_tn.legend(loc='upper right', fontsize=6)
+        ax_tn.set_xlabel('Speed (RPM)'); ax_tn.set_ylabel('|Torque| (Nm)')
+        ax_tn.grid(True, alpha=0.3)
+
+        # ── Plot 4: Motor Margin Bar Chart (복원) ──
+        ax_margin.clear()
+        names = sorted(engines.keys())
+        if names:
+            margins = []; colors_bar = []
+            for jname in names:
+                eng = engines[jname]
+                m = eng.per_step.get('torque_margin', 100) if eng.per_step else 100
+                margins.append(m)
+                if m < 0: colors_bar.append('red')
+                elif m < 20: colors_bar.append('orange')
+                else: colors_bar.append('green')
+            short_names = [n[:12] for n in names]
+            ax_margin.barh(range(len(names)), margins, color=colors_bar, height=0.6)
+            ax_margin.set_yticks(range(len(names)))
+            ax_margin.set_yticklabels(short_names, fontsize=7)
+            ax_margin.axvline(x=0, color='red', lw=1)
+            ax_margin.axvline(x=20, color='orange', ls='--', lw=0.8)
+            ax_margin.set_xlabel('Torque Margin (%)')
+            ax_margin.set_title('Motor Margin (green=OK, orange=tight, red=OVER)')
+            ax_margin.grid(True, alpha=0.3, axis='x')
 
     on_joint_select('[GLOBAL]')
     plt.show(block=False); plt.pause(0.3)
     fig.canvas.draw(); fig.canvas.flush_events()
-    print("UI created")
+    print("UI created — ▶Play / ⏸Pause / ◀◀◀▶▶ Step / Timeline slider")
 
 # ═══════════════════════════════════════════════════════════════
 # Initialize + CSV
@@ -3841,99 +3796,103 @@ csv_w.writerow(csv_header)
 # ═══════════════════════════════════════════════════════════════
 # Main Loop
 # ═══════════════════════════════════════════════════════════════
-print("\\n  SIMULATION STARTED — Close MuJoCo viewer to stop & see report.")
+print("\\n  SIMULATION STARTED — ⏸Pause to inspect snapshots, ◀◀/▶▶ to step")
+print("  Close MuJoCo viewer to stop & see final report.")
 
 try:
     with mujoco.viewer.launch_passive(model, data) as viewer:
-        start_time = time.time()
+        last_wall = time.time()
         last_print = 0; last_plot = 0; last_csv = 0
-        last_data_collect = 0  # 2ms 간격 데이터 수집 타이머
+        last_data_collect = 0
         loop_count = 0
 
         while viewer.is_running():
             now = time.time()
-            elapsed = now - start_time
+            wall_dt = now - last_wall
+            last_wall = now
 
-            if elapsed > duration:
-                loop_count += 1
-                start_time = now; elapsed = 0.0
-                data.qpos[:] = initial_qpos; data.qvel[:] = 0; data.ctrl[:] = 0
+            # ── 재생 상태일 때만 시뮬레이션 진행 ──
+            if is_playing:
+                sim_time += wall_dt
+                if sim_time > duration:
+                    loop_count += 1
+                    sim_time = 0.0
+                    data.qpos[:] = initial_qpos; data.qvel[:] = 0; data.ctrl[:] = 0
+                    mujoco.mj_forward(model, data)
+                    for eng in engines.values(): eng.pid.reset()
+                    for jh in joint_history.values():
+                        for v in jh.values(): v.clear()
+
+                step_idx = min(int(sim_time / dt), n_steps - 1)
+                csv_row = [sim_time]
+
+                for jname in sorted(engines.keys()):
+                    jid = joint_ids[jname]; aid = actuator_ids[jname]
+                    qadr = model.jnt_qposadr[jid]; dof_adr = model.jnt_dofadr[jid]
+                    q_ref = qpos_traj[step_idx, qadr]
+                    q_act = data.qpos[qadr]; v_act = data.qvel[dof_adr]
+                    ff = ff_torques_fwd[jname][step_idx] if jname in ff_torques_fwd else 0.0
+                    eng = engines[jname]
+                    state = eng.compute(sim_time, q_ref, q_act, v_act, dt, ff_torque=ff)
+                    data.ctrl[aid] = state['tau_final']
+                    csv_row.extend([q_ref, q_act, v_act, state['tau_cmd'], state['tau_limited'],
+                                   state['tau_final'], state['tau_friction'],
+                                   state['torque_margin'], state['thermal_ratio']])
+
+                mujoco.mj_step(model, data)
+
+                # 2ms 데이터 수집
+                if now - last_data_collect >= PLOT_DT:
+                    for jname, eng in engines.items():
+                        s = eng.per_step
+                        if not s: continue
+                        h = joint_history[jname]
+                        h['time'].append(s['time']); h['q_ref'].append(s['q_ref'])
+                        h['q_act'].append(s['q_act']); h['error'].append(abs(s['q_ref'] - s['q_act']))
+                        h['tau_cmd'].append(s['tau_cmd']); h['tau_limited'].append(s['tau_limited'])
+                        h['tau_final'].append(s['tau_final']); h['tau_friction'].append(abs(s['tau_friction']))
+                        h['v_act'].append(s['v_act']); h['t_avail'].append(s.get('t_avail', 0))
+                        h['v_act_rpm'].append(abs(s['v_act']) * eng.gear_ratio * 60.0 / (2.0 * np.pi))
+                    last_data_collect = now
+
+                # CSV 10Hz
+                if now - last_csv >= 0.1:
+                    csv_w.writerow(csv_row); last_csv = now
+
+            # ── 일시정지 상태: MuJoCo 뷰어를 현재 시간 포즈로 유지 ──
+            else:
+                step_idx = min(int(sim_time / dt), n_steps - 1)
+                for jname in sorted(engines.keys()):
+                    jid = joint_ids[jname]; qadr = model.jnt_qposadr[jid]
+                    data.qpos[qadr] = qpos_traj[step_idx, qadr]
+                data.qvel[:] = 0
                 mujoco.mj_forward(model, data)
-                for eng in engines.values():
-                    eng.pid.reset()
-                for jh in joint_history.values():
-                    for v in jh.values(): v.clear()
 
-            step_idx = min(int(elapsed / dt), n_steps - 1)
-            csv_row = [elapsed]
-
-            for jname in sorted(engines.keys()):
-                jid = joint_ids[jname]
-                aid = actuator_ids[jname]
-                qadr = model.jnt_qposadr[jid]
-                dof_adr = model.jnt_dofadr[jid]
-                q_ref = qpos_traj[step_idx, qadr]
-                q_act = data.qpos[qadr]
-                v_act = data.qvel[dof_adr]
-
-                ff = ff_torques_fwd[jname][step_idx] if jname in ff_torques_fwd else 0.0
-                eng = engines[jname]
-                state = eng.compute(elapsed, q_ref, q_act, v_act, dt, ff_torque=ff)
-                data.ctrl[aid] = state['tau_final']
-
-                csv_row.extend([q_ref, q_act, v_act, state['tau_cmd'], state['tau_limited'],
-                               state['tau_final'], state['tau_friction'],
-                               state['torque_margin'], state['thermal_ratio']])
-
-            mujoco.mj_step(model, data)
             viewer.sync()
-
-            # ── 2ms 고정 간격 데이터 수집 (플롯용) ──
-            if now - last_data_collect >= PLOT_DT:
-                for jname, eng in engines.items():
-                    s = eng.per_step
-                    if not s: continue
-                    h = joint_history[jname]
-                    h['time'].append(s['time'])
-                    h['q_ref'].append(s['q_ref'])
-                    h['q_act'].append(s['q_act'])
-                    h['error'].append(abs(s['q_ref'] - s['q_act']))
-                    h['tau_cmd'].append(s['tau_cmd'])
-                    h['tau_limited'].append(s['tau_limited'])
-                    h['tau_final'].append(s['tau_final'])
-                    h['tau_friction'].append(abs(s['tau_friction']))
-                    h['v_act'].append(s['v_act'])
-                    h['t_avail'].append(s.get('t_avail', 0))
-                    # RPM 변환: 출력축 rad/s → 모터축 RPM = v_act × gear_ratio × 60/(2π)
-                    motor_rpm = abs(s['v_act']) * eng.gear_ratio * 60.0 / (2.0 * np.pi)
-                    h['v_act_rpm'].append(motor_rpm)
-                last_data_collect = now
-
-            # CSV 10Hz
-            if now - last_csv >= 0.1:
-                csv_w.writerow(csv_row); last_csv = now
 
             # Console 2Hz
             if now - last_print >= 0.5:
-                worst_margin = 100.0
-                worst_joint = ""
+                worst_margin = 100.0; worst_joint = ""
                 for jname, eng in engines.items():
                     if eng.per_step:
                         m = eng.per_step.get('torque_margin', 100)
-                        if m < worst_margin:
-                            worst_margin = m; worst_joint = jname
+                        if m < worst_margin: worst_margin = m; worst_joint = jname
                 status = "OK" if worst_margin > 0 else "OVER!"
-                print(f"[T={{elapsed:.2f}}s] Worst: {{worst_joint}} margin={{worst_margin:.0f}}% {{status}} | Loop#{{loop_count}}")
+                play_str = "▶" if is_playing else "⏸"
+                print(f"{{play_str}} [T={{sim_time:.2f}}s] Worst: {{worst_joint}} margin={{worst_margin:.0f}}% {{status}} | Loop#{{loop_count}}")
                 last_print = now
 
-            # Plots 5Hz (그리기만 — 데이터 수집은 위에서 2ms마다)
+            # Plots 5Hz
             if HAS_MATPLOTLIB and now - last_plot >= 0.2:
                 try:
-                    update_info()
-                    update_plots()
+                    # 재생 중일 때 타임라인 슬라이더 동기화
+                    if is_playing:
+                        timeline_slider.eventson = False
+                        timeline_slider.set_val(min(sim_time, duration))
+                        timeline_slider.eventson = True
+                    update_info(); update_plots()
                     fig.canvas.draw_idle(); fig.canvas.flush_events()
-                except:
-                    pass
+                except: pass
                 last_plot = now
 
         print("\\nSimulation ended")
@@ -3953,14 +3912,11 @@ print("█"*70)
 print("█  MOTOR SIZING VALIDATION — FINAL REPORT")
 print("█"*70)
 
-overall_pass = True
-report_lines = []
+overall_pass = True; report_lines = []
 
 for jname in sorted(engines.keys()):
     eng = engines[jname]
-    if not eng.log:
-        continue
-
+    if not eng.log: continue
     torques_abs = [abs(s['tau_final']) for s in eng.log]
     errors = [abs(s['q_ref'] - s['q_act']) for s in eng.log]
     margins = [s['torque_margin'] for s in eng.log]
@@ -3968,72 +3924,49 @@ for jname in sorted(engines.keys()):
     velocities = [abs(s['v_act']) for s in eng.log]
 
     rms_torque = np.sqrt(np.mean([t**2 for t in torques_abs]))
-    peak_torque = max(torques_abs)
-    max_error = max(errors)
-    min_margin = min(margins)
-    avg_thermal = np.mean(thermal_ratios)
+    peak_torque = max(torques_abs); max_error = max(errors)
+    min_margin = min(margins); avg_thermal = np.mean(thermal_ratios)
     max_vel = max(velocities)
-
     saturated_steps = sum(1 for m in margins if m < 5)
     saturation_pct = saturated_steps / len(margins) * 100
-
     checks = {{}}
 
-    if min_margin > 20:
-        checks['Torque Margin'] = ('PASS', f'min={{min_margin:.0f}}% (>20%)')
-    elif min_margin > 0:
-        checks['Torque Margin'] = ('WARN', f'min={{min_margin:.0f}}% (tight!)')
-    else:
-        checks['Torque Margin'] = ('FAIL', f'min={{min_margin:.0f}}% (SATURATED)')
+    if min_margin > 20: checks['Torque Margin'] = ('PASS', f'min={{min_margin:.0f}}% (>20%)')
+    elif min_margin > 0: checks['Torque Margin'] = ('WARN', f'min={{min_margin:.0f}}% (tight!)')
+    else: checks['Torque Margin'] = ('FAIL', f'min={{min_margin:.0f}}% (SATURATED)')
 
-    if avg_thermal < 80:
-        checks['Thermal Load'] = ('PASS', f'avg={{avg_thermal:.0f}}% of rated (<80%)')
-    elif avg_thermal < 100:
-        checks['Thermal Load'] = ('WARN', f'avg={{avg_thermal:.0f}}% of rated (near limit)')
-    else:
-        checks['Thermal Load'] = ('FAIL', f'avg={{avg_thermal:.0f}}% of rated (OVERLOAD)')
+    if avg_thermal < 80: checks['Thermal Load'] = ('PASS', f'avg={{avg_thermal:.0f}}% (<80%)')
+    elif avg_thermal < 100: checks['Thermal Load'] = ('WARN', f'avg={{avg_thermal:.0f}}% (near limit)')
+    else: checks['Thermal Load'] = ('FAIL', f'avg={{avg_thermal:.0f}}% (OVERLOAD)')
 
-    if max_error < 0.05:
-        checks['Tracking'] = ('PASS', f'max_err={{max_error:.4f}} rad ({{np.degrees(max_error):.2f}}°)')
-    elif max_error < 0.15:
-        checks['Tracking'] = ('WARN', f'max_err={{max_error:.4f}} rad ({{np.degrees(max_error):.2f}}°)')
-    else:
-        checks['Tracking'] = ('FAIL', f'max_err={{max_error:.4f}} rad ({{np.degrees(max_error):.2f}}°)')
+    if max_error < 0.05: checks['Tracking'] = ('PASS', f'max={{max_error:.4f}}rad ({{np.degrees(max_error):.2f}}°)')
+    elif max_error < 0.15: checks['Tracking'] = ('WARN', f'max={{max_error:.4f}}rad ({{np.degrees(max_error):.2f}}°)')
+    else: checks['Tracking'] = ('FAIL', f'max={{max_error:.4f}}rad ({{np.degrees(max_error):.2f}}°)')
 
     speed_margin = (eng._output_speed_rads - max_vel) / max(eng._output_speed_rads, EPSILON) * 100
-    if speed_margin > 20:
-        checks['Speed Margin'] = ('PASS', f'margin={{speed_margin:.0f}}% (max={{max_vel:.2f}} rad/s)')
-    elif speed_margin > 0:
-        checks['Speed Margin'] = ('WARN', f'margin={{speed_margin:.0f}}% (close to limit)')
-    else:
-        checks['Speed Margin'] = ('FAIL', f'margin={{speed_margin:.0f}}% (SPEED EXCEEDED)')
+    if speed_margin > 20: checks['Speed Margin'] = ('PASS', f'{{speed_margin:.0f}}%')
+    elif speed_margin > 0: checks['Speed Margin'] = ('WARN', f'{{speed_margin:.0f}}% (close)')
+    else: checks['Speed Margin'] = ('FAIL', f'{{speed_margin:.0f}}% (EXCEEDED)')
 
-    if saturation_pct < 5:
-        checks['Saturation'] = ('PASS', f'{{saturation_pct:.1f}}% of time (<5%)')
-    elif saturation_pct < 20:
-        checks['Saturation'] = ('WARN', f'{{saturation_pct:.1f}}% of time')
-    else:
-        checks['Saturation'] = ('FAIL', f'{{saturation_pct:.1f}}% of time (frequent!)')
+    if saturation_pct < 5: checks['Saturation'] = ('PASS', f'{{saturation_pct:.1f}}%')
+    elif saturation_pct < 20: checks['Saturation'] = ('WARN', f'{{saturation_pct:.1f}}%')
+    else: checks['Saturation'] = ('FAIL', f'{{saturation_pct:.1f}}% (frequent!)')
 
     statuses = [v[0] for v in checks.values()]
-    if 'FAIL' in statuses:
-        joint_verdict = '❌ FAIL'
-        overall_pass = False
-    elif 'WARN' in statuses:
-        joint_verdict = '⚠️  WARN'
-    else:
-        joint_verdict = '✅ PASS'
+    if 'FAIL' in statuses: joint_verdict = '❌ FAIL'; overall_pass = False
+    elif 'WARN' in statuses: joint_verdict = '⚠️  WARN'
+    else: joint_verdict = '✅ PASS'
 
     print(f"\\n{'─'*60}")
     print(f"  Motor: {{jname}}  {{joint_verdict}}")
     print(f"  Spec: stall={{eng.stall_torque_nm:.4f}}Nm × gear={{eng.gear_ratio:.0f}} × eff={{eng.gear_efficiency:.0%}}"
-          f" → output_stall={{eng._output_stall:.2f}}Nm")
+          f" → out={{eng._output_stall:.2f}}Nm")
     print(f"  Spec: {{eng.rated_speed_rpm:.0f}}RPM / gear={{eng.gear_ratio:.0f}}"
-          f" → output_speed={{eng._output_speed_rads:.2f}}rad/s")
+          f" → out={{eng._output_speed_rads:.2f}}rad/s")
     print(f"{'─'*60}")
-    for check_name, (status, detail) in checks.items():
-        icon = '✅' if status == 'PASS' else ('⚠️ ' if status == 'WARN' else '❌')
-        print(f"  {{icon}} {{check_name:<20s}}: {{detail}}")
+    for cn, (st, det) in checks.items():
+        icon = '✅' if st == 'PASS' else ('⚠️ ' if st == 'WARN' else '❌')
+        print(f"  {{icon}} {{cn:<20s}}: {{det}}")
 
     report_lines.append({{
         'joint': jname, 'verdict': joint_verdict,
@@ -4045,29 +3978,23 @@ for jname in sorted(engines.keys()):
 
 print(f"\\n{'━'*70}")
 if overall_pass:
-    print("  ✅ OVERALL: ALL MOTORS PASS — Selected motors can handle this motion.")
+    print("  ✅ OVERALL: ALL MOTORS PASS")
 else:
     fail_joints = [r['joint'] for r in report_lines if '❌' in r['verdict']]
     warn_joints = [r['joint'] for r in report_lines if '⚠️' in r['verdict']]
     print(f"  ❌ OVERALL: SOME MOTORS NEED ATTENTION")
-    if fail_joints:
-        print(f"     FAIL: {{', '.join(fail_joints)}}")
-    if warn_joints:
-        print(f"     WARN: {{', '.join(warn_joints)}}")
+    if fail_joints: print(f"     FAIL: {{', '.join(fail_joints)}}")
+    if warn_joints: print(f"     WARN: {{', '.join(warn_joints)}}")
     print("\\n  💡 Recommendations:")
     for r in report_lines:
         if '❌' in r['verdict']:
             j = r['joint']
-            for check_name, (status, detail) in r['checks'].items():
-                if status == 'FAIL':
-                    if 'Torque' in check_name or 'Saturation' in check_name:
-                        print(f"     {{j}}: Increase stall torque or gear ratio")
-                    elif 'Thermal' in check_name:
-                        print(f"     {{j}}: Increase rated torque (larger motor)")
-                    elif 'Speed' in check_name:
-                        print(f"     {{j}}: Increase motor speed or reduce gear ratio")
-                    elif 'Tracking' in check_name:
-                        print(f"     {{j}}: Increase PID gains or motor torque")
+            for cn, (st, det) in r['checks'].items():
+                if st == 'FAIL':
+                    if 'Torque' in cn or 'Saturation' in cn: print(f"     {{j}}: Increase stall torque or gear ratio")
+                    elif 'Thermal' in cn: print(f"     {{j}}: Increase rated torque (larger motor)")
+                    elif 'Speed' in cn: print(f"     {{j}}: Increase motor speed or reduce gear ratio")
+                    elif 'Tracking' in cn: print(f"     {{j}}: Increase PID gains or motor torque")
 print(f"{'━'*70}")
 
 report_file = "motor_validation_report.json"
