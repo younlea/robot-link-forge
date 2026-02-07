@@ -3099,7 +3099,12 @@ class MotorPhysicsEngine:
         if ki is not None: self.pid.ki = ki
         if kd is not None: self.pid.kd = kd
     def compute(self, t, q_ref, q_act, v_act, dt, ff_torque=0.0):
-        tau_cmd = self.pid.compute(q_ref, q_act, dt, ff_torque)
+        # Pre-compensate FF for efficiency & friction losses
+        # Without this, pipeline always delivers ~10% less than needed
+        ff_comp = ff_torque / max(self.gear_efficiency, EPSILON)
+        ff_friction_comp = compute_friction_torque(v_act, self.friction_torque_nm)
+        ff_compensated = ff_comp + ff_friction_comp
+        tau_cmd = self.pid.compute(q_ref, q_act, dt, ff_compensated)
         tau_limited = apply_torque_limit(tau_cmd, v_act, self._output_stall, self._output_speed_rads)
         tau_eff = apply_efficiency(tau_limited, v_act, self.gear_efficiency)
         tau_friction = compute_friction_torque(v_act, self.friction_torque_nm)
@@ -3320,7 +3325,7 @@ for jname in joint_ids.keys():
     else:
         ff_torques_fwd[jname] = np.zeros(n_steps)
 
-DEFAULT_KP = 500.0; DEFAULT_KI = 50.0; DEFAULT_KD = 50.0
+DEFAULT_KP = 1500.0; DEFAULT_KI = 50.0; DEFAULT_KD = 100.0
 engines = {{}}
 for jname in joint_ids.keys():
     if jname not in actuator_ids: continue
@@ -3461,8 +3466,8 @@ if HAS_MATPLOTLIB:
         ('gear_efficiency', 'Gear Efficiency (%)', 30, 100, 90),
         ('rotor_inertia_kgcm2', 'Rotor Inertia (kg·cm²)', 0.001, 1.0, 0.005),
         ('friction_torque_nm', 'Friction Torque (Nm)', 0.0, 2.0, 0.01),
-        ('kp', 'PID Kp', 10, 2000, DEFAULT_KP),
-        ('kd', 'PID Kd', 1, 200, DEFAULT_KD),
+        ('kp', 'PID Kp', 10, 5000, DEFAULT_KP),
+        ('kd', 'PID Kd', 1, 500, DEFAULT_KD),
     ]
     sliders = {{}}
     textboxes = {{}}
