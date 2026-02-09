@@ -1,4 +1,3 @@
-------------------------------
 <mujoco model="direct_hand_parm">
   <compiler angle="radian" meshdir="meshes" balanceinertia="true"/>
   <option timestep="0.001" iterations="100" solver="Newton" tolerance="1e-10" gravity="0 0 -9.81"/>
