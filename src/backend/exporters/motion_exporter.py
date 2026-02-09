@@ -3351,6 +3351,7 @@ for jname, aid in actuator_ids.items():
 # ── Enable collision for ALL geoms (finger-to-finger pinch detection) ──
 # By default MJCF only enables collision on leaf/tip geoms.
 # Enable collision on all body geoms so fingertip pinch contacts are detected.
+# Also set strong contact parameters per-geom to prevent pass-through.
 _collision_enabled = 0
 for gi in range(model.ngeom):
     body_id = model.geom_bodyid[gi]
@@ -3361,8 +3362,15 @@ for gi in range(model.ngeom):
             model.geom_contype[gi] = 1
             model.geom_conaffinity[gi] = 1
             _collision_enabled += 1
+        # Enforce strong contact parameters on all body geoms
+        model.geom_condim[gi] = 4  # normal + 2D tangential + torsional friction
+        model.geom_solref[gi] = [0.004, 1.0]  # stiff spring (4ms time const), damping ratio 1
+        model.geom_solimp[gi] = [0.95, 0.99, 0.001, 0.5, 2.0]  # hard impedance
+        model.geom_margin[gi] = 0.003  # 3mm margin for early detection
+        model.geom_friction[gi] = [1.0, 0.005, 0.0001]  # good tangential friction
 if _collision_enabled > 0:
     print(f"Enabled collision on {{_collision_enabled}} geoms for finger contact detection")
+    print(f"  → solref=[0.004, 1.0], condim=4, margin=3mm for strong contact enforcement")
 
 ff_torques_fwd = {{}}
 for jname in joint_ids.keys():
