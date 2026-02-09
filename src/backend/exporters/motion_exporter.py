@@ -3083,6 +3083,7 @@ class MotorPhysicsEngine:
         self.friction_torque_nm = friction_torque_nm
         self.pid = PIDController(kp=kp, ki=ki, kd=kd)
         self._recalc(); self.log = []; self.per_step = {{}}
+        self._log_max = 500000  # cap log to prevent OOM on long runs
     def _recalc(self):
         self._output_stall = self.stall_torque_nm * self.gear_ratio * self.gear_efficiency
         self._output_rated = self.rated_torque_nm * self.gear_ratio * self.gear_efficiency
@@ -3118,6 +3119,8 @@ class MotorPhysicsEngine:
             'tau_eff': tau_eff, 'tau_friction': tau_friction, 'tau_final': tau_final,
             'torque_margin': torque_margin, 'thermal_ratio': thermal_ratio, 't_avail': t_avail,
         }}
+        if len(self.log) >= self._log_max:
+            self.log = self.log[-self._log_max//2:]  # keep recent half
         self.log.append(state); self.per_step = state
         return state
 
@@ -3356,20 +3359,38 @@ for jname in joint_ids.keys():
     else:
         ff_torques_fwd[jname] = np.zeros(n_steps)
 
-DEFAULT_KP = 1500.0; DEFAULT_KI = 50.0; DEFAULT_KD = 100.0
+# ── Auto-scale PID gains per joint ──
+# PID output is in Nm at the joint. If output_stall is small (0.5Nm),
+# Kp=1500 means 0.001rad error → 1.5Nm cmd → instant saturation.
+# Scale PID so that ~10% of stall torque is produced at 1° (0.017rad) error.
+# Kp_base = 0.10 * output_stall / 0.017 ≈ 5.9 * output_stall
+# But clamp to reasonable range.
+BASE_KP_FACTOR = 6.0   # Kp = factor * output_stall_torque
+BASE_KI_FACTOR = 0.2   # Ki = factor * output_stall_torque  
+BASE_KD_FACTOR = 0.4   # Kd = factor * output_stall_torque
+
 engines = {{}}
 for jname in joint_ids.keys():
     if jname not in actuator_ids: continue
     mp = default_motor_params.get(jname, {{}})
+    # Compute output stall for PID scaling
+    _stall = mp.get('stall_torque_nm', g_stall)
+    _gear = mp.get('gear_ratio', g_gear)
+    _eff = mp.get('gear_efficiency', 0.90)
+    _out_stall = _stall * _gear * _eff
+    # Scale PID gains to output torque capacity
+    j_kp = max(BASE_KP_FACTOR * _out_stall, 5.0)    # min Kp=5
+    j_ki = max(BASE_KI_FACTOR * _out_stall, 0.1)
+    j_kd = max(BASE_KD_FACTOR * _out_stall, 0.5)
     engines[jname] = MotorPhysicsEngine(
-        stall_torque_nm=mp.get('stall_torque_nm', g_stall),
+        stall_torque_nm=_stall,
         rated_torque_nm=mp.get('rated_torque_nm', g_rated),
         rated_speed_rpm=mp.get('rated_speed_rpm', g_rpm),
-        gear_ratio=mp.get('gear_ratio', g_gear),
-        gear_efficiency=mp.get('gear_efficiency', 0.90),
+        gear_ratio=_gear,
+        gear_efficiency=_eff,
         rotor_inertia_kgcm2=mp.get('rotor_inertia_kgcm2', 0.005),
         friction_torque_nm=mp.get('friction_torque_nm', 0.01),
-        kp=DEFAULT_KP, ki=DEFAULT_KI, kd=DEFAULT_KD,
+        kp=j_kp, ki=j_ki, kd=j_kd,
     )
 print(f"Created {{len(engines)}} motor physics engines")
 
@@ -3379,7 +3400,7 @@ for jname in sorted(engines.keys()):
     eng = engines[jname]
     no_load = eng._output_speed_rads * 1.2  # T-N curve zero-torque speed
     max_v = max_vels.get(jname, 0.0)
-    print(f"    {{jname:<30s}}: stall={{eng.stall_torque_nm:.4f}}Nm × gear={{eng.gear_ratio:.0f}} → out={{eng._output_stall:.1f}}Nm, rated_speed={{eng._output_speed_rads:.1f}}r/s, no_load={{no_load:.1f}}r/s, traj_maxV={{max_v:.2f}}r/s")
+    print(f"    {{jname:<30s}}: stall={{eng.stall_torque_nm:.4f}}Nm × gear={{eng.gear_ratio:.0f}} → out={{eng._output_stall:.1f}}Nm, speed={{eng._output_speed_rads:.1f}}r/s, PID({{eng.pid.kp:.1f}}/{{eng.pid.ki:.1f}}/{{eng.pid.kd:.1f}}), traj_maxV={{max_v:.2f}}r/s")
 
 # Diagnostic tracking — will print summary at end
 _diag_max_speed = {{jname: 0.0 for jname in engines}}
@@ -3509,6 +3530,10 @@ if HAS_MATPLOTLIB:
         return joint_list_full[s:s+joints_per_page]
 
     # === 모터 슬라이더 ===
+    # Compute initial PID from first engine (for slider defaults)
+    _first_eng = list(engines.values())[0] if engines else None
+    _init_kp = _first_eng.pid.kp if _first_eng else 100.0
+    _init_kd = _first_eng.pid.kd if _first_eng else 10.0
     slider_specs = [
         ('stall_torque_nm', 'Stall Torque (Nm)', 0.001, max(g_stall*10, 1.0), g_stall),
         ('rated_torque_nm', 'Rated Torque (Nm)', 0.001, max(g_rated*10, 0.5), g_rated),
@@ -3517,8 +3542,8 @@ if HAS_MATPLOTLIB:
         ('gear_efficiency', 'Gear Efficiency (%)', 30, 100, 90),
         ('rotor_inertia_kgcm2', 'Rotor Inertia (kg·cm²)', 0.001, 1.0, 0.005),
         ('friction_torque_nm', 'Friction Torque (Nm)', 0.0, 2.0, 0.01),
-        ('kp', 'PID Kp', 10, 5000, DEFAULT_KP),
-        ('kd', 'PID Kd', 1, 500, DEFAULT_KD),
+        ('kp', 'PID Kp', 0.1, max(_init_kp*10, 500), _init_kp),
+        ('kd', 'PID Kd', 0.01, max(_init_kd*10, 50), _init_kd),
     ]
     sliders = {{}}
     textboxes = {{}}
@@ -3649,7 +3674,11 @@ if HAS_MATPLOTLIB:
         if current_mode == 'per_joint' and selected_joint and selected_joint in default_motor_params:
             mp = default_motor_params[selected_joint]
             engines[selected_joint].update_from_datasheet(**mp)
-            engines[selected_joint].update_pid(kp=DEFAULT_KP, kd=DEFAULT_KD)
+            # Recalculate per-joint PID from output stall
+            _rs = engines[selected_joint]._output_stall
+            _rkp = max(BASE_KP_FACTOR * _rs, 5.0)
+            _rkd = max(BASE_KD_FACTOR * _rs, 0.5)
+            engines[selected_joint].update_pid(kp=_rkp, kd=_rkd)
             update_sliders_from_engine(engines[selected_joint])
 
     def on_save(event):
