@@ -3348,29 +3348,58 @@ for jname, aid in actuator_ids.items():
     model.actuator_forcerange[aid, :] = [-9999, 9999]
     model.actuator_ctrllimited[aid] = 0
 
-# ── Enable collision for ALL geoms (finger-to-finger pinch detection) ──
-# By default MJCF only enables collision on leaf/tip geoms.
-# Enable collision on all body geoms so fingertip pinch contacts are detected.
-# Also set strong contact parameters per-geom to prevent pass-through.
+# ── Enable inter-finger collision using bitmask groups ──
+# Strategy: assign each finger chain a unique bit in contype.
+# Set conaffinity to ALL OTHER fingers' bits (not own).
+# Result: same-finger segments CANNOT collide, different fingers CAN.
+# This prevents self-collision within a kinematic chain while enabling pinch detection.
+
+_finger_keywords = {{
+    'thumb':  ['thumb'],
+    'index':  ['index'],
+    'middle': ['middle'],
+    'ring':   ['ring'],
+    'little': ['little', 'pinky'],
+}}
+# Bit assignment: thumb=1, index=2, middle=4, ring=8, little=16
+_finger_bits = {{'thumb': 1, 'index': 2, 'middle': 4, 'ring': 8, 'little': 16}}
+_all_finger_bits = 1 | 2 | 4 | 8 | 16  # = 31
+
+def _get_finger_group(body_name):
+    nm = body_name.lower()
+    for finger, keywords in _finger_keywords.items():
+        if any(kw in nm for kw in keywords):
+            return finger
+    return None
+
 _collision_enabled = 0
+_finger_geom_counts = {{k: 0 for k in _finger_bits}}
 for gi in range(model.ngeom):
     body_id = model.geom_bodyid[gi]
+    if body_id == 0: continue  # skip world body (floor etc.)
     body_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, body_id) or ''
-    # Enable collision on finger segment geoms (not world body geoms like floor)
-    if body_id > 0:  # skip world body
-        if model.geom_contype[gi] == 0:
-            model.geom_contype[gi] = 1
-            model.geom_conaffinity[gi] = 1
-            _collision_enabled += 1
-        # Enforce strong contact parameters on all body geoms
-        model.geom_condim[gi] = 4  # normal + 2D tangential + torsional friction
-        model.geom_solref[gi] = [0.004, 1.0]  # stiff spring (4ms time const), damping ratio 1
-        model.geom_solimp[gi] = [0.95, 0.99, 0.001, 0.5, 2.0]  # hard impedance
-        model.geom_margin[gi] = 0.003  # 3mm margin for early detection
-        model.geom_friction[gi] = [1.0, 0.005, 0.0001]  # good tangential friction
+    finger = _get_finger_group(body_name)
+    if finger is None: continue  # not a finger geom — leave as-is
+
+    my_bit = _finger_bits[finger]
+    other_bits = _all_finger_bits & ~my_bit  # all fingers except mine
+
+    model.geom_contype[gi] = my_bit
+    model.geom_conaffinity[gi] = other_bits
+    # Strong contact parameters for solid collision
+    model.geom_condim[gi] = 4
+    model.geom_solref[gi] = [0.005, 1.0]
+    model.geom_solimp[gi] = [0.95, 0.99, 0.001, 0.5, 2.0]
+    model.geom_margin[gi] = 0.003
+    model.geom_friction[gi] = [1.0, 0.005, 0.0001]
+    _collision_enabled += 1
+    _finger_geom_counts[finger] += 1
+
 if _collision_enabled > 0:
-    print(f"Enabled collision on {{_collision_enabled}} geoms for finger contact detection")
-    print(f"  → solref=[0.004, 1.0], condim=4, margin=3mm for strong contact enforcement")
+    print(f"Enabled inter-finger collision on {{_collision_enabled}} geoms (bitmask groups)")
+    for fn, cnt in _finger_geom_counts.items():
+        if cnt > 0: print(f"  {{fn}}: {{cnt}} geoms, contype={{_finger_bits[fn]}}, conaffinity={{_all_finger_bits & ~_finger_bits[fn]}})")
+    print(f"  → Same-finger: NO collision | Different-finger: YES collision")
 
 ff_torques_fwd = {{}}
 for jname in joint_ids.keys():
