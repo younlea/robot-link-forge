@@ -3348,6 +3348,22 @@ for jname, aid in actuator_ids.items():
     model.actuator_forcerange[aid, :] = [-9999, 9999]
     model.actuator_ctrllimited[aid] = 0
 
+# ── Enable collision for ALL geoms (finger-to-finger pinch detection) ──
+# By default MJCF only enables collision on leaf/tip geoms.
+# Enable collision on all body geoms so fingertip pinch contacts are detected.
+_collision_enabled = 0
+for gi in range(model.ngeom):
+    body_id = model.geom_bodyid[gi]
+    body_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, body_id) or ''
+    # Enable collision on finger segment geoms (not world body geoms like floor)
+    if body_id > 0:  # skip world body
+        if model.geom_contype[gi] == 0:
+            model.geom_contype[gi] = 1
+            model.geom_conaffinity[gi] = 1
+            _collision_enabled += 1
+if _collision_enabled > 0:
+    print(f"Enabled collision on {{_collision_enabled}} geoms for finger contact detection")
+
 ff_torques_fwd = {{}}
 for jname in joint_ids.keys():
     if jname in ff_torques and jname in actuator_ids:
@@ -3433,6 +3449,7 @@ if os.path.exists(motor_params_file):
 sim_time = 0.0          # 시뮬레이션 시간 (0 ~ duration)
 is_playing = True       # True=재생 중, False=일시정지
 playback_speed = 1.0    # 재생 속도 (x1 고정)
+_should_quit = False    # Quit 버튼으로 양쪽 종료
 
 joint_history = {{}}
 for jname in engines:
@@ -3444,6 +3461,10 @@ for jname in engines:
         'v_act': RingBuffer(PLOT_MAX_POINTS), 't_avail': RingBuffer(PLOT_MAX_POINTS),
         'v_act_rpm': RingBuffer(PLOT_MAX_POINTS),
     }}
+
+# Contact force tracking (finger-to-finger collisions)
+_contact_history = {{'time': [], 'body1': [], 'body2': [], 'force_n': []}}
+_contact_total = 0
 
 def seek_to_time(target_t):
     \"\"\"시뮬레이션을 특정 시간으로 이동 (처음부터 다시 시뮬)\"\"\"
@@ -3605,12 +3626,15 @@ if HAS_MATPLOTLIB:
     ax_save = plt.axes([0.22, btn_y1, 0.06, 0.022])
     btn_save = Button(ax_save, 'Save')
 
-    # === Buttons row 2: Playback — ▶/⏸  Restart ===
+    # === Buttons row 2: Playback — ▶/⏸  Restart  Quit ===
     btn_y2 = btn_y1 - 0.035
-    ax_playpause = plt.axes([0.09, btn_y2, 0.08, 0.022])
+    ax_playpause = plt.axes([0.09, btn_y2, 0.07, 0.022])
     btn_playpause = Button(ax_playpause, '⏸ Pause')
-    ax_restart_btn = plt.axes([0.175, btn_y2, 0.07, 0.022])
+    ax_restart_btn = plt.axes([0.165, btn_y2, 0.06, 0.022])
     btn_restart_btn = Button(ax_restart_btn, 'Restart')
+    ax_quit_btn = plt.axes([0.23, btn_y2, 0.06, 0.022])
+    btn_quit = Button(ax_quit_btn, '■ Quit')
+    btn_quit.label.set_color('red')
 
     # === Timeline Slider ===
     timeline_y = btn_y2 - 0.035
@@ -3714,6 +3738,11 @@ if HAS_MATPLOTLIB:
         fig.canvas.draw_idle(); fig.canvas.flush_events()
         print("[RESTART] t=0")
 
+    def on_quit(event):
+        global _should_quit
+        _should_quit = True
+        print("\\n[QUIT] Stopping simulation — generating report...")
+
     _timeline_dragging = [False]
     def on_timeline_changed(val):
         global sim_time
@@ -3775,6 +3804,7 @@ if HAS_MATPLOTLIB:
     btn_save.on_clicked(on_save)
     btn_playpause.on_clicked(on_playpause)
     btn_restart_btn.on_clicked(on_restart)
+    btn_quit.on_clicked(on_quit)
     timeline_slider.on_changed(on_timeline_changed)
     radio.on_clicked(on_joint_select)
     btn_prev.on_clicked(on_prev)
@@ -3860,13 +3890,14 @@ if HAS_MATPLOTLIB:
             t_boundary = [compute_output_torque_limit(v, eng._output_stall, eng._output_speed_rads) for v in rads_range]
             ax_tn.plot(rpm_range, t_boundary, 'r--', lw=2, label='T-N Limit')
             ax_tn.axhline(y=eng._output_rated, color='green', ls=':', lw=1.5, label=f'Rated({{eng._output_rated:.1f}}Nm)')
-            rpm_arr = h['v_act_rpm'].to_array(); tf_arr = h['tau_final'].to_array()
-            if len(rpm_arr) > 0 and len(tf_arr) > 0:
+            # Use tau_limited (pre-efficiency) to match T-N boundary (also pre-efficiency)
+            rpm_arr = h['v_act_rpm'].to_array(); tl_arr = h['tau_limited'].to_array()
+            if len(rpm_arr) > 0 and len(tl_arr) > 0:
                 # Downsample for performance (max 200 points)
                 step = max(1, len(rpm_arr) // 200)
-                rpm_pts = np.abs(rpm_arr[::step]); t_pts = np.abs(tf_arr[::step])
-                ax_tn.scatter(rpm_pts, t_pts, c='blue', s=5, alpha=0.5)
-            ax_tn.set_title(f'T-N Curve: {{selected_joint}}')
+                rpm_pts = np.abs(rpm_arr[::step]); t_pts = np.abs(tl_arr[::step])
+                ax_tn.scatter(rpm_pts, t_pts, c='blue', s=5, alpha=0.5, label='Operating (limited)')
+            ax_tn.set_title(f'T-N Curve: {{selected_joint}} (pre-efficiency)')
             ax_tn.legend(loc='upper right', fontsize=7)
         else:
             # Global mode: only show T-N boundary + latest operating point per joint
@@ -3878,15 +3909,15 @@ if HAS_MATPLOTLIB:
                 t_boundary = [compute_output_torque_limit(v, ref_eng._output_stall, ref_eng._output_speed_rads)
                               for v in rads_range]
                 ax_tn.plot(rpm_range, t_boundary, 'r--', lw=2, alpha=0.5, label='T-N Limit')
-            # Plot only latest point per joint (20 points max, very fast)
+            # Plot only latest point per joint — use tau_limited (pre-efficiency)
             for jname in sorted(engines.keys()):
                 eng = engines[jname]
                 if eng.per_step:
                     rpm_pt = abs(eng.per_step['v_act']) * eng.gear_ratio * 60.0 / (2.0 * np.pi)
-                    t_pt = abs(eng.per_step['tau_final'])
+                    t_pt = abs(eng.per_step['tau_limited'])  # pre-efficiency to match T-N boundary
                     jc = joint_colors.get(jname, '#333')
                     ax_tn.plot(rpm_pt, t_pt, 'o', ms=5, color=jc, alpha=0.8)
-            ax_tn.set_title('All Joints: T-N Operating Points')
+            ax_tn.set_title('All Joints: T-N Operating Points (pre-eff)')
             if len(engines) <= 10: ax_tn.legend(loc='upper right', fontsize=6)
         ax_tn.set_xlabel('Speed (RPM)'); ax_tn.set_ylabel('|Torque| (Nm)')
         ax_tn.grid(True, alpha=0.3)
@@ -4025,7 +4056,7 @@ try:
         _sim_start_wall = time.time()  # for real-time gap tracking
         _sim_accumulated = 0.0         # total sim time elapsed
 
-        while viewer.is_running():
+        while viewer.is_running() and not _should_quit:
             now = time.time()
             wall_dt = now - last_wall
             last_wall = now
@@ -4071,6 +4102,27 @@ try:
                         if abs(state['tau_cmd']) > abs(state['tau_limited']) + 0.01: _diag_tn_limited_count[jname] += 1
 
                     mujoco.mj_step(model, data)
+
+                # ── Contact force detection (finger-to-finger collisions) ──
+                if data.ncon > 0:
+                    for ci in range(data.ncon):
+                        contact = data.contact[ci]
+                        g1 = contact.geom1; g2 = contact.geom2
+                        b1 = model.geom_bodyid[g1]; b2 = model.geom_bodyid[g2]
+                        if b1 == b2: continue  # skip self-contact
+                        b1_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, b1) or f'body{{b1}}'
+                        b2_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, b2) or f'body{{b2}}'
+                        # Get contact force
+                        c_force = np.zeros(6)
+                        mujoco.mj_contactForce(model, data, ci, c_force)
+                        force_n = abs(c_force[0])  # normal force
+                        if force_n > 0.01:  # threshold
+                            _contact_total += 1
+                            if len(_contact_history['time']) < 50000:  # cap
+                                _contact_history['time'].append(sim_time)
+                                _contact_history['body1'].append(b1_name)
+                                _contact_history['body2'].append(b2_name)
+                                _contact_history['force_n'].append(force_n)
 
                 # Data collection — once per frame (not per sub-step)
                 csv_row = [sim_time]
@@ -4121,7 +4173,8 @@ try:
                 play_str = "▶" if is_playing else "⏸"
                 wall_elapsed = now - _sim_start_wall
                 rt_ratio = _sim_accumulated / max(wall_elapsed, 0.001)
-                print(f"{{play_str}} [T={{sim_time:.2f}}s] Worst: {{worst_joint}} margin={{worst_margin:.0f}}% {{status}} | Loop#{{loop_count}} | RT={{rt_ratio:.2f}}x")
+                contacts_now = data.ncon
+                print(f"{{play_str}} [simT={{sim_time:.2f}}s wallT={{wall_elapsed:.1f}}s] Worst: {{worst_joint}} margin={{worst_margin:.0f}}% {{status}} | Loop#{{loop_count}} | RT={{rt_ratio:.2f}}x | contacts={{contacts_now}}")
                 last_print = now
 
             # Plots 2Hz (reduced from 5Hz for performance)
@@ -4137,14 +4190,43 @@ try:
                 except: pass
                 last_plot = now
 
+        # Clean shutdown
+        if _should_quit:
+            try: viewer.close()
+            except: pass
         print("\\nSimulation ended")
+
+        # Close matplotlib
+        if HAS_MATPLOTLIB:
+            try: plt.close('all')
+            except: pass
+
 except Exception as e:
     import traceback
     print(f"ERROR: {{e}}"); traceback.print_exc()
-    import sys; sys.exit(1)
+    # Still try to clean up matplotlib
+    try: plt.close('all')
+    except: pass
 
 csv_f.close()
 print(f"CSV log: {{log_file}}")
+
+# ── Contact force summary ──
+if _contact_total > 0:
+    print(f"\\n  💥 Total contact events: {{_contact_total}}")
+    # Summarize unique contact pairs
+    pair_forces = {{}}
+    for i in range(len(_contact_history['time'])):
+        pair = tuple(sorted([_contact_history['body1'][i], _contact_history['body2'][i]]))
+        if pair not in pair_forces:
+            pair_forces[pair] = {{'count': 0, 'max_force': 0.0}}
+        pair_forces[pair]['count'] += 1
+        pair_forces[pair]['max_force'] = max(pair_forces[pair]['max_force'], _contact_history['force_n'][i])
+    print(f"  Contact pairs:")
+    for (b1, b2), info in sorted(pair_forces.items(), key=lambda x: -x[1]['max_force']):
+        print(f"    {{b1}} <-> {{b2}}: {{info['count']}} events, max_force={{info['max_force']:.3f}}N")
+else:
+    print("\\n  ✅ No finger collisions detected")
 
 # ═══════════════════════════════════════════════════════════════
 # FINAL ANALYSIS REPORT
