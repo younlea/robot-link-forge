@@ -3348,58 +3348,50 @@ for jname, aid in actuator_ids.items():
     model.actuator_forcerange[aid, :] = [-9999, 9999]
     model.actuator_ctrllimited[aid] = 0
 
-# ── Enable inter-finger collision using bitmask groups ──
-# Strategy: assign each finger chain a unique bit in contype.
-# Set conaffinity to ALL OTHER fingers' bits (not own).
-# Result: same-finger segments CANNOT collide, different fingers CAN.
-# This prevents self-collision within a kinematic chain while enabling pinch detection.
+# ── Enable inter-finger collision on FINGERTIP geoms only ──
+# CRITICAL: Only enable collision on tip/end/3rd/distal geoms.
+# Intermediate finger segments (1st-pitch, 2nd-pitch, roll) have mesh convex
+# hulls that overlap with adjacent fingers' bases, causing huge repulsive forces
+# and simulation divergence. Tips are small enough to avoid false overlaps.
+#
+# We keep the MJCF's existing contype=1/conaffinity=1 on tip geoms and just
+# enhance their contact parameters for solid collision response.
+# Non-tip geoms remain contype=0 (no collision).
 
-_finger_keywords = {{
-    'thumb':  ['thumb'],
-    'index':  ['index'],
-    'middle': ['middle'],
-    'ring':   ['ring'],
-    'little': ['little', 'pinky'],
-}}
-# Bit assignment: thumb=1, index=2, middle=4, ring=8, little=16
-_finger_bits = {{'thumb': 1, 'index': 2, 'middle': 4, 'ring': 8, 'little': 16}}
-_all_finger_bits = 1 | 2 | 4 | 8 | 16  # = 31
+_tip_keywords = ['tip', 'end', '3rd', 'distal']
 
-def _get_finger_group(body_name):
-    nm = body_name.lower()
-    for finger, keywords in _finger_keywords.items():
-        if any(kw in nm for kw in keywords):
-            return finger
-    return None
-
-_collision_enabled = 0
-_finger_geom_counts = {{k: 0 for k in _finger_bits}}
+_collision_configured = 0
+_collision_names = []
 for gi in range(model.ngeom):
     body_id = model.geom_bodyid[gi]
-    if body_id == 0: continue  # skip world body (floor etc.)
+    if body_id == 0: continue
     body_name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, body_id) or ''
-    finger = _get_finger_group(body_name)
-    if finger is None: continue  # not a finger geom — leave as-is
+    nm_low = body_name.lower()
 
-    my_bit = _finger_bits[finger]
-    other_bits = _all_finger_bits & ~my_bit  # all fingers except mine
+    # Only configure tip/end geoms
+    is_tip = any(kw in nm_low for kw in _tip_keywords)
+    if not is_tip:
+        # Ensure non-tip geoms have collision DISABLED (in case MJCF default set it)
+        model.geom_contype[gi] = 0
+        model.geom_conaffinity[gi] = 0
+        continue
 
-    model.geom_contype[gi] = my_bit
-    model.geom_conaffinity[gi] = other_bits
-    # Strong contact parameters for solid collision
-    model.geom_condim[gi] = 4
-    model.geom_solref[gi] = [0.005, 1.0]
-    model.geom_solimp[gi] = [0.95, 0.99, 0.001, 0.5, 2.0]
-    model.geom_margin[gi] = 0.003
+    # Tip geom: enable collision with all other tips
+    model.geom_contype[gi] = 1
+    model.geom_conaffinity[gi] = 1
+    # Moderate contact parameters — not too stiff to avoid instability
+    model.geom_condim[gi] = 3  # normal + 2D tangential friction
+    model.geom_solref[gi] = [0.01, 1.0]   # 10ms time const (moderate stiffness)
+    model.geom_solimp[gi] = [0.9, 0.95, 0.001, 0.5, 2.0]
+    model.geom_margin[gi] = 0.002
     model.geom_friction[gi] = [1.0, 0.005, 0.0001]
-    _collision_enabled += 1
-    _finger_geom_counts[finger] += 1
+    _collision_configured += 1
+    _collision_names.append(body_name)
 
-if _collision_enabled > 0:
-    print(f"Enabled inter-finger collision on {{_collision_enabled}} geoms (bitmask groups)")
-    for fn, cnt in _finger_geom_counts.items():
-        if cnt > 0: print(f"  {{fn}}: {{cnt}} geoms, contype={{_finger_bits[fn]}}, conaffinity={{_all_finger_bits & ~_finger_bits[fn]}})")
-    print(f"  → Same-finger: NO collision | Different-finger: YES collision")
+if _collision_configured > 0:
+    print(f"Configured collision on {{_collision_configured}} tip geoms: {{_collision_names}}")
+    print(f"  → solref=[0.01, 1.0], condim=3, margin=2mm")
+    print(f"  → Only tip-to-tip collisions enabled (non-tip geoms: contype=0)")
 
 ff_torques_fwd = {{}}
 for jname in joint_ids.keys():

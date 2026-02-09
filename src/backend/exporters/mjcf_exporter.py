@@ -85,13 +85,9 @@ def generate_mjcf_xml(
     # Size settings: ensure enough contact buffer for finger collisions
     xml.append('  <size nconmax="200" njmax="600"/>')
 
-    # Default geom contact parameters for strong collision response
-    # solref: stiff spring (low time constant) prevents deep penetration
-    # solimp: high impedance for hard contact
-    # condim=4: normal + tangential friction + torsional friction
-    xml.append('  <default>')
-    xml.append('    <geom condim="4" solref="0.005 1" solimp="0.95 0.99 0.001 0.5 2" friction="1.0 0.005 0.0001" margin="0.002"/>')
-    xml.append('  </default>')
+    # NOTE: No <default><geom solref=...> here.
+    # Strong contact params are set ONLY on tip geoms at runtime in Mode 3,
+    # to avoid affecting intermediate segments whose mesh convex hulls overlap.
 
     # CRITICAL: Contact settings to prevent adjacent link collisions
     # Adjacent links in kinematic chain should not collide with each other
