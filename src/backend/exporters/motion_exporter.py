@@ -3229,7 +3229,9 @@ print("="*70)
 print(f"  {{'Joint':<30s}} | {{'Peak(Nm)':>10s}} | {{'RMS(Nm)':>10s}} | {{'MaxVel(r/s)':>12s}}")
 print("  " + "-"*70)
 
-SAFETY_MARGIN = 1.5
+TORQUE_MARGIN = 1.5   # torque headroom multiplier
+SPEED_MARGIN = 3.0    # speed headroom multiplier (PID needs MUCH more speed than trajectory)
+MIN_OUTPUT_SPEED = 20.0  # rad/s — minimum output speed at joint for PID responsiveness
 default_motor_params = {{}}
 for jname in sorted(joint_ids.keys()):
     peak = max_torques.get(jname, 0.0)
@@ -3238,38 +3240,39 @@ for jname in sorted(joint_ids.keys()):
     assumed_eff = 0.90
 
     # ── Determine output requirements ──
-    output_torque_needed = max(peak * SAFETY_MARGIN, 0.5)
-    # PID correction needs headroom: even "static" joints need speed for error recovery
-    # Minimum 5 rad/s output speed ensures PID can always correct
-    pid_speed_headroom = 5.0  # rad/s at output
-    output_speed_needed = max(max_v * SAFETY_MARGIN, pid_speed_headroom)
+    output_torque_needed = max(peak * TORQUE_MARGIN, 0.5)
+    # PID correction needs MUCH more speed than trajectory max velocity:
+    # When error is large, PID drives high velocity to catch up.
+    # T-N curve outputs torque=0 when speed >= no_load_speed(= rated*1.2)
+    # So rated_speed must be well above any PID-driven velocity.
+    output_speed_needed = max(max_v * SPEED_MARGIN, MIN_OUTPUT_SPEED)
 
     # ── Pick motor + gear combo ──
-    # Motor spec: choose from a reasonable motor (stall 0.3Nm, 6000RPM)
     typical_motor_stall = 0.3  # Nm (motor side)
     typical_motor_rpm = 6000   # RPM (motor side, no load)
     motor_max_speed_rads = typical_motor_rpm * 2.0 * np.pi / 60.0  # ~628 rad/s
 
-    # Max gear ratio limited by speed requirement
+    # Max gear ratio limited by SPEED (most critical constraint)
     max_gear_from_speed = motor_max_speed_rads / output_speed_needed
     # Min gear ratio needed for torque
     min_gear_from_torque = output_torque_needed / (typical_motor_stall * assumed_eff)
 
+    # ALWAYS prefer lower gear ratio — speed is king for PID tracking
     if min_gear_from_torque <= max_gear_from_speed:
-        # Can satisfy both with one motor — pick gear for torque (speed is fine)
-        assumed_gear = max(5, min(300, round(min_gear_from_torque / 5) * 5))
-        if assumed_gear < 5: assumed_gear = 5
-        motor_stall = output_torque_needed / (assumed_gear * assumed_eff)
+        # Both achievable — pick midpoint leaning toward speed
+        mid_gear = (min_gear_from_torque + max_gear_from_speed) / 2.0
+        assumed_gear = max(5, min(200, round(mid_gear / 5) * 5))
     else:
-        # Speed is bottleneck — cap gear at speed limit, use bigger motor
-        assumed_gear = max(5, min(300, round(max_gear_from_speed / 5) * 5))
-        if assumed_gear < 5: assumed_gear = 5
-        motor_stall = output_torque_needed / (assumed_gear * assumed_eff)
+        # Speed-limited — cap gear at speed limit, use bigger motor
+        assumed_gear = max(5, min(200, round(max_gear_from_speed / 5) * 5))
+    motor_stall = output_torque_needed / (assumed_gear * assumed_eff)
 
     # Ensure motor RPM covers the required output speed through the gear
     motor_rpm = max(output_speed_needed * assumed_gear * 60.0 / (2.0 * np.pi), 3000)
-    motor_rated = max(rms_val * SAFETY_MARGIN, output_torque_needed * 0.4) / (assumed_gear * assumed_eff)
-    friction = round(output_torque_needed * 0.003, 4)
+    # Rated torque = max(RMS need, 60% of peak) — prevents thermal overload
+    motor_rated = max(rms_val * TORQUE_MARGIN, output_torque_needed * 0.6) / (assumed_gear * assumed_eff)
+    # Very low friction — it accumulates through the pipeline and hinders tracking
+    friction = round(output_torque_needed * 0.001, 5)
     default_motor_params[jname] = {{
         'stall_torque_nm': round(motor_stall, 4), 'rated_torque_nm': round(motor_rated, 4),
         'rated_speed_rpm': round(motor_rpm, 1), 'gear_ratio': assumed_gear,
@@ -3278,7 +3281,8 @@ for jname in sorted(joint_ids.keys()):
     }}
     out_stall = motor_stall * assumed_gear * assumed_eff
     out_speed = motor_rpm / assumed_gear * 2.0 * np.pi / 60.0
-    print(f"  {{jname:<30s}} | {{peak:>10.3f}} | {{rms_val:>10.3f}} | {{max_v:>12.3f}}  (gear={{assumed_gear:.0f}}:1, out={{out_stall:.1f}}Nm, {{out_speed:.1f}}r/s)")
+    speed_margin_pct = (out_speed - max_v) / max(out_speed, 0.01) * 100.0 if out_speed > 0.01 else 100.0
+    print(f"  {{jname:<30s}} | {{peak:>10.3f}} | {{rms_val:>10.3f}} | {{max_v:>12.3f}}  (gear={{assumed_gear:.0f}}:1, out={{out_stall:.1f}}Nm, {{out_speed:.1f}}r/s, speed_margin={{speed_margin_pct:.0f}}%)")
 
 all_stall = [p['stall_torque_nm'] for p in default_motor_params.values()]
 all_rated_t = [p['rated_torque_nm'] for p in default_motor_params.values()]
@@ -3373,8 +3377,15 @@ print(f"Created {{len(engines)}} motor physics engines")
 print("\\n  Per-joint motor specs:")
 for jname in sorted(engines.keys()):
     eng = engines[jname]
-    out_rpm = eng._output_speed_rads * 60.0 / (2.0 * np.pi)
-    print(f"    {{jname:<30s}}: stall={{eng.stall_torque_nm:.4f}}Nm × gear={{eng.gear_ratio:.0f}} → out={{eng._output_stall:.1f}}Nm, {{eng._output_speed_rads:.1f}}r/s")
+    no_load = eng._output_speed_rads * 1.2  # T-N curve zero-torque speed
+    max_v = max_vels.get(jname, 0.0)
+    print(f"    {{jname:<30s}}: stall={{eng.stall_torque_nm:.4f}}Nm × gear={{eng.gear_ratio:.0f}} → out={{eng._output_stall:.1f}}Nm, rated_speed={{eng._output_speed_rads:.1f}}r/s, no_load={{no_load:.1f}}r/s, traj_maxV={{max_v:.2f}}r/s")
+
+# Diagnostic tracking — will print summary at end
+_diag_max_speed = {{jname: 0.0 for jname in engines}}
+_diag_saturation_count = {{jname: 0 for jname in engines}}
+_diag_total_steps = {{jname: 0 for jname in engines}}
+_diag_tn_limited_count = {{jname: 0 for jname in engines}}
 
 motor_params_file = "motor_parameters_v3.json"
 if os.path.exists(motor_params_file):
@@ -4015,6 +4026,12 @@ try:
                     csv_row.extend([q_ref, q_act, v_act, state['tau_cmd'], state['tau_limited'],
                                    state['tau_final'], state['tau_friction'],
                                    state['torque_margin'], state['thermal_ratio']])
+                    # Diagnostic tracking
+                    _diag_total_steps[jname] += 1
+                    abs_v = abs(v_act)
+                    if abs_v > _diag_max_speed[jname]: _diag_max_speed[jname] = abs_v
+                    if abs(state['tau_limited']) >= eng._output_stall * 0.99: _diag_saturation_count[jname] += 1
+                    if abs(state['tau_cmd']) > abs(state['tau_limited']) + 0.01: _diag_tn_limited_count[jname] += 1
 
                 mujoco.mj_step(model, data)
 
@@ -4084,6 +4101,24 @@ print(f"CSV log: {{log_file}}")
 # ═══════════════════════════════════════════════════════════════
 # FINAL ANALYSIS REPORT
 # ═══════════════════════════════════════════════════════════════
+print("\\n")
+print("█"*70)
+print("█  DIAGNOSTIC SUMMARY — Actual vs Spec")
+print("█"*70)
+print(f"  {{'Joint':<30s}} | {{'TrajMaxV':>8s}} | {{'ActMaxV':>8s}} | {{'RatedSpd':>8s}} | {{'NoLoad':>8s}} | {{'SatPct':>6s}} | {{'TNlimit':>7s}}")
+print("  " + "─"*90)
+for jname in sorted(engines.keys()):
+    eng = engines[jname]
+    traj_v = max_vels.get(jname, 0.0)
+    act_v = _diag_max_speed.get(jname, 0.0)
+    rated = eng._output_speed_rads
+    no_load = rated * 1.2
+    total = _diag_total_steps.get(jname, 1)
+    sat_pct = _diag_saturation_count.get(jname, 0) / max(total, 1) * 100
+    tn_pct = _diag_tn_limited_count.get(jname, 0) / max(total, 1) * 100
+    flag = " ⚠️" if act_v > rated else ""
+    print(f"  {{jname:<30s}} | {{traj_v:>7.1f}} | {{act_v:>7.1f}} | {{rated:>7.1f}} | {{no_load:>7.1f}} | {{sat_pct:>5.1f}}% | {{tn_pct:>5.1f}}%{{flag}}")
+
 print("\\n")
 print("█"*70)
 print("█  MOTOR SIZING VALIDATION — FINAL REPORT")
