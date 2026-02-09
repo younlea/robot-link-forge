@@ -3000,9 +3000,9 @@ except ImportError:
     HAS_MATPLOTLIB = False
 
 EPSILON = 1e-6
-PLOT_DT = 0.002
+PLOT_DT = 0.02          # 50Hz data collection (was 2ms=500Hz, way too dense for plotting)
 PLOT_WINDOW_SEC = 6.0
-PLOT_MAX_POINTS = int(PLOT_WINDOW_SEC / PLOT_DT)
+PLOT_MAX_POINTS = int(PLOT_WINDOW_SEC / PLOT_DT)  # 300 points (was 3000)
 
 class RingBuffer:
     def __init__(self, maxlen):
@@ -3855,38 +3855,38 @@ if HAS_MATPLOTLIB:
         if current_mode == 'per_joint' and selected_joint and selected_joint in engines:
             eng = engines[selected_joint]; h = joint_history[selected_joint]
             out_no_load_rpm = eng._output_speed_rads * 1.2 * 60.0 / (2.0 * np.pi)
-            rpm_range = np.linspace(0, out_no_load_rpm, 100)
+            rpm_range = np.linspace(0, out_no_load_rpm, 50)
             rads_range = rpm_range * 2.0 * np.pi / 60.0
             t_boundary = [compute_output_torque_limit(v, eng._output_stall, eng._output_speed_rads) for v in rads_range]
             ax_tn.plot(rpm_range, t_boundary, 'r--', lw=2, label='T-N Limit')
             ax_tn.axhline(y=eng._output_rated, color='green', ls=':', lw=1.5, label=f'Rated({{eng._output_rated:.1f}}Nm)')
             rpm_arr = h['v_act_rpm'].to_array(); tf_arr = h['tau_final'].to_array()
             if len(rpm_arr) > 0 and len(tf_arr) > 0:
-                rpm_pts = np.abs(rpm_arr); t_pts = np.abs(tf_arr)
-                rads_pts = rpm_pts * 2.0 * np.pi / 60.0
-                colors = ['red' if t > compute_output_torque_limit(v, eng._output_stall, eng._output_speed_rads)
-                          else 'blue' for v, t in zip(rads_pts, t_pts)]
-                ax_tn.scatter(rpm_pts, t_pts, c=colors, s=5, alpha=0.5)
+                # Downsample for performance (max 200 points)
+                step = max(1, len(rpm_arr) // 200)
+                rpm_pts = np.abs(rpm_arr[::step]); t_pts = np.abs(tf_arr[::step])
+                ax_tn.scatter(rpm_pts, t_pts, c='blue', s=5, alpha=0.5)
             ax_tn.set_title(f'T-N Curve: {{selected_joint}}')
             ax_tn.legend(loc='upper right', fontsize=7)
         else:
-            plotted_any = False
-            for jname in sorted(engines.keys()):
-                h = joint_history[jname]
-                rpm_arr = h['v_act_rpm'].to_array(); tf_arr = h['tau_final'].to_array()
-                if len(rpm_arr) > 0 and len(tf_arr) > 0:
-                    jc = joint_colors.get(jname, '#333')
-                    ax_tn.scatter(np.abs(rpm_arr), np.abs(tf_arr), s=3, alpha=0.5, label=jname[:12], color=jc)
-                    plotted_any = True
-            if plotted_any:
-                ref_eng = max(engines.values(), key=lambda e: e._output_stall)
+            # Global mode: only show T-N boundary + latest operating point per joint
+            ref_eng = max(engines.values(), key=lambda e: e._output_stall) if engines else None
+            if ref_eng:
                 out_no_load_rpm = ref_eng._output_speed_rads * 1.2 * 60.0 / (2.0 * np.pi)
-                rpm_range = np.linspace(0, out_no_load_rpm, 100)
+                rpm_range = np.linspace(0, out_no_load_rpm, 50)
                 rads_range = rpm_range * 2.0 * np.pi / 60.0
                 t_boundary = [compute_output_torque_limit(v, ref_eng._output_stall, ref_eng._output_speed_rads)
                               for v in rads_range]
                 ax_tn.plot(rpm_range, t_boundary, 'r--', lw=2, alpha=0.5, label='T-N Limit')
-            ax_tn.set_title('All Joints: T-N Curve')
+            # Plot only latest point per joint (20 points max, very fast)
+            for jname in sorted(engines.keys()):
+                eng = engines[jname]
+                if eng.per_step:
+                    rpm_pt = abs(eng.per_step['v_act']) * eng.gear_ratio * 60.0 / (2.0 * np.pi)
+                    t_pt = abs(eng.per_step['tau_final'])
+                    jc = joint_colors.get(jname, '#333')
+                    ax_tn.plot(rpm_pt, t_pt, 'o', ms=5, color=jc, alpha=0.8)
+            ax_tn.set_title('All Joints: T-N Operating Points')
             if len(engines) <= 10: ax_tn.legend(loc='upper right', fontsize=6)
         ax_tn.set_xlabel('Speed (RPM)'); ax_tn.set_ylabel('|Torque| (Nm)')
         ax_tn.grid(True, alpha=0.3)
@@ -4022,6 +4022,8 @@ try:
         last_print = 0; last_plot = 0; last_csv = 0
         last_data_collect = 0
         loop_count = 0
+        _sim_start_wall = time.time()  # for real-time gap tracking
+        _sim_accumulated = 0.0         # total sim time elapsed
 
         while viewer.is_running():
             now = time.time()
@@ -4030,41 +4032,56 @@ try:
 
             # ── 재생 상태일 때만 시뮬레이션 진행 ──
             if is_playing:
-                sim_time += wall_dt
-                if sim_time > duration:
-                    loop_count += 1
-                    sim_time = 0.0
-                    data.qpos[:] = initial_qpos; data.qvel[:] = 0; data.ctrl[:] = 0
-                    mujoco.mj_forward(model, data)
-                    for eng in engines.values(): eng.pid.reset()
-                    for jh in joint_history.values():
-                        for v in jh.values(): v.clear()
+                # Decouple simulation from rendering:
+                # Instead of sim_time += wall_dt (which slows when rendering is heavy),
+                # step MuJoCo at its own fixed timestep, multiple steps per frame if needed.
+                # Target: advance sim by wall_dt worth of simulation time.
+                # Cap wall_dt to prevent spiral-of-death when rendering is very slow.
+                capped_dt = min(wall_dt, 0.05)  # max 50ms wall time per frame
+                steps_to_run = max(1, int(capped_dt / dt))
+                
+                for _sub in range(steps_to_run):
+                    sim_time += dt
+                    _sim_accumulated += dt
+                    if sim_time > duration:
+                        loop_count += 1
+                        sim_time = 0.0
+                        data.qpos[:] = initial_qpos; data.qvel[:] = 0; data.ctrl[:] = 0
+                        mujoco.mj_forward(model, data)
+                        for eng in engines.values(): eng.pid.reset()
+                        for jh in joint_history.values():
+                            for v in jh.values(): v.clear()
 
-                step_idx = min(int(sim_time / dt), n_steps - 1)
+                    step_idx = min(int(sim_time / dt), n_steps - 1)
+
+                    for jname in sorted(engines.keys()):
+                        jid = joint_ids[jname]; aid = actuator_ids[jname]
+                        qadr = model.jnt_qposadr[jid]; dof_adr = model.jnt_dofadr[jid]
+                        q_ref = qpos_traj[step_idx, qadr]
+                        q_act = data.qpos[qadr]; v_act = data.qvel[dof_adr]
+                        ff = ff_torques_fwd[jname][step_idx] if jname in ff_torques_fwd else 0.0
+                        eng = engines[jname]
+                        state = eng.compute(sim_time, q_ref, q_act, v_act, dt, ff_torque=ff)
+                        data.ctrl[aid] = state['tau_final']
+                        # Diagnostic tracking
+                        _diag_total_steps[jname] += 1
+                        abs_v = abs(v_act)
+                        if abs_v > _diag_max_speed[jname]: _diag_max_speed[jname] = abs_v
+                        if abs(state['tau_limited']) >= eng._output_stall * 0.99: _diag_saturation_count[jname] += 1
+                        if abs(state['tau_cmd']) > abs(state['tau_limited']) + 0.01: _diag_tn_limited_count[jname] += 1
+
+                    mujoco.mj_step(model, data)
+
+                # Data collection — once per frame (not per sub-step)
                 csv_row = [sim_time]
-
                 for jname in sorted(engines.keys()):
-                    jid = joint_ids[jname]; aid = actuator_ids[jname]
-                    qadr = model.jnt_qposadr[jid]; dof_adr = model.jnt_dofadr[jid]
-                    q_ref = qpos_traj[step_idx, qadr]
-                    q_act = data.qpos[qadr]; v_act = data.qvel[dof_adr]
-                    ff = ff_torques_fwd[jname][step_idx] if jname in ff_torques_fwd else 0.0
-                    eng = engines[jname]
-                    state = eng.compute(sim_time, q_ref, q_act, v_act, dt, ff_torque=ff)
-                    data.ctrl[aid] = state['tau_final']
-                    csv_row.extend([q_ref, q_act, v_act, state['tau_cmd'], state['tau_limited'],
-                                   state['tau_final'], state['tau_friction'],
-                                   state['torque_margin'], state['thermal_ratio']])
-                    # Diagnostic tracking
-                    _diag_total_steps[jname] += 1
-                    abs_v = abs(v_act)
-                    if abs_v > _diag_max_speed[jname]: _diag_max_speed[jname] = abs_v
-                    if abs(state['tau_limited']) >= eng._output_stall * 0.99: _diag_saturation_count[jname] += 1
-                    if abs(state['tau_cmd']) > abs(state['tau_limited']) + 0.01: _diag_tn_limited_count[jname] += 1
+                    s = engines[jname].per_step
+                    if s:
+                        csv_row.extend([s['q_ref'], s['q_act'], s['v_act'], s['tau_cmd'], s['tau_limited'],
+                                       s['tau_final'], s['tau_friction'], s['torque_margin'], s['thermal_ratio']])
+                    else:
+                        csv_row.extend([0]*9)
 
-                mujoco.mj_step(model, data)
-
-                # 2ms 데이터 수집
                 if now - last_data_collect >= PLOT_DT:
                     for jname, eng in engines.items():
                         s = eng.per_step
@@ -4093,7 +4110,7 @@ try:
 
             viewer.sync()
 
-            # Console 2Hz
+            # Console 2Hz — with real-time gap monitoring
             if now - last_print >= 0.5:
                 worst_margin = 100.0; worst_joint = ""
                 for jname, eng in engines.items():
@@ -4102,11 +4119,13 @@ try:
                         if m < worst_margin: worst_margin = m; worst_joint = jname
                 status = "OK" if worst_margin > 0 else "OVER!"
                 play_str = "▶" if is_playing else "⏸"
-                print(f"{{play_str}} [T={{sim_time:.2f}}s] Worst: {{worst_joint}} margin={{worst_margin:.0f}}% {{status}} | Loop#{{loop_count}}")
+                wall_elapsed = now - _sim_start_wall
+                rt_ratio = _sim_accumulated / max(wall_elapsed, 0.001)
+                print(f"{{play_str}} [T={{sim_time:.2f}}s] Worst: {{worst_joint}} margin={{worst_margin:.0f}}% {{status}} | Loop#{{loop_count}} | RT={{rt_ratio:.2f}}x")
                 last_print = now
 
-            # Plots 5Hz
-            if HAS_MATPLOTLIB and now - last_plot >= 0.2:
+            # Plots 2Hz (reduced from 5Hz for performance)
+            if HAS_MATPLOTLIB and now - last_plot >= 0.5:
                 try:
                     # 재생 중일 때 타임라인 슬라이더 동기화
                     if is_playing:
