@@ -88,7 +88,7 @@ const SensorPlacement = () => {
                                     Link: {getLinkName(sensor.linkId)} |
                                     Pos: [{sensor.localPosition.map(v => v.toFixed(3)).join(', ')}]
                                 </div>
-                                
+
                                 {isSensorExpanded && (
                                     <div className="mt-3 space-y-3 border-t border-gray-700 pt-3">
                                         <div>

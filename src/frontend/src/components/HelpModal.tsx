@@ -489,7 +489,7 @@ const TendonDetailGuide: React.FC = () => {
                 <p className="text-gray-300 mb-3">
                     For <strong className="text-orange-400">Active Tendons</strong>, you can record tendon-driven movements in the Web Viewer for realistic MuJoCo simulation playback.
                 </p>
-                
+
                 <div className="bg-orange-900/20 border border-orange-600 rounded-lg p-4 mb-4">
                     <h4 className="font-bold text-orange-400 mb-2 text-sm">🎬 Tendon Recording Workflow</h4>
                     <ol className="list-decimal ml-5 space-y-2 text-sm text-gray-300">

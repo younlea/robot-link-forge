@@ -80,11 +80,10 @@ const ObstacleManager = () => {
                         <span className="text-xs text-gray-400">3D Drag Mode</span>
                         <button
                             onClick={toggleDragMode}
-                            className={`px-3 py-1 rounded text-xs font-semibold ${
-                                interactionMode === 'obstacle-drag'
+                            className={`px-3 py-1 rounded text-xs font-semibold ${interactionMode === 'obstacle-drag'
                                     ? 'bg-blue-600 text-white'
                                     : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                            }`}
+                                }`}
                         >
                             {interactionMode === 'obstacle-drag' ? 'Active' : 'Inactive'}
                         </button>

@@ -1,6 +1,3 @@
-
-
-
 // src/frontend/src/components/RobotVisualizer.tsx
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
@@ -11,6 +8,7 @@ import { useFrame, useThree } from '@react-three/fiber';
 import { Move, RotateCw } from 'lucide-react';
 import { STLMesh } from './STLMesh';
 import { computeBoundsTree, disposeBoundsTree, acceleratedRaycast } from 'three-mesh-bvh';
+import { ThreeEvent } from '@react-three/fiber';
 
 // Popup for overlapping selection
 const SelectionPopup = ({ candidates, onClose }: { candidates: string[], onClose: () => void }) => {
@@ -28,7 +26,7 @@ const SelectionPopup = ({ candidates, onClose }: { candidates: string[], onClose
               <button
                 key={id}
                 className="block w-full text-left text-xs px-2 py-1 hover:bg-gray-700 rounded transition-colors"
-                onClick={(e) => { e.stopPropagation(); selectItem(id, 'joint'); onClose(); }}
+                onClick={(e) => { e.stopPropagation?.(); selectItem(id, 'joint'); onClose(); }}
               >
                 {joint?.name || id}
               </button>
@@ -61,7 +59,7 @@ const JointWrapper: React.FC<{ jointId: string; registerRef: RegisterRef }> = ({
   const setSelectionCandidates = useRobotStore(s => s.setSelectionCandidates);
 
   const clickHandler = (e: any) => {
-    e.stopPropagation();
+    e.stopPropagation?.();
 
     // Multi-hit logic
     if (e.intersections && e.intersections.length > 0) {
@@ -247,7 +245,7 @@ const RecursiveLink: React.FC<{ linkId: string; registerRef: RegisterRef }> = ({
   if (!link) return null;
 
   const isSelected = selectedItem.id === linkId;
-  const clickHandler = (e: any) => { e.stopPropagation(); selectItem(link.id, 'link'); };
+  const clickHandler = (e: any) => { e.stopPropagation?.(); selectItem(link.id, 'link'); };
 
   const renderSkeleton = () => {
     // Render a "Ghost" visual (transparent cylinder) connecting to all child joints
@@ -898,36 +896,36 @@ const ObstacleRenderer = () => {
   const [dragOffset, setDragOffset] = useState<THREE.Vector3 | null>(null);
   const { camera, raycaster } = useThree();
 
-  const handleObstaclePointerDown = (obstacleId: string, event: THREE.Event) => {
+  const handleObstaclePointerDown = (obstacleId: string, event: ThreeEvent<PointerEvent>) => {
     if (interactionMode !== 'obstacle-drag') return;
-    
+
     event.stopPropagation();
     setDraggedObstacle(obstacleId);
-    
+
     // Calculate drag offset
     const obstacle = obstacles[obstacleId];
     const obstaclePos = new THREE.Vector3(...obstacle.position);
     const intersectPoint = new THREE.Vector3();
-    raycaster.setFromCamera(event.point, camera);
-    
+    raycaster.setFromCamera(new THREE.Vector2(event.unprojectedPoint.x, event.unprojectedPoint.y), camera);
+
     // Create a plane at the obstacle's current position for dragging
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -obstaclePos.y);
     raycaster.ray.intersectPlane(plane, intersectPoint);
-    
+
     setDragOffset(intersectPoint.clone().sub(obstaclePos));
   };
 
-  const handleObstaclePointerMove = (event: THREE.Event) => {
+  const handleObstaclePointerMove = (event: ThreeEvent<PointerEvent>) => {
     if (!draggedObstacle || !dragOffset) return;
-    
+
     const intersectPoint = new THREE.Vector3();
-    raycaster.setFromCamera(event.point, camera);
-    
+    raycaster.setFromCamera(new THREE.Vector2(event.unprojectedPoint.x, event.unprojectedPoint.y), camera);
+
     // Use the same plane for consistent dragging
     const obstacle = obstacles[draggedObstacle];
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -obstacle.position[1]);
     raycaster.ray.intersectPlane(plane, intersectPoint);
-    
+
     const newPos = intersectPoint.clone().sub(dragOffset);
     updateObstacle(draggedObstacle, 'position', [newPos.x, newPos.y, newPos.z]);
   };
@@ -948,7 +946,21 @@ const ObstacleRenderer = () => {
             ((event.clientX - rect.left) / rect.width) * 2 - 1,
             -((event.clientY - rect.top) / rect.height) * 2 + 1
           );
-          handleObstaclePointerMove({ point: mouse } as any);
+          handleObstaclePointerMove({
+            unprojectedPoint: new THREE.Vector3(mouse.x, mouse.y, 0),
+            eventObject: new THREE.Object3D(),
+            intersections: [],
+            pointer: {} as any,
+            delta: 0,
+            stopped: false,
+            ray: raycaster.ray,
+            camera,
+            stopPropagation: () => { },
+            nativeEvent: {} as PointerEvent,
+            distance: 0,
+            point: new THREE.Vector3(),
+            object: new THREE.Object3D(),
+          } as ThreeEvent<PointerEvent>);
         }
       }
     };
@@ -978,62 +990,94 @@ const ObstacleRenderer = () => {
             {obstacle.shape === 'box' && (
               <mesh
                 onPointerDown={(e) => handleObstaclePointerDown(obstacle.id, e)}
-                onPointerOver={() => isDragMode && document.body.style.cursor = 'grab'}
-                onPointerOut={() => isDragMode && document.body.style.cursor = 'auto'}
+                onPointerOver={() => {
+                  if (isDragMode) {
+                    document.body.style.cursor = 'grab';
+                  }
+                }}
+                onPointerOut={() => {
+                  if (isDragMode) {
+                    document.body.style.cursor = 'auto';
+                  }
+                }}
               >
                 <boxGeometry args={dim} />
                 <meshStandardMaterial color={color} transparent opacity={0.7} />
               </mesh>
-            )}
-            {obstacle.shape === 'sphere' && (
-              <mesh
-                onPointerDown={(e) => handleObstaclePointerDown(obstacle.id, e)}
-                onPointerOver={() => isDragMode && document.body.style.cursor = 'grab'}
-                onPointerOut={() => isDragMode && document.body.style.cursor = 'auto'}
-              >
-                <sphereGeometry args={[dim[0], 16, 16]} />
-                <meshStandardMaterial color={color} transparent opacity={0.7} />
-              </mesh>
-            )}
-            {obstacle.shape === 'cylinder' && (
-              <mesh
-                onPointerDown={(e) => handleObstaclePointerDown(obstacle.id, e)}
-                onPointerOver={() => isDragMode && document.body.style.cursor = 'grab'}
-                onPointerOut={() => isDragMode && document.body.style.cursor = 'auto'}
-              >
-                <cylinderGeometry args={[dim[0], dim[0], dim[1], 16]} />
-                <meshStandardMaterial color={color} transparent opacity={0.7} />
-              </mesh>
-            )}
+            )
+            }
+            {
+              obstacle.shape === 'sphere' && (
+                <mesh
+                  onPointerDown={(e) => handleObstaclePointerDown(obstacle.id, e)}
+                  onPointerOver={() => {
+                    if (isDragMode) {
+                      document.body.style.cursor = 'grab';
+                    }
+                  }}
+                  onPointerOut={() => {
+                    if (isDragMode) {
+                      document.body.style.cursor = 'auto';
+                    }
+                  }}
+                >
+                  <sphereGeometry args={[dim[0], 16, 16]} />
+                  <meshStandardMaterial color={color} transparent opacity={0.7} />
+                </mesh >
+              )}
+            {
+              obstacle.shape === 'cylinder' && (
+                <mesh
+                  onPointerDown={(e) => handleObstaclePointerDown(obstacle.id, e)}
+                  onPointerOver={() => {
+                    if (isDragMode) {
+                      document.body.style.cursor = 'grab';
+                    }
+                  }}
+                  onPointerOut={() => {
+                    if (isDragMode) {
+                      document.body.style.cursor = 'auto';
+                    }
+                  }}
+                >
+                  <cylinderGeometry args={[dim[0], dim[0], dim[1], 16]} />
+                  <meshStandardMaterial color={color} transparent opacity={0.7} />
+                </mesh >
+              )}
             {/* Wireframe overlay */}
-            {obstacle.shape === 'box' && (
-              <mesh>
-                <boxGeometry args={dim} />
-                <meshBasicMaterial color={color} wireframe />
-              </mesh>
-            )}
-            {obstacle.shape === 'sphere' && (
-              <mesh>
-                <sphereGeometry args={[dim[0], 16, 16]} />
-                <meshBasicMaterial color={color} wireframe />
-              </mesh>
-            )}
-            {obstacle.shape === 'cylinder' && (
-              <mesh>
-                <cylinderGeometry args={[dim[0], dim[0], dim[1], 16]} />
-                <meshBasicMaterial color={color} wireframe />
-              </mesh>
-            )}
+            {
+              obstacle.shape === 'box' && (
+                <mesh>
+                  <boxGeometry args={dim} />
+                  <meshBasicMaterial color={color} wireframe />
+                </mesh>
+              )
+            }
+            {
+              obstacle.shape === 'sphere' && (
+                <mesh>
+                  <sphereGeometry args={[dim[0], 16, 16]} />
+                  <meshBasicMaterial color={color} wireframe />
+                </mesh>
+              )
+            }
+            {
+              obstacle.shape === 'cylinder' && (
+                <mesh>
+                  <cylinderGeometry args={[dim[0], dim[0], dim[1], 16]} />
+                  <meshBasicMaterial color={color} wireframe />
+                </mesh>
+              )
+            }
             {/* Label */}
             <Html position={[0, dim[1] / 2 + 0.02, 0]} center>
-              <div className={`text-[10px] text-white px-1 rounded whitespace-nowrap ${
-                isDragMode ? 'bg-blue-800/80' : 'bg-red-800/80'
-              }`}>
+              <div className={`text-[10px] text-white px-1 rounded whitespace-nowrap ${isDragMode ? 'bg-blue-800/80' : 'bg-red-800/80'
+                }`}>
                 {obstacle.name}
                 {isDragMode && ' (click to drag)'}
               </div>
             </Html>
-          </group>
+          </group >
         );
 
         return obstacleMesh;
