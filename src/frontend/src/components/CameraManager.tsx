@@ -35,7 +35,7 @@ export const CameraManager: React.FC = () => {
             const deltaX = e.movementX * 0.005; // Adjust sensitivity
             const deltaY = e.movementY * 0.005;
 
-            // Ensure both buttons rotate in the same direction
+            // Ensure both buttons rotate in the same direction and only rotate (no zoom)
             controls.rotate(-deltaX, -deltaY, true);
         };
 
@@ -66,6 +66,8 @@ export const CameraManager: React.FC = () => {
         const handleMouseMove = (e: MouseEvent) => {
             const deltaX = e.movementX * 0.005; // Adjust sensitivity
             const deltaY = e.movementY * 0.005;
+
+            // Ensure both buttons rotate in the same direction and only rotate (no zoom)
             controls.rotate(-deltaX, -deltaY, true);
         };
 
