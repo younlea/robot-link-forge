@@ -1098,6 +1098,8 @@ const SensorMarkers = ({ objectRefs }: { objectRefs: RefMap }) => {
       if (linkObj) {
         const localPos = new THREE.Vector3(...sensor.localPosition);
         newPositions[sensor.id] = linkObj.localToWorld(localPos.clone());
+      } else {
+        console.warn(`Sensor ${sensor.id} has invalid linkId: ${sensor.linkId}`);
       }
     }
     setWorldPositions(newPositions);
@@ -1107,10 +1109,13 @@ const SensorMarkers = ({ objectRefs }: { objectRefs: RefMap }) => {
     <>
       {Object.values(sensors).map(sensor => {
         const worldPos = worldPositions[sensor.id];
-        if (!worldPos) return null;
+        if (!worldPos) {
+          console.warn(`Sensor ${sensor.id} has no world position calculated.`);
+          return null;
+        }
         return (
           <mesh key={sensor.id} position={worldPos}>
-            <sphereGeometry args={[0.004, 8, 8]} />
+            <sphereGeometry args={[sensor.size || 0.004, 8, 8]} />
             <meshStandardMaterial
               color={sensor.type === 'touch' ? '#00ff88' : '#ffaa00'}
               emissive={sensor.type === 'touch' ? '#00ff88' : '#ffaa00'}
@@ -1136,7 +1141,6 @@ const InteractionHandler = ({ objectRefs }: { objectRefs: RefMap }) => {
     if (interactionMode === 'select') return;
 
     const handleClick = (event: MouseEvent) => {
-      // Compute normalized device coordinates
       const rect = gl.domElement.getBoundingClientRect();
       const mouse = new THREE.Vector2(
         ((event.clientX - rect.left) / rect.width) * 2 - 1,
@@ -1145,7 +1149,6 @@ const InteractionHandler = ({ objectRefs }: { objectRefs: RefMap }) => {
 
       raycaster.setFromCamera(mouse, camera);
 
-      // Collect all link meshes to raycast against
       const meshTargets: THREE.Object3D[] = [];
       for (const [id, obj] of objectRefs.entries()) {
         if (links[id]) {
@@ -1158,12 +1161,14 @@ const InteractionHandler = ({ objectRefs }: { objectRefs: RefMap }) => {
       }
 
       const intersects = raycaster.intersectObjects(meshTargets, false);
-      if (intersects.length === 0) return;
+      if (intersects.length === 0) {
+        console.warn('No intersection detected during click.');
+        return;
+      }
 
       const hit = intersects[0];
       const worldPoint = hit.point.clone();
 
-      // Find which link was hit
       let hitLinkId: string | null = null;
       for (const [id, obj] of objectRefs.entries()) {
         if (links[id]) {
@@ -1178,12 +1183,16 @@ const InteractionHandler = ({ objectRefs }: { objectRefs: RefMap }) => {
         }
       }
 
-      if (!hitLinkId) return;
+      if (!hitLinkId) {
+        console.warn('No link ID found for the clicked object.');
+        return;
+      }
 
-      // Convert world point to link-local coordinates
       const linkObj = objectRefs.get(hitLinkId)!;
       const localPoint = linkObj.worldToLocal(worldPoint.clone());
       const localPos: [number, number, number] = [localPoint.x, localPoint.y, localPoint.z];
+
+      console.log(`Interaction Mode: ${interactionMode}, Hit Link ID: ${hitLinkId}, Local Position:`, localPos);
 
       if (interactionMode === 'tendon-routing' && activeTendonId) {
         addTendonRoutingPoint(activeTendonId, hitLinkId, localPos);
@@ -1197,18 +1206,6 @@ const InteractionHandler = ({ objectRefs }: { objectRefs: RefMap }) => {
       gl.domElement.removeEventListener('click', handleClick);
     };
   }, [interactionMode, activeTendonId, objectRefs, links, raycaster, camera, gl, addTendonRoutingPoint, addSensor]);
-
-  // Change cursor when in special mode
-  useEffect(() => {
-    if (interactionMode !== 'select') {
-      gl.domElement.style.cursor = 'crosshair';
-    } else {
-      gl.domElement.style.cursor = 'default';
-    }
-    return () => { gl.domElement.style.cursor = 'default'; };
-  }, [interactionMode, gl]);
-
-  return null;
 };
 
 export default RobotVisualizer;

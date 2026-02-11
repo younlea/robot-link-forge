@@ -26,6 +26,12 @@ const SensorPlacement = () => {
         setExpandedSensors(newExpanded);
     };
 
+    // Helper function to get link name
+    const getLinkName = (linkId: string) => {
+        const links = useRobotStore(s => s.links);
+        return links[linkId]?.name || linkId.slice(0, 8);
+    };
+
     return (
         <div className="mt-4 border-t border-gray-700 pt-4">
             <button
