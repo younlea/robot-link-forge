@@ -28,7 +28,6 @@ const SensorPlacement = () => {
 
     // Helper function to get link name
     const getLinkName = (linkId: string) => {
-        const links = useRobotStore(s => s.links);
         return links[linkId]?.name || linkId.slice(0, 8);
     };
 
@@ -79,54 +78,48 @@ const SensorPlacement = () => {
                                         <span className={`w-2 h-2 rounded-full ${sensor.type === 'touch' ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
                                         <span className="font-semibold">{sensor.siteName}</span>
                                         <button
-                                            onClick={() => toggleSensorExpanded(sensor.id)}
-                                            className="text-gray-400 hover:text-white text-xs"
-                                        >
-                                            {isSensorExpanded ? '▼' : '▶'}
-                                        </button>
+                                            onClick={() => deleteSensor(sensor.id)}
+                                            className="text-red-400 hover:text-red-300 px-1"
+                                        >✕</button>
                                     </div>
-                                    <button
-                                        onClick={() => deleteSensor(sensor.id)}
-                                        className="text-red-400 hover:text-red-300 px-1"
-                                    >✕</button>
-                                </div>
-                                <div className="text-gray-500 text-[10px] mt-1">
-                                    Link: {getLinkName(sensor.linkId)} |
-                                    Pos: [{sensor.localPosition.map(v => v.toFixed(3)).join(', ')}]
-                                </div>
+                                    <div className="text-gray-500 text-[10px] mt-1">
+                                        Link: {getLinkName(sensor.linkId)} |
+                                        Pos: [{sensor.localPosition.map(v => v.toFixed(3)).join(', ')}]
+                                    </div>
 
-                                {isSensorExpanded && (
-                                    <div className="mt-3 space-y-3 border-t border-gray-700 pt-3">
-                                        <div>
-                                            <label className="block text-gray-400 text-[10px] mb-1">
-                                                Size: {(sensor.size || 0.01).toFixed(3)} m
-                                            </label>
-                                            <input
-                                                type="range"
-                                                min="0.001"
-                                                max="0.1"
-                                                step="0.001"
-                                                value={sensor.size || 0.01}
-                                                onChange={(e) => updateSensor(sensor.id, { size: parseFloat(e.target.value) })}
-                                                className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-                                            />
+                                    {isSensorExpanded && (
+                                        <div className="mt-3 space-y-3 border-t border-gray-700 pt-3">
+                                            <div>
+                                                <label className="block text-gray-400 text-[10px] mb-1">
+                                                    Size: {(sensor.size || 0.01).toFixed(3)} m
+                                                </label>
+                                                <input
+                                                    type="range"
+                                                    min="0.001"
+                                                    max="0.1"
+                                                    step="0.001"
+                                                    value={sensor.size || 0.01}
+                                                    onChange={(e) => updateSensor(sensor.id, { size: parseFloat(e.target.value) })}
+                                                    className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                                                />
+                                            </div>
+                                            <div>
+                                                <label className="block text-gray-400 text-[10px] mb-1">
+                                                    Range: {(sensor.range || 0.02).toFixed(3)} m
+                                                </label>
+                                                <input
+                                                    type="range"
+                                                    min="0.005"
+                                                    max="0.2"
+                                                    step="0.005"
+                                                    value={sensor.range || 0.02}
+                                                    onChange={(e) => updateSensor(sensor.id, { range: parseFloat(e.target.value) })}
+                                                    className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                                                />
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-gray-400 text-[10px] mb-1">
-                                                Range: {(sensor.range || 0.02).toFixed(3)} m
-                                            </label>
-                                            <input
-                                                type="range"
-                                                min="0.005"
-                                                max="0.2"
-                                                step="0.005"
-                                                value={sensor.range || 0.02}
-                                                onChange={(e) => updateSensor(sensor.id, { range: parseFloat(e.target.value) })}
-                                                className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
+                                    )}
+                                </div>
                             </div>
                         );
                     })}
