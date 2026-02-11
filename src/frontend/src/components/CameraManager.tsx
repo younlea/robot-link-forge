@@ -5,9 +5,6 @@ import { useThree } from '@react-three/fiber';
 import { useRobotStore } from '../store';
 import { Vector3 } from 'three';
 
-const PAN_SPEED = 0.5; // units per second
-const ROTATE_SPEED = 1.0; // radians per second
-
 export const CameraManager: React.FC = () => {
     const controlsRef = useRef<CameraControls | null>(null);
     const { scene } = useThree();
@@ -17,7 +14,7 @@ export const CameraManager: React.FC = () => {
         if (controlsRef.current) {
             setCameraControls(controlsRef.current);
         }
-        
+
         const controls = controlsRef.current;
         if (!controls) return;
 
@@ -25,11 +22,34 @@ export const CameraManager: React.FC = () => {
         const pos = new Vector3(-3, 4, 5);
         const target = new Vector3(0, 0, 0);
         controls.setLookAt(pos.x, pos.y, pos.z, target.x, target.y, target.z, false);
-        
+
+        // Unified rotation logic for both left mouse button and middle mouse button
+        const handleMouseDown = (e: MouseEvent) => {
+            if (e.button === 0 || e.button === 1) { // Left or Middle mouse button
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+            }
+        };
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const deltaX = e.movementX * 0.005; // Adjust sensitivity
+            const deltaY = e.movementY * 0.005;
+
+            // Ensure both buttons rotate in the same direction
+            controls.rotate(-deltaX, -deltaY, true);
+        };
+
+        const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        window.addEventListener('mousedown', handleMouseDown);
+
         return () => {
-            setCameraControls(null);
-        }
-    }, [scene, setCameraControls]);
+            window.removeEventListener('mousedown', handleMouseDown);
+        };
+    }, [setCameraControls]);
 
     useEffect(() => {
         const controls = controlsRef.current;
@@ -46,7 +66,7 @@ export const CameraManager: React.FC = () => {
         const handleMouseMove = (e: MouseEvent) => {
             const deltaX = e.movementX * 0.005; // Adjust sensitivity
             const deltaY = e.movementY * 0.005;
-            controls.rotate(deltaX, deltaY, true);
+            controls.rotate(-deltaX, -deltaY, true);
         };
 
         const handleMouseUp = () => {
