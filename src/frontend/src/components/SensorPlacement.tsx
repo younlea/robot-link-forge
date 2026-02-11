@@ -3,8 +3,9 @@ import { useRobotStore } from '../store';
 import { SensorDef } from '../types';
 
 const SensorPlacement = () => {
-    const { sensors, deleteSensor, setInteractionMode, interactionMode, links } = useRobotStore();
+    const { sensors, deleteSensor, setInteractionMode, interactionMode, links, updateSensor } = useRobotStore();
     const [isExpanded, setIsExpanded] = useState(false);
+    const [expandedSensors, setExpandedSensors] = useState<Set<string>>(new Set());
     const sensorList = Object.values(sensors);
 
     const handleStartPlacement = () => {
@@ -15,7 +16,15 @@ const SensorPlacement = () => {
         setInteractionMode('select');
     };
 
-    const getLinkName = (linkId: string) => links[linkId]?.name || linkId.slice(0, 8);
+    const toggleSensorExpanded = (sensorId: string) => {
+        const newExpanded = new Set(expandedSensors);
+        if (newExpanded.has(sensorId)) {
+            newExpanded.delete(sensorId);
+        } else {
+            newExpanded.add(sensorId);
+        }
+        setExpandedSensors(newExpanded);
+    };
 
     return (
         <div className="mt-4 border-t border-gray-700 pt-4">
@@ -55,24 +64,66 @@ const SensorPlacement = () => {
                     )}
 
                     {/* Sensor List */}
-                    {sensorList.map(sensor => (
-                        <div key={sensor.id} className="p-2 bg-gray-900/50 rounded text-xs">
-                            <div className="flex items-center justify-between">
-                                <div className="flex items-center space-x-2">
-                                    <span className={`w-2 h-2 rounded-full ${sensor.type === 'touch' ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
-                                    <span className="font-semibold">{sensor.siteName}</span>
+                    {sensorList.map(sensor => {
+                        const isSensorExpanded = expandedSensors.has(sensor.id);
+                        return (
+                            <div key={sensor.id} className="p-2 bg-gray-900/50 rounded text-xs">
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center space-x-2 flex-1">
+                                        <span className={`w-2 h-2 rounded-full ${sensor.type === 'touch' ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
+                                        <span className="font-semibold">{sensor.siteName}</span>
+                                        <button
+                                            onClick={() => toggleSensorExpanded(sensor.id)}
+                                            className="text-gray-400 hover:text-white text-xs"
+                                        >
+                                            {isSensorExpanded ? '▼' : '▶'}
+                                        </button>
+                                    </div>
+                                    <button
+                                        onClick={() => deleteSensor(sensor.id)}
+                                        className="text-red-400 hover:text-red-300 px-1"
+                                    >✕</button>
                                 </div>
-                                <button
-                                    onClick={() => deleteSensor(sensor.id)}
-                                    className="text-red-400 hover:text-red-300 px-1"
-                                >✕</button>
+                                <div className="text-gray-500 text-[10px] mt-1">
+                                    Link: {getLinkName(sensor.linkId)} |
+                                    Pos: [{sensor.localPosition.map(v => v.toFixed(3)).join(', ')}]
+                                </div>
+                                
+                                {isSensorExpanded && (
+                                    <div className="mt-3 space-y-3 border-t border-gray-700 pt-3">
+                                        <div>
+                                            <label className="block text-gray-400 text-[10px] mb-1">
+                                                Size: {(sensor.size || 0.01).toFixed(3)} m
+                                            </label>
+                                            <input
+                                                type="range"
+                                                min="0.001"
+                                                max="0.1"
+                                                step="0.001"
+                                                value={sensor.size || 0.01}
+                                                onChange={(e) => updateSensor(sensor.id, { size: parseFloat(e.target.value) })}
+                                                className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-gray-400 text-[10px] mb-1">
+                                                Range: {(sensor.range || 0.02).toFixed(3)} m
+                                            </label>
+                                            <input
+                                                type="range"
+                                                min="0.005"
+                                                max="0.2"
+                                                step="0.005"
+                                                value={sensor.range || 0.02}
+                                                onChange={(e) => updateSensor(sensor.id, { range: parseFloat(e.target.value) })}
+                                                className="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer slider"
+                                            />
+                                        </div>
+                                    </div>
+                                )}
                             </div>
-                            <div className="text-gray-500 text-[10px] mt-1">
-                                Link: {getLinkName(sensor.linkId)} |
-                                Pos: [{sensor.localPosition.map(v => v.toFixed(3)).join(', ')}]
-                            </div>
-                        </div>
-                    ))}
+                        );
+                    })}
 
                     {sensorList.length === 0 && (
                         <p className="text-xs text-gray-500 text-center py-2">

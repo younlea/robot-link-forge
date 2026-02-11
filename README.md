@@ -92,6 +92,7 @@ Open your browser to `http://localhost:5173`.
 *   **Slider Mode**: Move joints manually and click **"Capture Keyframe"**.
 *   **Timeline**: Drag keyframes to adjust timing. Modify transition bars to change speed.
 *   **Webcam Mode**: Toggle "Camera" to control the robot with your hand.
+*   **Tendon-Driven Recording**: For joints controlled by active tendons, use the "Tendon Input" slider in the link inspector. This records both joint positions and tendon input values for realistic MuJoCo simulation.
 
 ### 4. Export & Replay (ROS 2)
 When you export to ROS 2, you get a ZIP file containing a complete ROS 2 package.

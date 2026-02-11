@@ -892,6 +892,77 @@ const TendonLines = ({ objectRefs }: { objectRefs: RefMap }) => {
 // --- Obstacle Renderer: fixed-position boxes/spheres/cylinders ---
 const ObstacleRenderer = () => {
   const obstacles = useRobotStore(s => s.obstacles);
+  const interactionMode = useRobotStore(s => s.interactionMode);
+  const updateObstacle = useRobotStore(s => s.updateObstacle);
+  const [draggedObstacle, setDraggedObstacle] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState<THREE.Vector3 | null>(null);
+  const { camera, raycaster } = useThree();
+
+  const handleObstaclePointerDown = (obstacleId: string, event: THREE.Event) => {
+    if (interactionMode !== 'obstacle-drag') return;
+    
+    event.stopPropagation();
+    setDraggedObstacle(obstacleId);
+    
+    // Calculate drag offset
+    const obstacle = obstacles[obstacleId];
+    const obstaclePos = new THREE.Vector3(...obstacle.position);
+    const intersectPoint = new THREE.Vector3();
+    raycaster.setFromCamera(event.point, camera);
+    
+    // Create a plane at the obstacle's current position for dragging
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -obstaclePos.y);
+    raycaster.ray.intersectPlane(plane, intersectPoint);
+    
+    setDragOffset(intersectPoint.clone().sub(obstaclePos));
+  };
+
+  const handleObstaclePointerMove = (event: THREE.Event) => {
+    if (!draggedObstacle || !dragOffset) return;
+    
+    const intersectPoint = new THREE.Vector3();
+    raycaster.setFromCamera(event.point, camera);
+    
+    // Use the same plane for consistent dragging
+    const obstacle = obstacles[draggedObstacle];
+    const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -obstacle.position[1]);
+    raycaster.ray.intersectPlane(plane, intersectPoint);
+    
+    const newPos = intersectPoint.clone().sub(dragOffset);
+    updateObstacle(draggedObstacle, 'position', [newPos.x, newPos.y, newPos.z]);
+  };
+
+  const handleObstaclePointerUp = () => {
+    setDraggedObstacle(null);
+    setDragOffset(null);
+  };
+
+  useEffect(() => {
+    const handleGlobalPointerUp = () => handleObstaclePointerUp();
+    const handleGlobalPointerMove = (event: MouseEvent) => {
+      if (draggedObstacle) {
+        const canvas = document.querySelector('canvas');
+        if (canvas) {
+          const rect = canvas.getBoundingClientRect();
+          const mouse = new THREE.Vector2(
+            ((event.clientX - rect.left) / rect.width) * 2 - 1,
+            -((event.clientY - rect.top) / rect.height) * 2 + 1
+          );
+          handleObstaclePointerMove({ point: mouse } as any);
+        }
+      }
+    };
+
+    if (draggedObstacle) {
+      document.addEventListener('pointerup', handleGlobalPointerUp);
+      document.addEventListener('pointermove', handleGlobalPointerMove);
+    }
+
+    return () => {
+      document.removeEventListener('pointerup', handleGlobalPointerUp);
+      document.removeEventListener('pointermove', handleGlobalPointerMove);
+    };
+  }, [draggedObstacle, dragOffset]);
 
   return (
     <>
@@ -900,23 +971,36 @@ const ObstacleRenderer = () => {
         const rot = obstacle.rotation as [number, number, number];
         const dim = obstacle.dimensions as [number, number, number];
         const color = obstacle.color;
+        const isDragMode = interactionMode === 'obstacle-drag';
 
-        return (
+        const obstacleMesh = (
           <group key={obstacle.id} position={pos} rotation={rot}>
             {obstacle.shape === 'box' && (
-              <mesh>
+              <mesh
+                onPointerDown={(e) => handleObstaclePointerDown(obstacle.id, e)}
+                onPointerOver={() => isDragMode && document.body.style.cursor = 'grab'}
+                onPointerOut={() => isDragMode && document.body.style.cursor = 'auto'}
+              >
                 <boxGeometry args={dim} />
                 <meshStandardMaterial color={color} transparent opacity={0.7} />
               </mesh>
             )}
             {obstacle.shape === 'sphere' && (
-              <mesh>
+              <mesh
+                onPointerDown={(e) => handleObstaclePointerDown(obstacle.id, e)}
+                onPointerOver={() => isDragMode && document.body.style.cursor = 'grab'}
+                onPointerOut={() => isDragMode && document.body.style.cursor = 'auto'}
+              >
                 <sphereGeometry args={[dim[0], 16, 16]} />
                 <meshStandardMaterial color={color} transparent opacity={0.7} />
               </mesh>
             )}
             {obstacle.shape === 'cylinder' && (
-              <mesh>
+              <mesh
+                onPointerDown={(e) => handleObstaclePointerDown(obstacle.id, e)}
+                onPointerOver={() => isDragMode && document.body.style.cursor = 'grab'}
+                onPointerOut={() => isDragMode && document.body.style.cursor = 'auto'}
+              >
                 <cylinderGeometry args={[dim[0], dim[0], dim[1], 16]} />
                 <meshStandardMaterial color={color} transparent opacity={0.7} />
               </mesh>
@@ -942,12 +1026,17 @@ const ObstacleRenderer = () => {
             )}
             {/* Label */}
             <Html position={[0, dim[1] / 2 + 0.02, 0]} center>
-              <div className="text-[10px] text-white bg-red-800/80 px-1 rounded whitespace-nowrap">
+              <div className={`text-[10px] text-white px-1 rounded whitespace-nowrap ${
+                isDragMode ? 'bg-blue-800/80' : 'bg-red-800/80'
+              }`}>
                 {obstacle.name}
+                {isDragMode && ' (click to drag)'}
               </div>
             </Html>
           </group>
         );
+
+        return obstacleMesh;
       })}
     </>
   );

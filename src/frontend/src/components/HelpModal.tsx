@@ -18,8 +18,8 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                 </button>
 
                 {currentPage !== 'main' && (
-                    <button 
-                        onClick={() => setCurrentPage('main')} 
+                    <button
+                        onClick={() => setCurrentPage('main')}
                         className="absolute top-4 left-4 text-gray-400 hover:text-white flex items-center space-x-1 z-10"
                     >
                         <ArrowLeft className="w-5 h-5" />
@@ -82,7 +82,7 @@ const MainGuide: React.FC<{ setPage: (page: HelpPage) => void }> = ({ setPage })
 
             <section>
                 <h3 className="text-xl font-semibold text-white mb-3">3. Advanced Simulation Features</h3>
-                
+
                 <div className="space-y-4">
                     <div className="bg-gray-900 p-4 rounded border-l-4 border-orange-500">
                         <h4 className="font-bold text-orange-400 mb-2">🧵 Tendon System</h4>
@@ -95,7 +95,7 @@ const MainGuide: React.FC<{ setPage: (page: HelpPage) => void }> = ({ setPage })
                             <li><strong>3D Routing:</strong> Click "Add Points" in tendon editor, then click on link surfaces to define the path.</li>
                             <li>Configure stiffness, damping, rest length, and moment arm parameters.</li>
                         </ul>
-                        <button 
+                        <button
                             onClick={() => setPage('tendon-detail')}
                             className="mt-3 text-orange-400 hover:text-orange-300 text-sm font-semibold flex items-center space-x-1"
                         >
@@ -485,7 +485,57 @@ const TendonDetailGuide: React.FC = () => {
             </section>
 
             <section>
-                <h3 className="text-xl font-semibold text-white mb-3">Step 7: Export to MuJoCo</h3>
+                <h3 className="text-xl font-semibold text-white mb-3">Step 7: Record Tendon Movements</h3>
+                <p className="text-gray-300 mb-3">
+                    For <strong className="text-orange-400">Active Tendons</strong>, you can record tendon-driven movements in the Web Viewer for realistic MuJoCo simulation playback.
+                </p>
+                
+                <div className="bg-orange-900/20 border border-orange-600 rounded-lg p-4 mb-4">
+                    <h4 className="font-bold text-orange-400 mb-2 text-sm">🎬 Tendon Recording Workflow</h4>
+                    <ol className="list-decimal ml-5 space-y-2 text-sm text-gray-300">
+                        <li><strong>Find Tendon Input Controls:</strong> In the link inspector panel, look for <strong className="text-orange-400">"Tendon Input"</strong> sliders for joints controlled by active tendons</li>
+                        <li><strong>Adjust Tendon Inputs:</strong> Use the sliders to control joint positions through tendon actuation</li>
+                        <li><strong>Start Recording:</strong> Click <strong className="text-white">"Recording"</strong> in the sidebar</li>
+                        <li><strong>Capture Keyframes:</strong> Move tendon inputs and click <strong className="text-white">"Capture Keyframe"</strong> to save positions</li>
+                        <li><strong>Playback:</strong> Use the timeline to replay tendon-driven movements</li>
+                    </ol>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div className="bg-gray-900 p-4 rounded border-l-4 border-orange-500">
+                        <h4 className="font-bold text-orange-400 mb-2 text-sm">🎛️ Tendon Input Controls</h4>
+                        <div className="space-y-2 text-xs text-gray-400">
+                            <p>• Appears in <strong>Link Inspector</strong> for driven joints</p>
+                            <p>• Range: <span className="text-white font-mono">0.0 - 1.0</span> (normalized)</p>
+                            <p>• <strong>Moment Arm:</strong> Converts input to joint angle</p>
+                            <p>• Real-time joint position updates</p>
+                        </div>
+                    </div>
+
+                    <div className="bg-gray-900 p-4 rounded border-l-4 border-purple-500">
+                        <h4 className="font-bold text-purple-400 mb-2 text-sm">📊 Recorded Data</h4>
+                        <div className="space-y-2 text-xs text-gray-400">
+                            <p>• <strong>Joint Positions:</strong> Calculated from tendon inputs</p>
+                            <p>• <strong>Tendon Inputs:</strong> Saved in keyframes</p>
+                            <p>• <strong>Interpolation:</strong> Smooth playback between frames</p>
+                            <p>• <strong>MuJoCo Ready:</strong> Exports with tendon data</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="bg-blue-900/20 border border-blue-600 rounded p-3">
+                    <p className="text-blue-300 font-semibold text-sm mb-1">💡 Pro Recording Tips</p>
+                    <ul className="text-xs text-gray-400 ml-4 space-y-0.5">
+                        <li>• Use <strong>small moment arms</strong> (0.01-0.05) for fine control</li>
+                        <li>• Record <strong>gradual movements</strong> for smooth interpolation</li>
+                        <li>• Combine with <strong>direct joint control</strong> for complex motions</li>
+                        <li>• Test playback before exporting to MuJoCo</li>
+                    </ul>
+                </div>
+            </section>
+
+            <section>
+                <h3 className="text-xl font-semibold text-white mb-3">Step 8: Export to MuJoCo</h3>
                 <p className="text-gray-300 mb-3">
                     Once your tendons are configured, export your robot:
                 </p>

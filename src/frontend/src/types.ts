@@ -158,11 +158,13 @@ export interface SensorDef {
   localPosition: [number, number, number];
   localRotation: [number, number, number];
   siteName: string;  // For MJCF export
+  size?: number;     // Sensor size/radius (default: 0.01)
+  range?: number;    // Sensor detection range (default: 0.02)
 }
 
 // --- Interaction Modes ---
 
-export type InteractionMode = 'select' | 'tendon-routing' | 'sensor-placement';
+export type InteractionMode = 'select' | 'tendon-routing' | 'sensor-placement' | 'obstacle-drag';
 
 // --- Motion Recording Types ---
 
@@ -173,6 +175,7 @@ export interface MotionKeyframe {
   timestamp: number;  // ms from recording start
   transitionDuration?: number; // Optional: effective duration for movement. If < (next - curr), we wait.
   jointValues: Record<string, JointValues>;  // jointId -> values snapshot
+  tendonInputs?: Record<string, number>;     // tendonId -> input value (for tendon-driven joints)
 }
 
 export interface MotionRecording {

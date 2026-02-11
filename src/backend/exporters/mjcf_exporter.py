@@ -133,15 +133,17 @@ def generate_mjcf_xml(
     joint_counter = {}  # Track joint names to avoid duplicates
     parent_child_pairs = []  # Track parent-child body pairs for collision exclusion
     rolling_constraints = []  # Track rolling contact joints for <equality> section
-    tendon_sites = {}  # Track tendon routing sites: {tendon_id: [(site_name, body_name)]}
-    
+    tendon_sites = (
+        {}
+    )  # Track tendon routing sites: {tendon_id: [(site_name, body_name)]}
+
     # Helper function to check if a joint is driven by a tendon
     def is_joint_tendon_driven(joint_id: str) -> bool:
         """Check if a joint is controlled by any tendon (should not get actuator)"""
-        if not hasattr(robot, 'tendons') or not robot.tendons:
+        if not hasattr(robot, "tendons") or not robot.tendons:
             return False
         for tendon in robot.tendons.values():
-            if hasattr(tendon, 'drivenJointIds') and tendon.drivenJointIds:
+            if hasattr(tendon, "drivenJointIds") and tendon.drivenJointIds:
                 if joint_id in tendon.drivenJointIds:
                     return True
         return False
@@ -300,7 +302,7 @@ def generate_mjcf_xml(
                         # Check if this joint is driven by a tendon
                         # If so, skip actuator creation (tendon will control it)
                         joint_is_tendon_driven = is_joint_tendon_driven(parent_joint_id)
-                        
+
                         if not joint_is_tendon_driven:
                             # Ensure unique actuator name
                             act_name = f"{joint_xml_name}_act"
@@ -327,7 +329,9 @@ def generate_mjcf_xml(
                                 f'kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" {ctrl_range}/>'
                             )
                         else:
-                            print(f"INFO: Joint '{joint_xml_name}' is tendon-driven, skipping actuator creation")
+                            print(
+                                f"INFO: Joint '{joint_xml_name}' is tendon-driven, skipping actuator creation"
+                            )
 
                         # Capture Info for Replay Mapping
                         # Note: for rotational joints we used 'active_axes' logic.
@@ -375,7 +379,7 @@ def generate_mjcf_xml(
 
                     # Check if this joint is driven by a tendon
                     joint_is_tendon_driven = is_joint_tendon_driven(parent_joint_id)
-                    
+
                     if not joint_is_tendon_driven:
                         # Ensure unique actuator name
                         act_name = f"{joint_xml_name}_act"
@@ -397,7 +401,9 @@ def generate_mjcf_xml(
                             f'kp="800" kv="80" gear="1" forcelimited="true" forcerange="-150 150" {ctrl_range}/>'
                         )
                     else:
-                        print(f"INFO: Joint '{joint_xml_name}' is tendon-driven, skipping actuator creation")
+                        print(
+                            f"INFO: Joint '{joint_xml_name}' is tendon-driven, skipping actuator creation"
+                        )
 
                     # Capture Info for Replay Mapping
                     generated_joints_info.append(
@@ -411,11 +417,11 @@ def generate_mjcf_xml(
                 elif joint.type == "rolling":
                     # Rolling contact joint: modeled as a hinge with equality constraints
                     # The rolling constraint is added via <equality><connect> later
-                    rolling_params = getattr(joint, 'rollingParams', None)
-                    
+                    rolling_params = getattr(joint, "rollingParams", None)
+
                     axis_val = joint.axis if joint.axis else [0, 0, 1]
                     axis_str = f"{axis_val[0]} {axis_val[1]} {axis_val[2]}"
-                    
+
                     # Use first active rotational DoF or default
                     active_axes = []
                     if joint.dof.roll:
@@ -424,54 +430,62 @@ def generate_mjcf_xml(
                         active_axes.append(("pitch", "0 1 0"))
                     if joint.dof.yaw:
                         active_axes.append(("yaw", "0 0 1"))
-                    
+
                     if not active_axes:
                         active_axes.append(("roll", axis_str))
-                    
+
                     for dof_name, dof_axis_str in active_axes:
                         suffix = f"_{dof_name}" if len(active_axes) > 1 else ""
                         joint_xml_name = f"{joint.name}{suffix}"
-                        
+
                         if joint_xml_name in joint_counter:
                             joint_counter[joint_xml_name] += 1
-                            joint_xml_name = f"{joint_xml_name}_{joint_counter[joint_xml_name]}"
+                            joint_xml_name = (
+                                f"{joint_xml_name}_{joint_counter[joint_xml_name]}"
+                            )
                         else:
                             joint_counter[joint_xml_name] = 0
-                        
+
                         limit = joint.limits.get(dof_name)
                         range_str = ""
                         if limit:
                             range_str = f'range="{limit.lower} {limit.upper}"'
-                        
+
                         # Rolling joints get higher friction/damping for realistic contact behavior
-                        friction_val = rolling_params.contactFriction if rolling_params else 0.5
+                        friction_val = (
+                            rolling_params.contactFriction if rolling_params else 0.5
+                        )
                         xml.append(
                             f'{indent}  <joint name="{joint_xml_name}" type="hinge" axis="{dof_axis_str}" '
                             f'{range_str} damping="{friction_val}" armature="0.001" />'
                         )
-                        
+
                         ctrl_range = (
                             range_str.replace("range=", "ctrlrange=")
                             if range_str
                             else 'ctrlrange="-3.14 3.14"'
                         )
-                        
+
                         # Check if this rolling joint is driven by a tendon
                         if not is_joint_tendon_driven(parent_joint_id):
                             act_name = f"{joint_xml_name}_act"
                             if act_name in actuator_counter:
                                 actuator_counter[act_name] += 1
-                                act_name = f"{joint_xml_name}_act_{actuator_counter[act_name]}"
+                                act_name = (
+                                    f"{joint_xml_name}_act_{actuator_counter[act_name]}"
+                                )
                             else:
                                 actuator_counter[act_name] = 0
-                            
+
                             actuators.append(
                                 f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
                                 f'kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" {ctrl_range}/>'
                             )
                         else:
-                            print(f"INFO: Rolling joint '{joint_xml_name}' is tendon-driven, skipping actuator creation")
-                        
+                            print(
+                                f"INFO: Rolling joint '{joint_xml_name}' is tendon-driven, skipping actuator creation"
+                            )
+
                         generated_joints_info.append(
                             {
                                 "original_id": parent_joint_id,
@@ -479,16 +493,18 @@ def generate_mjcf_xml(
                                 "name": joint_xml_name,
                             }
                         )
-                        
+
                         # Store rolling constraint info for <equality> section
                         if rolling_params:
-                            rolling_constraints.append({
-                                "joint_name": joint_xml_name,
-                                "body_name": body_name,
-                                "parent_body_name": parent_body_name,
-                                "curvature_radius": rolling_params.curvatureRadius,
-                                "surface_type": rolling_params.surfaceType,
-                            })
+                            rolling_constraints.append(
+                                {
+                                    "joint_name": joint_xml_name,
+                                    "body_name": body_name,
+                                    "parent_body_name": parent_body_name,
+                                    "curvature_radius": rolling_params.curvatureRadius,
+                                    "surface_type": rolling_params.surfaceType,
+                                }
+                            )
 
         # --- Joint Visuals ---
         if parent_joint_id:
@@ -876,17 +892,27 @@ def generate_mjcf_xml(
         if robot.sensors:
             for sensor_id, sensor_def in robot.sensors.items():
                 if sensor_def.linkId == link_id:
-                    s_pos = " ".join(map(lambda x: f"{x:.6f}", sensor_def.localPosition))
-                    s_rot = " ".join(map(lambda x: f"{x:.6f}", sensor_def.localRotation)) if sensor_def.localRotation else "0 0 0"
+                    s_pos = " ".join(
+                        map(lambda x: f"{x:.6f}", sensor_def.localPosition)
+                    )
+                    s_rot = (
+                        " ".join(map(lambda x: f"{x:.6f}", sensor_def.localRotation))
+                        if sensor_def.localRotation
+                        else "0 0 0"
+                    )
                     site_name = to_snake_case(sensor_def.siteName)
                     xml.append(
                         f'{indent}  <site name="{site_name}" pos="{s_pos}" euler="{s_rot}" '
                         f'type="sphere" size="0.003" rgba="0 1 0.5 0.8" />'
                     )
-                    if sensor_def.type == 'touch':
-                        sensors.append(f'    <touch name="user_{site_name}" site="{site_name}" />')
-                    elif sensor_def.type == 'force':
-                        sensors.append(f'    <force name="user_{site_name}" site="{site_name}" />')
+                    if sensor_def.type == "touch":
+                        sensors.append(
+                            f'    <touch name="user_{site_name}" site="{site_name}" />'
+                        )
+                    elif sensor_def.type == "force":
+                        sensors.append(
+                            f'    <force name="user_{site_name}" site="{site_name}" />'
+                        )
 
         # --- Tendon Routing Sites ---
         # Place <site> elements at routing point positions for spatial tendons
@@ -895,7 +921,9 @@ def generate_mjcf_xml(
                 for rp in tendon.routingPoints:
                     if rp.linkId == link_id:
                         rp_pos = " ".join(map(lambda x: f"{x:.6f}", rp.localPosition))
-                        site_name = f"tendon_{to_snake_case(tendon.name)}_rp_{rp.id[-8:]}"
+                        site_name = (
+                            f"tendon_{to_snake_case(tendon.name)}_rp_{rp.id[-8:]}"
+                        )
                         xml.append(
                             f'{indent}  <site name="{site_name}" pos="{rp_pos}" '
                             f'type="sphere" size="0.002" rgba="1 0.4 0 0.6" />'
@@ -951,10 +979,12 @@ def generate_mjcf_xml(
             obs_name = to_snake_case(obs.name)
             obs_pos = " ".join(map(lambda x: f"{x:.6f}", obs.position))
             obs_rot = " ".join(map(lambda x: f"{x:.6f}", obs.rotation))
-            
-            xml.append(f'    <body name="{obs_name}" pos="{obs_pos}" euler="{obs_rot}">')
+
+            xml.append(
+                f'    <body name="{obs_name}" pos="{obs_pos}" euler="{obs_rot}">'
+            )
             xml.append(f'      <inertial pos="0 0 0" mass="100" diaginertia="1 1 1" />')
-            
+
             # Convert hex color to RGBA
             obs_rgba = "0.5 0.5 0.5 1"
             if obs.color:
@@ -965,30 +995,32 @@ def generate_mjcf_xml(
                     obs_rgba = f"{r:.3f} {g:.3f} {b:.3f} 1"
                 except (ValueError, IndexError):
                     pass
-            
+
             friction_str = f"{obs.physics.friction} {obs.physics.friction} 0.0001"
             solref_str = " ".join(map(str, obs.physics.solref))
             solimp_str = " ".join(map(str, obs.physics.solimp))
-            
-            if obs.shape == 'box':
+
+            if obs.shape == "box":
                 size = " ".join([str(d / 2) for d in obs.dimensions])
                 xml.append(
                     f'      <geom type="box" size="{size}" rgba="{obs_rgba}" '
                     f'friction="{friction_str}" solref="{solref_str}" solimp="{solimp_str}" />'
                 )
-            elif obs.shape == 'sphere':
+            elif obs.shape == "sphere":
                 xml.append(
                     f'      <geom type="sphere" size="{obs.dimensions[0]}" rgba="{obs_rgba}" '
                     f'friction="{friction_str}" solref="{solref_str}" solimp="{solimp_str}" />'
                 )
-            elif obs.shape == 'cylinder':
+            elif obs.shape == "cylinder":
                 xml.append(
                     f'      <geom type="cylinder" size="{obs.dimensions[0]} {obs.dimensions[1] / 2}" rgba="{obs_rgba}" '
                     f'friction="{friction_str}" solref="{solref_str}" solimp="{solimp_str}" />'
                 )
-            
-            xml.append(f'    </body>')
-        print(f"✓ Added {sum(1 for o in robot.obstacles.values() if o.enabled)} obstacle bodies")
+
+            xml.append(f"    </body>")
+        print(
+            f"✓ Added {sum(1 for o in robot.obstacles.values() if o.enabled)} obstacle bodies"
+        )
 
     xml.append("  </worldbody>")
 
@@ -1032,28 +1064,32 @@ def generate_mjcf_xml(
             range_str = ""
             if tendon.restLength > 0:
                 range_str = f'range="0 {tendon.restLength * 2:.4f}"'
-            
+
             xml.append(
                 f'    <spatial name="{tendon_name}" {width_str} '
                 f'stiffness="{stiffness}" damping="{damping}" {range_str}>'
             )
             for site_name, body_name in tendon_sites[tendon_id]:
                 xml.append(f'      <site site="{site_name}" />')
-            xml.append(f'    </spatial>')
+            xml.append(f"    </spatial>")
         xml.append("  </tendon>")
         print(f"✓ Added {len(tendon_sites)} spatial tendons")
-        
+
         # Tendon actuators for active tendons
         if robot.tendons:
             for tendon_id, tendon in robot.tendons.items():
-                if tendon.type == 'active' and tendon_id in tendon_sites and len(tendon_sites[tendon_id]) >= 2:
+                if (
+                    tendon.type == "active"
+                    and tendon_id in tendon_sites
+                    and len(tendon_sites[tendon_id]) >= 2
+                ):
                     tendon_name = to_snake_case(tendon.name)
                     act_name = f"{tendon_name}_motor"
-                    
+
                     # Determine actuator parameters based on driven joints
                     driven_joints = tendon.drivenJointIds or []
                     moment_arm = tendon.momentArm if tendon.momentArm else 0.01
-                    
+
                     if driven_joints:
                         # Position control actuator for tendon-driven joints
                         # gainprm[0] = kp (position gain through tendon)
@@ -1066,8 +1102,14 @@ def generate_mjcf_xml(
                             f'forcelimited="true" forcerange="-300 300" '
                             f'ctrlrange="-1 1" />'
                         )
-                        driven_names = [to_snake_case(robot.joints[jid].name) for jid in driven_joints if jid in robot.joints]
-                        print(f"  ✓ Active tendon '{tendon_name}' drives joints: {driven_names}")
+                        driven_names = [
+                            to_snake_case(robot.joints[jid].name)
+                            for jid in driven_joints
+                            if jid in robot.joints
+                        ]
+                        print(
+                            f"  ✓ Active tendon '{tendon_name}' drives joints: {driven_names}"
+                        )
                     else:
                         # Simple force actuator (no specific joint coupling)
                         actuators.append(

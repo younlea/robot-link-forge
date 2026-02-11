@@ -35,9 +35,17 @@ const Vec3Input = ({ label, value, onChange }: { label: string, value: [number, 
 );
 
 const ObstacleManager = () => {
-    const { obstacles, addObstacle, updateObstacle, deleteObstacle } = useRobotStore();
+    const { obstacles, addObstacle, updateObstacle, deleteObstacle, setInteractionMode, interactionMode } = useRobotStore();
     const [isExpanded, setIsExpanded] = useState(false);
     const obstacleList = Object.values(obstacles);
+
+    const toggleDragMode = () => {
+        if (interactionMode === 'obstacle-drag') {
+            setInteractionMode('select');
+        } else {
+            setInteractionMode('obstacle-drag');
+        }
+    };
 
     return (
         <div className="mt-4 border-t border-gray-700 pt-4">
@@ -67,8 +75,24 @@ const ObstacleManager = () => {
                         </button>
                     </div>
 
+                    {/* Drag Mode Toggle */}
+                    <div className="flex items-center justify-between">
+                        <span className="text-xs text-gray-400">3D Drag Mode</span>
+                        <button
+                            onClick={toggleDragMode}
+                            className={`px-3 py-1 rounded text-xs font-semibold ${
+                                interactionMode === 'obstacle-drag'
+                                    ? 'bg-blue-600 text-white'
+                                    : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
+                            }`}
+                        >
+                            {interactionMode === 'obstacle-drag' ? 'Active' : 'Inactive'}
+                        </button>
+                    </div>
+
                     <p className="text-[10px] text-gray-500">
                         Fixed obstacles for contact simulation. Toggle enabled/disabled without deleting.
+                        {interactionMode === 'obstacle-drag' && ' Click and drag obstacles in 3D view.'}
                     </p>
 
                     {/* Obstacle List */}

@@ -171,6 +171,25 @@ const RecordingPanel = ({ onClose }: RecordingPanelProps) => {
                 updateJoint(jointId, `currentValues.${dof}`, interpolated);
             });
         });
+
+        // Apply interpolated tendon inputs
+        const allTendonIds = new Set([
+            ...Object.keys(kf0.tendonInputs || {}),
+            ...Object.keys(kf1.tendonInputs || {}),
+            ...Object.keys(kf2.tendonInputs || {}),
+            ...Object.keys(kf3.tendonInputs || {})
+        ]);
+
+        allTendonIds.forEach(tendonId => {
+            const v0 = kf0.tendonInputs?.[tendonId] ?? kf1.tendonInputs?.[tendonId] ?? 0;
+            const v1 = kf1.tendonInputs?.[tendonId] ?? 0;
+            const v2 = kf2.tendonInputs?.[tendonId] ?? 0;
+            const v3 = kf3.tendonInputs?.[tendonId] ?? kf2.tendonInputs?.[tendonId] ?? 0;
+
+            const interpolated = catmullRom(v0, v1, v2, v3, Math.max(0, Math.min(1, t)));
+            // Note: setTendonInput will automatically update driven joints
+            setTendonInput(tendonId, interpolated);
+        });
     };
 
     // Playback animation loop

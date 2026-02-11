@@ -153,6 +153,39 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
     selectionCandidates: [],
     cameraControls: null,
 
+    // --- Tendon Input State ---
+    tendonInputs: {}, // tendonId -> input value (for tendon-driven joints)
+
+    setTendonInput: (tendonId: string, value: number) => {
+        setState(state => ({
+            tendonInputs: { ...state.tendonInputs, [tendonId]: value }
+        }));
+        // Optionally: update driven joints
+        const tendon = getState().tendons[tendonId];
+        if (tendon && tendon.drivenJointIds) {
+            for (const jointId of tendon.drivenJointIds) {
+                // 간단한 기구학: momentArm * input = 각도 변화
+                const joint = getState().joints[jointId];
+                if (joint && joint.type === 'rotational') {
+                    const angle = value * (tendon.momentArm || 1);
+                    setState(state => ({
+                        joints: {
+                            ...state.joints,
+                            [jointId]: {
+                                ...state.joints[jointId],
+                                currentValues: {
+                                    ...state.joints[jointId].currentValues,
+                                    // 가장 단순하게 yaw에 적용 (실제 구현에서는 dof별로 분기)
+                                    yaw: angle
+                                }
+                            }
+                        }
+                    }));
+                }
+            }
+        }
+    },
+
     uploadAndSetMesh: async (itemId, itemType, file) => {
         const { joints, links } = getState();
 
@@ -1500,6 +1533,8 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             localPosition,
             localRotation: [0, 0, 0],
             siteName: `${type}_site_${linkName}_${sensorCount}`,
+            size: 0.01,  // Default sensor size (1cm radius)
+            range: 0.02, // Default detection range (2cm)
         };
         setState(state => ({
             sensors: { ...state.sensors, [id]: sensor },
@@ -1511,6 +1546,15 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             const { [id]: _, ...rest } = state.sensors;
             return { sensors: rest };
         });
+    },
+
+    updateSensor: (id: string, updates: Partial<SensorDef>) => {
+        setState(state => ({
+            sensors: {
+                ...state.sensors,
+                [id]: { ...state.sensors[id], ...updates }
+            }
+        }));
     },
 
     // --- Interaction Mode ---
@@ -1628,6 +1672,9 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             jointValues[jointId] = { ...joint.currentValues };
         });
 
+        // Capture current tendon inputs (for tendon-driven joints)
+        const tendonInputs: Record<string, number> = { ...state.tendonInputs };
+
         const timestamp = state.recordingStartTime
             ? Date.now() - state.recordingStartTime
             : 0;
@@ -1636,6 +1683,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             id: uuidv4(),
             timestamp,
             jointValues,
+            tendonInputs,
         };
 
         setState({
@@ -1760,7 +1808,15 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             }
         });
 
-        setState({ joints: newJoints });
+        // Apply tendon inputs
+        const newTendonInputs = { ...state.tendonInputs };
+        if (keyframe.tendonInputs) {
+            Object.entries(keyframe.tendonInputs).forEach(([tendonId, value]) => {
+                newTendonInputs[tendonId] = value;
+            });
+        }
+
+        setState({ joints: newJoints, tendonInputs: newTendonInputs });
     },
 
     editRecording: (recordingId) => {
