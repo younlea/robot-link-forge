@@ -35,9 +35,8 @@ export const CameraManager: React.FC = () => {
             const deltaX = e.movementX * 0.005; // Adjust sensitivity
             const deltaY = e.movementY * 0.005;
 
-            // Ensure middle mouse button only rotates (pitch/yaw) without any zoom effect
+            // Unified rotation logic for both left and middle mouse buttons
             controls.rotate(-deltaX, -deltaY, true);
-            controls.dolly(0, true); // Explicitly prevent zooming
         };
 
         const handleMouseUp = () => {
