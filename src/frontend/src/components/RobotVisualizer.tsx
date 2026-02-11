@@ -1098,8 +1098,6 @@ const SensorMarkers = ({ objectRefs }: { objectRefs: RefMap }) => {
       if (linkObj) {
         const localPos = new THREE.Vector3(...sensor.localPosition);
         newPositions[sensor.id] = linkObj.localToWorld(localPos.clone());
-      } else {
-        console.warn(`Sensor ${sensor.id} has invalid linkId: ${sensor.linkId}`);
       }
     }
     setWorldPositions(newPositions);
