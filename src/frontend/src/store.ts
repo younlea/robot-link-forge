@@ -1382,6 +1382,7 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             stiffness: type === 'passive' ? 50.0 : 0.0,
             damping: 0.1,
             restLength: 0.1,
+            drivenJointIds: [],
             color: type === 'active' ? '#ff6600' : '#00aaff',
             width: 0.002,
         };

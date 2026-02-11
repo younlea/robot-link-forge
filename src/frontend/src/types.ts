@@ -121,6 +121,9 @@ export interface Tendon {
   actuatorMotorId?: string;  // Which motor drives this tendon
   momentArm?: number;        // Effective moment arm (m)
 
+  // Tendon-driven joint coupling
+  drivenJointIds?: string[];  // Joints controlled by this tendon (replaces direct actuation)
+
   // Visualization
   color: string;
   width: number;           // Line thickness (visualization only)

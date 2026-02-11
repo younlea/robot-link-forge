@@ -99,10 +99,20 @@ const TendonItem = ({
     onStopRouting: () => void;
     isRouting: boolean;
 }) => {
-    const { updateTendon, deleteTendon, removeTendonRoutingPoint, links, setActiveTendonId } = useRobotStore();
+    const { updateTendon, deleteTendon, removeTendonRoutingPoint, links, joints, setActiveTendonId } = useRobotStore();
     const [isExpanded, setIsExpanded] = useState(false);
 
     const getLinkName = (linkId: string) => links[linkId]?.name || linkId.slice(0, 8);
+    const getJointName = (jointId: string) => joints[jointId]?.name || jointId.slice(0, 8);
+
+    // Helper to toggle joint in drivenJointIds
+    const toggleDrivenJoint = (jointId: string) => {
+        const current = tendon.drivenJointIds || [];
+        const newList = current.includes(jointId)
+            ? current.filter(id => id !== jointId)
+            : [...current, jointId];
+        updateTendon(tendon.id, 'drivenJointIds', newList);
+    };
 
     return (
         <div className={`p-2 rounded text-xs space-y-2 ${isActive ? 'bg-gray-700 border border-orange-600' : 'bg-gray-900/50'
@@ -165,13 +175,59 @@ const TendonItem = ({
                     </div>
 
                     {tendon.type === 'active' && (
-                        <div className="flex items-center justify-between">
-                            <label className="text-gray-400">Moment Arm (m)</label>
-                            <input
-                                type="number" step={0.001} value={tendon.momentArm ?? 0.01}
-                                onChange={(e) => updateTendon(tendon.id, 'momentArm', parseFloat(e.target.value) || 0)}
-                                className="w-2/3 bg-gray-900 rounded p-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
-                            />
+                        <>
+                            <div className="flex items-center justify-between">
+                                <label className="text-gray-400">Moment Arm (m)</label>
+                                <input
+                                    type="number" step={0.001} value={tendon.momentArm ?? 0.01}
+                                    onChange={(e) => updateTendon(tendon.id, 'momentArm', parseFloat(e.target.value) || 0)}
+                                    className="w-2/3 bg-gray-900 rounded p-1 text-xs focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                />
+                            </div>
+
+                            {/* Driven Joints Section */}
+                            <div className="border-t border-gray-800 pt-2">
+                                <div className="flex justify-between items-center mb-1">
+                                    <span className="text-gray-400 font-semibold text-[10px]">
+                                        🔗 Driven Joints ({(tendon.drivenJointIds || []).length})
+                                    </span>
+                                </div>
+                                <div className="bg-gray-950/50 rounded p-2 space-y-1 max-h-32 overflow-y-auto">
+                                    {Object.values(joints).filter(j => j.type !== 'fixed').map(joint => {
+                                        const isDriven = (tendon.drivenJointIds || []).includes(joint.id);
+                                        return (
+                                            <label key={joint.id} className="flex items-center space-x-2 cursor-pointer hover:bg-gray-800 rounded p-1">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={isDriven}
+                                                    onChange={() => toggleDrivenJoint(joint.id)}
+                                                    className="form-checkbox h-3 w-3 text-orange-600 rounded"
+                                                />
+                                                <span className={`text-[10px] flex-1 ${isDriven ? 'text-orange-300 font-semibold' : 'text-gray-400'}`}>
+                                                    {getJointName(joint.id)}
+                                                </span>
+                                                <span className="text-[9px] text-gray-600">{joint.type}</span>
+                                            </label>
+                                        );
+                                    })}
+                                    {Object.values(joints).filter(j => j.type !== 'fixed').length === 0 && (
+                                        <p className="text-[10px] text-gray-600 text-center py-1">
+                                            No active joints available
+                                        </p>
+                                    )}
+                                </div>
+                                <p className="text-[9px] text-gray-600 mt-1">
+                                    💡 Selected joints will be controlled by this tendon (no direct actuator)
+                                </p>
+                            </div>
+                        </>
+                    )}
+
+                    {tendon.type === 'passive' && (
+                        <div className="bg-blue-900/20 rounded p-2">
+                            <p className="text-[9px] text-blue-300">
+                                💡 Passive tendons act as springs. They cannot drive joints directly.
+                            </p>
                         </div>
                     )}
 

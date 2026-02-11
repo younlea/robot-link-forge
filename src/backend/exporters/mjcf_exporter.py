@@ -134,6 +134,17 @@ def generate_mjcf_xml(
     parent_child_pairs = []  # Track parent-child body pairs for collision exclusion
     rolling_constraints = []  # Track rolling contact joints for <equality> section
     tendon_sites = {}  # Track tendon routing sites: {tendon_id: [(site_name, body_name)]}
+    
+    # Helper function to check if a joint is driven by a tendon
+    def is_joint_tendon_driven(joint_id: str) -> bool:
+        """Check if a joint is controlled by any tendon (should not get actuator)"""
+        if not hasattr(robot, 'tendons') or not robot.tendons:
+            return False
+        for tendon in robot.tendons.values():
+            if hasattr(tendon, 'drivenJointIds') and tendon.drivenJointIds:
+                if joint_id in tendon.drivenJointIds:
+                    return True
+        return False
 
     def build_body(
         link_id: str,
@@ -286,30 +297,37 @@ def generate_mjcf_xml(
                             else 'ctrlrange="-3.14 3.14"'
                         )
 
-                        # Ensure unique actuator name
-                        act_name = f"{joint_xml_name}_act"
-                        if act_name in actuator_counter:
-                            actuator_counter[act_name] += 1
-                            new_act_name = (
-                                f"{joint_xml_name}_act_{actuator_counter[act_name]}"
-                            )
-                            print(
-                                f"WARNING: Duplicate actuator name '{act_name}' detected. Renamed to '{new_act_name}'"
-                            )
-                            act_name = new_act_name
-                        else:
-                            actuator_counter[act_name] = 0
+                        # Check if this joint is driven by a tendon
+                        # If so, skip actuator creation (tendon will control it)
+                        joint_is_tendon_driven = is_joint_tendon_driven(parent_joint_id)
+                        
+                        if not joint_is_tendon_driven:
+                            # Ensure unique actuator name
+                            act_name = f"{joint_xml_name}_act"
+                            if act_name in actuator_counter:
+                                actuator_counter[act_name] += 1
+                                new_act_name = (
+                                    f"{joint_xml_name}_act_{actuator_counter[act_name]}"
+                                )
+                                print(
+                                    f"WARNING: Duplicate actuator name '{act_name}' detected. Renamed to '{new_act_name}'"
+                                )
+                                act_name = new_act_name
+                            else:
+                                actuator_counter[act_name] = 0
 
-                        # Motor parameters - BALANCED approach:
-                        # - gear=50: Realistic gear ratio (allows fast movement)
-                        # - kp=200: Moderate position gain
-                        # - kv=20: 10% damping ratio for stability
-                        # - forcerange=300: Realistic motor torque (50×6Nm = 300Nm)
-                        # Physics: High gear → slow speed! Use moderate gear for trajectory tracking
-                        actuators.append(
-                            f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
-                            f'kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" {ctrl_range}/>'
-                        )
+                            # Motor parameters - BALANCED approach:
+                            # - gear=50: Realistic gear ratio (allows fast movement)
+                            # - kp=200: Moderate position gain
+                            # - kv=20: 10% damping ratio for stability
+                            # - forcerange=300: Realistic motor torque (50×6Nm = 300Nm)
+                            # Physics: High gear → slow speed! Use moderate gear for trajectory tracking
+                            actuators.append(
+                                f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
+                                f'kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" {ctrl_range}/>'
+                            )
+                        else:
+                            print(f"INFO: Joint '{joint_xml_name}' is tendon-driven, skipping actuator creation")
 
                         # Capture Info for Replay Mapping
                         # Note: for rotational joints we used 'active_axes' logic.
@@ -355,25 +373,31 @@ def generate_mjcf_xml(
                         else 'ctrlrange="-1 1"'
                     )
 
-                    # Ensure unique actuator name
-                    act_name = f"{joint_xml_name}_act"
-                    if act_name in actuator_counter:
-                        actuator_counter[act_name] += 1
-                        new_act_name = (
-                            f"{joint_xml_name}_act_{actuator_counter[act_name]}"
-                        )
-                        print(
-                            f"WARNING: Duplicate actuator name '{act_name}' detected. Renamed to '{new_act_name}'"
-                        )
-                        act_name = new_act_name
-                    else:
-                        actuator_counter[act_name] = 0
+                    # Check if this joint is driven by a tendon
+                    joint_is_tendon_driven = is_joint_tendon_driven(parent_joint_id)
+                    
+                    if not joint_is_tendon_driven:
+                        # Ensure unique actuator name
+                        act_name = f"{joint_xml_name}_act"
+                        if act_name in actuator_counter:
+                            actuator_counter[act_name] += 1
+                            new_act_name = (
+                                f"{joint_xml_name}_act_{actuator_counter[act_name]}"
+                            )
+                            print(
+                                f"WARNING: Duplicate actuator name '{act_name}' detected. Renamed to '{new_act_name}'"
+                            )
+                            act_name = new_act_name
+                        else:
+                            actuator_counter[act_name] = 0
 
-                    # Tuned for stable tracking
-                    actuators.append(
-                        f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
-                        f'kp="800" kv="80" gear="1" forcelimited="true" forcerange="-150 150" {ctrl_range}/>'
-                    )
+                        # Tuned for stable tracking
+                        actuators.append(
+                            f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
+                            f'kp="800" kv="80" gear="1" forcelimited="true" forcerange="-150 150" {ctrl_range}/>'
+                        )
+                    else:
+                        print(f"INFO: Joint '{joint_xml_name}' is tendon-driven, skipping actuator creation")
 
                     # Capture Info for Replay Mapping
                     generated_joints_info.append(
@@ -432,17 +456,21 @@ def generate_mjcf_xml(
                             else 'ctrlrange="-3.14 3.14"'
                         )
                         
-                        act_name = f"{joint_xml_name}_act"
-                        if act_name in actuator_counter:
-                            actuator_counter[act_name] += 1
-                            act_name = f"{joint_xml_name}_act_{actuator_counter[act_name]}"
+                        # Check if this rolling joint is driven by a tendon
+                        if not is_joint_tendon_driven(parent_joint_id):
+                            act_name = f"{joint_xml_name}_act"
+                            if act_name in actuator_counter:
+                                actuator_counter[act_name] += 1
+                                act_name = f"{joint_xml_name}_act_{actuator_counter[act_name]}"
+                            else:
+                                actuator_counter[act_name] = 0
+                            
+                            actuators.append(
+                                f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
+                                f'kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" {ctrl_range}/>'
+                            )
                         else:
-                            actuator_counter[act_name] = 0
-                        
-                        actuators.append(
-                            f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
-                            f'kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" {ctrl_range}/>'
-                        )
+                            print(f"INFO: Rolling joint '{joint_xml_name}' is tendon-driven, skipping actuator creation")
                         
                         generated_joints_info.append(
                             {
@@ -1021,10 +1049,31 @@ def generate_mjcf_xml(
                 if tendon.type == 'active' and tendon_id in tendon_sites and len(tendon_sites[tendon_id]) >= 2:
                     tendon_name = to_snake_case(tendon.name)
                     act_name = f"{tendon_name}_motor"
-                    actuators.append(
-                        f'    <general name="{act_name}" tendon="{tendon_name}" '
-                        f'gainprm="100" biasprm="0 -100 -10" />'
-                    )
+                    
+                    # Determine actuator parameters based on driven joints
+                    driven_joints = tendon.drivenJointIds or []
+                    moment_arm = tendon.momentArm if tendon.momentArm else 0.01
+                    
+                    if driven_joints:
+                        # Position control actuator for tendon-driven joints
+                        # gainprm[0] = kp (position gain through tendon)
+                        # biasprm = [0, -kp, -kv] for PD control
+                        kp = 200.0
+                        kv = 20.0
+                        actuators.append(
+                            f'    <general name="{act_name}" tendon="{tendon_name}" '
+                            f'gainprm="{kp}" biasprm="0 -{kp} -{kv}" '
+                            f'forcelimited="true" forcerange="-300 300" '
+                            f'ctrlrange="-1 1" />'
+                        )
+                        driven_names = [to_snake_case(robot.joints[jid].name) for jid in driven_joints if jid in robot.joints]
+                        print(f"  ✓ Active tendon '{tendon_name}' drives joints: {driven_names}")
+                    else:
+                        # Simple force actuator (no specific joint coupling)
+                        actuators.append(
+                            f'    <general name="{act_name}" tendon="{tendon_name}" '
+                            f'gainprm="100" biasprm="0 -100 -10" />'
+                        )
 
     # --- Equality Constraints for Rolling Contact Joints ---
     if rolling_constraints:

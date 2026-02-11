@@ -74,6 +74,7 @@ class Tendon(BaseModel):
     restLength: float = Field(0.0, alias="restLength")
     actuatorMotorId: Optional[str] = Field(None, alias="actuatorMotorId")
     momentArm: Optional[float] = Field(None, alias="momentArm")
+    drivenJointIds: Optional[List[str]] = Field(default_factory=list, alias="drivenJointIds")
     color: str = "#ff6600"
     width: float = 0.002
 
