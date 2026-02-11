@@ -69,7 +69,9 @@ export const CameraManager: React.FC = () => {
 
             // Ensure middle mouse button only rotates (pitch/yaw) without any zoom effect
             controls.rotate(-deltaX, -deltaY, true);
-            controls.dolly(0, true); // Explicitly prevent zooming
+
+            // Explicitly disable dolly (zoom) functionality
+            controls.dolly(0, false); // Prevent zoom changes
         };
 
         const handleMouseUp = () => {
