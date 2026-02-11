@@ -35,12 +35,7 @@ export const CameraManager: React.FC = () => {
             const deltaX = e.movementX * 0.005; // Adjust sensitivity
             const deltaY = e.movementY * 0.005;
 
-            // Ensure middle mouse button only rotates (pitch/yaw) without any zoom effect
-            const currentPitch = controls.getAzimuthalAngle();
-            const newPitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, currentPitch - deltaY)); // Limit pitch to [-90, 90] degrees
-
-            controls.rotate(-deltaX, 0, true); // Rotate yaw
-            controls.setAzimuthalAngle(newPitch); // Set limited pitch
+            controls.rotate(-deltaX, -deltaY, true); // Rotate yaw and pitch
         };
 
         const handleMouseUp = () => {
@@ -71,15 +66,7 @@ export const CameraManager: React.FC = () => {
             const deltaX = e.movementX * 0.005; // Adjust sensitivity
             const deltaY = e.movementY * 0.005;
 
-            // Ensure middle mouse button only rotates (pitch/yaw) without any zoom effect
-            const currentPitch = controls.getAzimuthalAngle();
-            const newPitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, currentPitch - deltaY)); // Limit pitch to [-90, 90] degrees
-
-            controls.rotate(-deltaX, 0, true); // Rotate yaw
-            controls.setAzimuthalAngle(newPitch); // Set limited pitch
-
-            // Explicitly disable dolly (zoom) functionality
-            controls.dolly(0, false); // Prevent zoom changes
+            controls.rotate(-deltaX, -deltaY, true); // Rotate yaw and pitch
         };
 
         const handleMouseUp = () => {
