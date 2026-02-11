@@ -132,6 +132,8 @@ def generate_mjcf_xml(
     actuator_counter = {}  # Track actuator names to avoid duplicates
     joint_counter = {}  # Track joint names to avoid duplicates
     parent_child_pairs = []  # Track parent-child body pairs for collision exclusion
+    rolling_constraints = []  # Track rolling contact joints for <equality> section
+    tendon_sites = {}  # Track tendon routing sites: {tendon_id: [(site_name, body_name)]}
 
     def build_body(
         link_id: str,
@@ -381,6 +383,84 @@ def generate_mjcf_xml(
                             "name": joint_xml_name,
                         }
                     )
+
+                elif joint.type == "rolling":
+                    # Rolling contact joint: modeled as a hinge with equality constraints
+                    # The rolling constraint is added via <equality><connect> later
+                    rolling_params = getattr(joint, 'rollingParams', None)
+                    
+                    axis_val = joint.axis if joint.axis else [0, 0, 1]
+                    axis_str = f"{axis_val[0]} {axis_val[1]} {axis_val[2]}"
+                    
+                    # Use first active rotational DoF or default
+                    active_axes = []
+                    if joint.dof.roll:
+                        active_axes.append(("roll", "1 0 0"))
+                    if joint.dof.pitch:
+                        active_axes.append(("pitch", "0 1 0"))
+                    if joint.dof.yaw:
+                        active_axes.append(("yaw", "0 0 1"))
+                    
+                    if not active_axes:
+                        active_axes.append(("roll", axis_str))
+                    
+                    for dof_name, dof_axis_str in active_axes:
+                        suffix = f"_{dof_name}" if len(active_axes) > 1 else ""
+                        joint_xml_name = f"{joint.name}{suffix}"
+                        
+                        if joint_xml_name in joint_counter:
+                            joint_counter[joint_xml_name] += 1
+                            joint_xml_name = f"{joint_xml_name}_{joint_counter[joint_xml_name]}"
+                        else:
+                            joint_counter[joint_xml_name] = 0
+                        
+                        limit = joint.limits.get(dof_name)
+                        range_str = ""
+                        if limit:
+                            range_str = f'range="{limit.lower} {limit.upper}"'
+                        
+                        # Rolling joints get higher friction/damping for realistic contact behavior
+                        friction_val = rolling_params.contactFriction if rolling_params else 0.5
+                        xml.append(
+                            f'{indent}  <joint name="{joint_xml_name}" type="hinge" axis="{dof_axis_str}" '
+                            f'{range_str} damping="{friction_val}" armature="0.001" />'
+                        )
+                        
+                        ctrl_range = (
+                            range_str.replace("range=", "ctrlrange=")
+                            if range_str
+                            else 'ctrlrange="-3.14 3.14"'
+                        )
+                        
+                        act_name = f"{joint_xml_name}_act"
+                        if act_name in actuator_counter:
+                            actuator_counter[act_name] += 1
+                            act_name = f"{joint_xml_name}_act_{actuator_counter[act_name]}"
+                        else:
+                            actuator_counter[act_name] = 0
+                        
+                        actuators.append(
+                            f'{indent}    <position name="{act_name}" joint="{joint_xml_name}" '
+                            f'kp="200" kv="20" gear="50" forcelimited="true" forcerange="-300 300" {ctrl_range}/>'
+                        )
+                        
+                        generated_joints_info.append(
+                            {
+                                "original_id": parent_joint_id,
+                                "suffix": dof_name,
+                                "name": joint_xml_name,
+                            }
+                        )
+                        
+                        # Store rolling constraint info for <equality> section
+                        if rolling_params:
+                            rolling_constraints.append({
+                                "joint_name": joint_xml_name,
+                                "body_name": body_name,
+                                "parent_body_name": parent_body_name,
+                                "curvature_radius": rolling_params.curvatureRadius,
+                                "surface_type": rolling_params.surfaceType,
+                            })
 
         # --- Joint Visuals ---
         if parent_joint_id:
@@ -764,6 +844,38 @@ def generate_mjcf_xml(
                 sensor_name = f"sensor_{body_name}"
                 sensors.append(f'    <touch name="{sensor_name}" site="{site_name}" />')
 
+        # --- User-defined Sensor Sites ---
+        if robot.sensors:
+            for sensor_id, sensor_def in robot.sensors.items():
+                if sensor_def.linkId == link_id:
+                    s_pos = " ".join(map(lambda x: f"{x:.6f}", sensor_def.localPosition))
+                    s_rot = " ".join(map(lambda x: f"{x:.6f}", sensor_def.localRotation)) if sensor_def.localRotation else "0 0 0"
+                    site_name = to_snake_case(sensor_def.siteName)
+                    xml.append(
+                        f'{indent}  <site name="{site_name}" pos="{s_pos}" euler="{s_rot}" '
+                        f'type="sphere" size="0.003" rgba="0 1 0.5 0.8" />'
+                    )
+                    if sensor_def.type == 'touch':
+                        sensors.append(f'    <touch name="user_{site_name}" site="{site_name}" />')
+                    elif sensor_def.type == 'force':
+                        sensors.append(f'    <force name="user_{site_name}" site="{site_name}" />')
+
+        # --- Tendon Routing Sites ---
+        # Place <site> elements at routing point positions for spatial tendons
+        if robot.tendons:
+            for tendon_id, tendon in robot.tendons.items():
+                for rp in tendon.routingPoints:
+                    if rp.linkId == link_id:
+                        rp_pos = " ".join(map(lambda x: f"{x:.6f}", rp.localPosition))
+                        site_name = f"tendon_{to_snake_case(tendon.name)}_rp_{rp.id[-8:]}"
+                        xml.append(
+                            f'{indent}  <site name="{site_name}" pos="{rp_pos}" '
+                            f'type="sphere" size="0.002" rgba="1 0.4 0 0.6" />'
+                        )
+                        if tendon_id not in tendon_sites:
+                            tendon_sites[tendon_id] = []
+                        tendon_sites[tendon_id].append((site_name, body_name))
+
         # Collect child body names for sibling collision exclusion
         # (e.g., finger yaw and pitch joints from same parent link)
         child_body_names = []
@@ -801,6 +913,55 @@ def generate_mjcf_xml(
     )  # Indent 3 because inside fixed_world body
 
     xml.append("    </body>  <!-- End fixed_world -->")
+
+    # --- Obstacle Bodies (fixed in world frame) ---
+    if robot.obstacles:
+        xml.append("    <!-- Obstacles for contact simulation -->")
+        for obs_id, obs in robot.obstacles.items():
+            if not obs.enabled:
+                continue
+            obs_name = to_snake_case(obs.name)
+            obs_pos = " ".join(map(lambda x: f"{x:.6f}", obs.position))
+            obs_rot = " ".join(map(lambda x: f"{x:.6f}", obs.rotation))
+            
+            xml.append(f'    <body name="{obs_name}" pos="{obs_pos}" euler="{obs_rot}">')
+            xml.append(f'      <inertial pos="0 0 0" mass="100" diaginertia="1 1 1" />')
+            
+            # Convert hex color to RGBA
+            obs_rgba = "0.5 0.5 0.5 1"
+            if obs.color:
+                try:
+                    r = int(obs.color[1:3], 16) / 255
+                    g = int(obs.color[3:5], 16) / 255
+                    b = int(obs.color[5:7], 16) / 255
+                    obs_rgba = f"{r:.3f} {g:.3f} {b:.3f} 1"
+                except (ValueError, IndexError):
+                    pass
+            
+            friction_str = f"{obs.physics.friction} {obs.physics.friction} 0.0001"
+            solref_str = " ".join(map(str, obs.physics.solref))
+            solimp_str = " ".join(map(str, obs.physics.solimp))
+            
+            if obs.shape == 'box':
+                size = " ".join([str(d / 2) for d in obs.dimensions])
+                xml.append(
+                    f'      <geom type="box" size="{size}" rgba="{obs_rgba}" '
+                    f'friction="{friction_str}" solref="{solref_str}" solimp="{solimp_str}" />'
+                )
+            elif obs.shape == 'sphere':
+                xml.append(
+                    f'      <geom type="sphere" size="{obs.dimensions[0]}" rgba="{obs_rgba}" '
+                    f'friction="{friction_str}" solref="{solref_str}" solimp="{solimp_str}" />'
+                )
+            elif obs.shape == 'cylinder':
+                xml.append(
+                    f'      <geom type="cylinder" size="{obs.dimensions[0]} {obs.dimensions[1] / 2}" rgba="{obs_rgba}" '
+                    f'friction="{friction_str}" solref="{solref_str}" solimp="{solimp_str}" />'
+                )
+            
+            xml.append(f'    </body>')
+        print(f"✓ Added {sum(1 for o in robot.obstacles.values() if o.enabled)} obstacle bodies")
+
     xml.append("  </worldbody>")
 
     # Insert contact exclusions now that we have all parent-child and sibling pairs
@@ -828,6 +989,58 @@ def generate_mjcf_xml(
     else:
         print(f"⚠️ WARNING: No collision exclusions were added!")
         print(f"   This may cause instability from adjacent link collisions")
+
+    # --- Tendon Section ---
+    # MuJoCo <tendon> uses <spatial> with <site> routing points
+    if tendon_sites:
+        xml.append("  <tendon>")
+        for tendon_id, tendon in robot.tendons.items():
+            if tendon_id not in tendon_sites or len(tendon_sites[tendon_id]) < 2:
+                continue
+            tendon_name = to_snake_case(tendon.name)
+            stiffness = tendon.stiffness
+            damping = tendon.damping
+            width_str = f'width="{tendon.width}"' if tendon.width else 'width="0.002"'
+            range_str = ""
+            if tendon.restLength > 0:
+                range_str = f'range="0 {tendon.restLength * 2:.4f}"'
+            
+            xml.append(
+                f'    <spatial name="{tendon_name}" {width_str} '
+                f'stiffness="{stiffness}" damping="{damping}" {range_str}>'
+            )
+            for site_name, body_name in tendon_sites[tendon_id]:
+                xml.append(f'      <site site="{site_name}" />')
+            xml.append(f'    </spatial>')
+        xml.append("  </tendon>")
+        print(f"✓ Added {len(tendon_sites)} spatial tendons")
+        
+        # Tendon actuators for active tendons
+        if robot.tendons:
+            for tendon_id, tendon in robot.tendons.items():
+                if tendon.type == 'active' and tendon_id in tendon_sites and len(tendon_sites[tendon_id]) >= 2:
+                    tendon_name = to_snake_case(tendon.name)
+                    act_name = f"{tendon_name}_motor"
+                    actuators.append(
+                        f'    <general name="{act_name}" tendon="{tendon_name}" '
+                        f'gainprm="100" biasprm="0 -100 -10" />'
+                    )
+
+    # --- Equality Constraints for Rolling Contact Joints ---
+    if rolling_constraints:
+        xml.append("  <equality>")
+        for rc in rolling_constraints:
+            # Rolling contact: gear constraint between parent and child body rotation
+            # The curvature ratio determines the gear ratio
+            xml.append(
+                f'    <!-- Rolling constraint for {rc["joint_name"]} '
+                f'(curvature radius: {rc["curvature_radius"]}) -->'
+            )
+            xml.append(
+                f'    <joint joint1="{rc["joint_name"]}" polycoef="0 1 0 0 0" />'
+            )
+        xml.append("  </equality>")
+        print(f"✓ Added {len(rolling_constraints)} rolling contact constraints")
 
     if actuators:
         xml.append("  <actuator>")

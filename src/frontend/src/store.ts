@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { v4 as uuidv4 } from 'uuid';
 import * as THREE from 'three';
-import { RobotState, RobotActions, RobotLink, RobotJoint, JointType, RecordingMode, MotionKeyframe, MotionRecording, PlaybackState, JointValues } from './types';
+import { RobotState, RobotActions, RobotLink, RobotJoint, JointType, RecordingMode, MotionKeyframe, MotionRecording, PlaybackState, JointValues, Tendon, TendonRoutingPoint, Obstacle, SensorDef, InteractionMode } from './types';
 import { set } from 'lodash';
 import JSZip from 'jszip'; // Needed for advanced save/load
 
@@ -27,12 +27,19 @@ const createInitialState = (): RobotState => {
         importUnit: 'cm', // Default to CM
         collisionMode: 'off', // Default collision off
         collisionBoxScale: 0.8,
+        // --- Advanced Simulation Systems ---
+        tendons: {},
+        obstacles: {},
+        sensors: {},
+        interactionMode: 'select',
+        activeTendonId: null,
         // Motion Recording State
         recordingMode: null,
         isRecording: false,
         recordingStartTime: null,
         currentRecording: null,
         recordings: [],
+        recordingInterval: null,
         playbackState: { isPlaying: false, currentTime: 0, recordingId: null },
     };
 };
@@ -123,7 +130,14 @@ const createRobotZip = async (state: RobotState) => {
         await processVisual(joint, joint.name);
     }
 
-    const robotData = { links: linksToSave, joints: jointsToSave, baseLinkId };
+    const robotData = {
+        links: linksToSave,
+        joints: jointsToSave,
+        baseLinkId,
+        tendons: JSON.parse(JSON.stringify(state.tendons || {})),
+        obstacles: JSON.parse(JSON.stringify(state.obstacles || {})),
+        sensors: JSON.parse(JSON.stringify(state.sensors || {})),
+    };
     zip.file('robot-scene.json', JSON.stringify(robotData, null, 2));
 
     return await zip.generateAsync({ type: 'blob' });
@@ -644,8 +658,14 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                 links: robotData.links,
                 joints: robotData.joints,
                 baseLinkId: robotData.baseLinkId,
+                // Backward-compatible: load new data or default to empty
+                tendons: robotData.tendons || {},
+                obstacles: robotData.obstacles || {},
+                sensors: robotData.sensors || {},
                 selectedItem: { id: null, type: null },
                 highlightedItem: { id: null, type: null },
+                interactionMode: 'select',
+                activeTendonId: null,
             });
         };
 
@@ -1001,8 +1021,8 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
 
     exportMujocoMJCF: async (robotName: string, useMeshCollision: boolean = false, directHand: boolean = false) => {
         try {
-            const { links, joints, baseLinkId } = getState();
-            const robotData = JSON.parse(JSON.stringify({ links, joints, baseLinkId }));
+            const { links, joints, baseLinkId, tendons, obstacles, sensors } = getState();
+            const robotData = JSON.parse(JSON.stringify({ links, joints, baseLinkId, tendons, obstacles, sensors }));
 
             // Helper to collect meshes (Same logic)
             const collectMeshes = async (items: any[]) => {
@@ -1038,6 +1058,17 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
             const state = getState();
             if (state.recordings && state.recordings.length > 0) {
                 formData.append('recordings', JSON.stringify(state.recordings));
+            }
+
+            // Include advanced simulation data
+            if (Object.keys(state.tendons).length > 0) {
+                formData.append('tendons', JSON.stringify(state.tendons));
+            }
+            if (Object.keys(state.obstacles).length > 0) {
+                formData.append('obstacles', JSON.stringify(state.obstacles));
+            }
+            if (Object.keys(state.sensors).length > 0) {
+                formData.append('sensors', JSON.stringify(state.sensors));
             }
 
             for (const meshData of meshDatas) {
@@ -1337,6 +1368,154 @@ export const useRobotStore = create<RobotState & RobotActions>((setState, getSta
                 cameraControls: getState().cameraControls // Keep camera controls
             });
         }
+    },
+
+    // --- Tendon Actions ---
+
+    addTendon: (type: 'active' | 'passive') => {
+        const id = `tendon-${uuidv4()}`;
+        const tendon: Tendon = {
+            id,
+            name: `tendon_${Object.keys(getState().tendons).length + 1}`,
+            type,
+            routingPoints: [],
+            stiffness: type === 'passive' ? 50.0 : 0.0,
+            damping: 0.1,
+            restLength: 0.1,
+            color: type === 'active' ? '#ff6600' : '#00aaff',
+            width: 0.002,
+        };
+        setState(state => ({
+            tendons: { ...state.tendons, [id]: tendon },
+            activeTendonId: id,
+        }));
+    },
+
+    updateTendon: (id: string, path: string, value: any) => {
+        setState(state => {
+            const tendon = state.tendons[id];
+            if (!tendon) return state;
+            const updated = updateDeep(tendon, path, value);
+            return { tendons: { ...state.tendons, [id]: updated } };
+        });
+    },
+
+    deleteTendon: (id: string) => {
+        setState(state => {
+            const { [id]: _, ...rest } = state.tendons;
+            return {
+                tendons: rest,
+                activeTendonId: state.activeTendonId === id ? null : state.activeTendonId,
+            };
+        });
+    },
+
+    addTendonRoutingPoint: (tendonId: string, linkId: string, localPosition: [number, number, number]) => {
+        const pointId = `rp-${uuidv4()}`;
+        setState(state => {
+            const tendon = state.tendons[tendonId];
+            if (!tendon) return state;
+            const newPoint: TendonRoutingPoint = { id: pointId, linkId, localPosition };
+            const updated = {
+                ...tendon,
+                routingPoints: [...tendon.routingPoints, newPoint],
+            };
+            return { tendons: { ...state.tendons, [tendonId]: updated } };
+        });
+    },
+
+    removeTendonRoutingPoint: (tendonId: string, pointId: string) => {
+        setState(state => {
+            const tendon = state.tendons[tendonId];
+            if (!tendon) return state;
+            const updated = {
+                ...tendon,
+                routingPoints: tendon.routingPoints.filter(p => p.id !== pointId),
+            };
+            return { tendons: { ...state.tendons, [tendonId]: updated } };
+        });
+    },
+
+    setActiveTendonId: (id: string | null) => {
+        setState({ activeTendonId: id });
+    },
+
+    // --- Obstacle Actions ---
+
+    addObstacle: (shape: 'box' | 'sphere' | 'cylinder') => {
+        const id = `obstacle-${uuidv4()}`;
+        const defaultDimensions: Record<string, [number, number, number]> = {
+            box: [0.05, 0.05, 0.05],
+            sphere: [0.03, 0.03, 0.03],
+            cylinder: [0.02, 0.05, 0.02],
+        };
+        const obstacle: Obstacle = {
+            id,
+            name: `obstacle_${Object.keys(getState().obstacles).length + 1}`,
+            shape,
+            dimensions: defaultDimensions[shape],
+            position: [0.1, 0, 0.3],
+            rotation: [0, 0, 0],
+            color: '#cc4444',
+            physics: {
+                friction: 0.5,
+                solref: [0.02, 1.0],
+                solimp: [0.9, 0.95, 0.001],
+            },
+            enabled: true,
+        };
+        setState(state => ({
+            obstacles: { ...state.obstacles, [id]: obstacle },
+        }));
+    },
+
+    updateObstacle: (id: string, path: string, value: any) => {
+        setState(state => {
+            const obstacle = state.obstacles[id];
+            if (!obstacle) return state;
+            const updated = updateDeep(obstacle, path, value);
+            return { obstacles: { ...state.obstacles, [id]: updated } };
+        });
+    },
+
+    deleteObstacle: (id: string) => {
+        setState(state => {
+            const { [id]: _, ...rest } = state.obstacles;
+            return { obstacles: rest };
+        });
+    },
+
+    // --- Sensor Actions ---
+
+    addSensor: (type: 'touch' | 'force', linkId: string, localPosition: [number, number, number]) => {
+        const id = `sensor-${uuidv4()}`;
+        const links = getState().links;
+        const linkName = links[linkId]?.name || 'unknown';
+        const sensorCount = Object.keys(getState().sensors).length;
+        const sensor: SensorDef = {
+            id,
+            type,
+            linkId,
+            localPosition,
+            localRotation: [0, 0, 0],
+            siteName: `${type}_site_${linkName}_${sensorCount}`,
+        };
+        setState(state => ({
+            sensors: { ...state.sensors, [id]: sensor },
+        }));
+    },
+
+    deleteSensor: (id: string) => {
+        setState(state => {
+            const { [id]: _, ...rest } = state.sensors;
+            return { sensors: rest };
+        });
+    },
+
+    // --- Interaction Mode ---
+
+    setInteractionMode: (mode: InteractionMode) => {
+        setState({ interactionMode: mode });
     },
 
     // --- Motion Recording Actions ---

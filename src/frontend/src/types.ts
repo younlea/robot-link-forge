@@ -24,7 +24,7 @@ export interface RobotLink {
 
 // --- New Comprehensive Joint Model ---
 
-export type JointType = 'fixed' | 'rotational' | 'prismatic';
+export type JointType = 'fixed' | 'rotational' | 'prismatic' | 'rolling';
 
 export type RotationalDof = {
   roll: boolean; // x-axis
@@ -82,7 +82,84 @@ export interface RobotJoint {
     xyz: [number, number, number];
     rpy: [number, number, number];
   };
+
+  // Rolling Contact Joint properties (only used when type === 'rolling')
+  rollingParams?: RollingContactParams;
 }
+
+// --- Rolling Contact Joint ---
+
+export interface RollingContactParams {
+  curvatureRadius: number;     // Curvature radius (m)
+  contactFriction: number;     // Contact friction coefficient
+  surfaceType: 'convex' | 'concave';
+}
+
+// --- Tendon System (independent entity, NOT a JointType) ---
+
+export interface TendonRoutingPoint {
+  id: string;
+  linkId: string;                          // Which link this point is on
+  localPosition: [number, number, number]; // Position in link-local coordinates
+  worldPosition?: [number, number, number]; // Cached world position (for visualization)
+}
+
+export interface Tendon {
+  id: string;
+  name: string;
+  type: 'active' | 'passive';
+
+  // Routing path through links
+  routingPoints: TendonRoutingPoint[];
+
+  // Physics parameters
+  stiffness: number;     // N/m (required for passive tendons)
+  damping: number;       // N·s/m
+  restLength: number;    // Natural length (m)
+
+  // Active tendon: motor reference
+  actuatorMotorId?: string;  // Which motor drives this tendon
+  momentArm?: number;        // Effective moment arm (m)
+
+  // Visualization
+  color: string;
+  width: number;           // Line thickness (visualization only)
+}
+
+// --- Obstacle System (fixed-position objects for contact simulation) ---
+
+export interface ObstaclePhysics {
+  friction: number;
+  solref: [number, number];           // MuJoCo contact solver parameters
+  solimp: [number, number, number];   // MuJoCo impedance parameters
+}
+
+export interface Obstacle {
+  id: string;
+  name: string;
+  shape: 'box' | 'sphere' | 'cylinder';
+  dimensions: [number, number, number];
+  position: [number, number, number];
+  rotation: [number, number, number];  // RPY
+  color: string;
+  physics: ObstaclePhysics;
+  enabled: boolean;  // Toggle on/off without deleting
+}
+
+// --- Sensor System ---
+
+export interface SensorDef {
+  id: string;
+  type: 'touch' | 'force';
+  linkId: string;
+  localPosition: [number, number, number];
+  localRotation: [number, number, number];
+  siteName: string;  // For MJCF export
+}
+
+// --- Interaction Modes ---
+
+export type InteractionMode = 'select' | 'tendon-routing' | 'sensor-placement';
 
 // --- Motion Recording Types ---
 
@@ -129,6 +206,13 @@ export interface RobotState {
   importUnit: 'm' | 'cm' | 'mm';
   collisionMode: 'box' | 'mesh' | 'off';
   collisionBoxScale: number;
+
+  // --- Advanced Simulation Systems ---
+  tendons: Record<string, Tendon>;
+  obstacles: Record<string, Obstacle>;
+  sensors: Record<string, SensorDef>;
+  interactionMode: InteractionMode;
+  activeTendonId: string | null;  // Currently editing tendon (for routing mode)
 
   // Motion Recording State
   recordingMode: RecordingMode | null;
@@ -177,7 +261,7 @@ export interface RobotActions {
   exportURDF: (robotName: string) => Promise<void>;
   exportURDF_ROS2: (robotName: string) => Promise<void>;
   exportMujocoURDF: (robotName: string) => Promise<void>;
-  exportMujocoMJCF: (robotName: string, useMeshCollision?: boolean) => Promise<void>;
+  exportMujocoMJCF: (robotName: string, useMeshCollision?: boolean, directHand?: boolean) => Promise<void>;
   exportGazebo: (robotName: string) => Promise<void>;
   exportGazeboROS2: (robotName: string) => Promise<void>;
 
@@ -198,6 +282,26 @@ export interface RobotActions {
   setImportUnit: (unit: 'm' | 'cm' | 'mm') => void;
   setCollisionMode: (mode: 'box' | 'mesh' | 'off') => void;
   setCollisionBoxScale: (scale: number) => void;
+
+  // --- Tendon Actions ---
+  addTendon: (type: 'active' | 'passive') => void;
+  updateTendon: (id: string, path: string, value: any) => void;
+  deleteTendon: (id: string) => void;
+  addTendonRoutingPoint: (tendonId: string, linkId: string, localPosition: [number, number, number]) => void;
+  removeTendonRoutingPoint: (tendonId: string, pointId: string) => void;
+  setActiveTendonId: (id: string | null) => void;
+
+  // --- Obstacle Actions ---
+  addObstacle: (shape: 'box' | 'sphere' | 'cylinder') => void;
+  updateObstacle: (id: string, path: string, value: any) => void;
+  deleteObstacle: (id: string) => void;
+
+  // --- Sensor Actions ---
+  addSensor: (type: 'touch' | 'force', linkId: string, localPosition: [number, number, number]) => void;
+  deleteSensor: (id: string) => void;
+
+  // --- Interaction Mode ---
+  setInteractionMode: (mode: InteractionMode) => void;
 
   // Motion Recording Actions
   setRecordingMode: (mode: RecordingMode | null) => void;

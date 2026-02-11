@@ -5,6 +5,9 @@ import { ToyBrick, PlusSquare, Link as LinkIcon, GitCommit, Move3d, Save, Folder
 import HelpModal from './HelpModal';
 import HandControl from './HandControl';
 import RecordingPanel from './RecordingPanel';
+import TendonEditor from './TendonEditor';
+import ObstacleManager from './ObstacleManager';
+import SensorPlacement from './SensorPlacement';
 
 // --- Reusable Input Components (with fixes) ---
 const NumberInput = ({ label, value, onChange, step = 0.01 }: { label: string, value: number, onChange: (val: number) => void, step?: number }) => {
@@ -636,7 +639,7 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
                 <label className="text-xs text-gray-400">Joint Type</label>
                 <select value={joint.type} onChange={(e) => updateJoint(joint.id, 'type', e.target.value as JointType)}
                     className="w-full bg-gray-700 rounded p-1 mt-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
-                    <option value="fixed">Fixed</option> <option value="rotational">Rotational</option> <option value="prismatic">Prismatic</option>
+                    <option value="fixed">Fixed</option> <option value="rotational">Rotational</option> <option value="prismatic">Prismatic</option> <option value="rolling">Rolling Contact</option>
                 </select>
             </div>
 
@@ -730,6 +733,34 @@ const JointInspector = ({ joint }: { joint: RobotJoint }) => {
 
                 </div>
 
+            )}
+
+            {joint.type === 'rolling' && (
+                <div className="p-2 bg-gray-900/50 rounded space-y-3">
+                    <p className="text-sm font-semibold mb-2">Rolling Contact Parameters</p>
+                    <NumberInput label="Curvature Radius (m)" value={joint.rollingParams?.curvatureRadius ?? 0.02} onChange={v => updateJoint(joint.id, 'rollingParams.curvatureRadius', v)} step={0.001} />
+                    <NumberInput label="Contact Friction" value={joint.rollingParams?.contactFriction ?? 0.5} onChange={v => updateJoint(joint.id, 'rollingParams.contactFriction', v)} step={0.1} />
+                    <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs text-gray-400 w-1/3">Surface Type</label>
+                        <select value={joint.rollingParams?.surfaceType ?? 'convex'} onChange={(e) => updateJoint(joint.id, 'rollingParams.surfaceType', e.target.value)}
+                            className="w-2/3 bg-gray-900 rounded p-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500">
+                            <option value="convex">Convex</option>
+                            <option value="concave">Concave</option>
+                        </select>
+                    </div>
+                    <Vector3Input label="Axis" value={joint.axis} onChange={(p, v) => updateJoint(joint.id, `axis${p.substring(p.indexOf('['))}`, v)} path="axis" />
+                    <div className="pt-2 border-t border-gray-800">
+                        <div className="flex justify-between items-center mb-2">
+                            <p className="text-sm font-semibold">Limits</p>
+                            <div className="flex w-3/4 space-x-1">
+                                <span className="text-xs text-gray-400 w-1/2 text-center">Rad</span>
+                                <span className="text-xs text-gray-400 w-1/2 text-center">Deg</span>
+                            </div>
+                        </div>
+                        <RadianDegreeInput label="Lower" radValue={joint.limits.yaw.lower} onRadChange={v => updateJoint(joint.id, 'limits.yaw.lower', v)} />
+                        <RadianDegreeInput label="Upper" radValue={joint.limits.yaw.upper} onRadChange={v => updateJoint(joint.id, 'limits.yaw.upper', v)} />
+                    </div>
+                </div>
             )}
 
 
@@ -1472,6 +1503,11 @@ const Sidebar = () => {
                 {!selectedItem.id && <GlobalJointController />}
                 {selectedLink && <LinkInspector link={selectedLink} />}
                 {selectedJoint && <JointInspector joint={selectedJoint} />}
+
+                {/* --- Advanced Simulation Panels --- */}
+                <TendonEditor />
+                <ObstacleManager />
+                <SensorPlacement />
             </div>
         </>
     );

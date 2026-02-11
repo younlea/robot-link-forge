@@ -5,7 +5,7 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { useRobotStore } from '../store';
-import { Box, Cylinder, Sphere, TransformControls, Html } from '@react-three/drei';
+import { Box, Cylinder, Sphere, TransformControls, Html, Line } from '@react-three/drei';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Move, RotateCw } from 'lucide-react';
@@ -786,6 +786,18 @@ const RobotVisualizer: React.FC = () => {
       </Html>
       {baseLinkId && <RecursiveLink linkId={baseLinkId} registerRef={registerRef} />}
 
+      {/* --- Tendon Lines Visualization --- */}
+      <TendonLines objectRefs={objectRefs} />
+
+      {/* --- Obstacle Rendering --- */}
+      <ObstacleRenderer />
+
+      {/* --- Sensor Markers --- */}
+      <SensorMarkers objectRefs={objectRefs} />
+
+      {/* --- 3D Click Handler for Tendon Routing / Sensor Placement --- */}
+      <InteractionHandler objectRefs={objectRefs} />
+
       <TransformControls
         ref={transformControlsRef}
         onObjectChange={handleObjectChange}
@@ -811,6 +823,259 @@ const RobotVisualizer: React.FC = () => {
 
     </CollisionContext.Provider>
   );
+};
+
+// --- Tendon Lines: connects routing points with colored lines ---
+const TendonLines = ({ objectRefs }: { objectRefs: RefMap }) => {
+  const tendons = useRobotStore(s => s.tendons);
+
+  // Recompute positions each frame for dynamic updates
+  const [positions, setPositions] = useState<Record<string, THREE.Vector3[]>>({});
+
+  useFrame(() => {
+    const newPositions: Record<string, THREE.Vector3[]> = {};
+    for (const tendon of Object.values(tendons)) {
+      if (tendon.routingPoints.length < 2) continue;
+      const points: THREE.Vector3[] = [];
+      for (const rp of tendon.routingPoints) {
+        const linkObj = objectRefs.get(rp.linkId);
+        if (linkObj) {
+          const localPos = new THREE.Vector3(...rp.localPosition);
+          const worldPos = linkObj.localToWorld(localPos.clone());
+          points.push(worldPos);
+        }
+      }
+      if (points.length >= 2) {
+        newPositions[tendon.id] = points;
+      }
+    }
+    setPositions(newPositions);
+  });
+
+  return (
+    <>
+      {Object.values(tendons).map(tendon => {
+        const pts = positions[tendon.id];
+        if (!pts || pts.length < 2) return null;
+        return (
+          <Line
+            key={tendon.id}
+            points={pts}
+            color={tendon.color}
+            lineWidth={tendon.type === 'active' ? 3 : 2}
+            dashed={tendon.type === 'passive'}
+            dashSize={0.01}
+            gapSize={0.005}
+          />
+        );
+      })}
+
+      {/* Routing point markers */}
+      {Object.values(tendons).map(tendon =>
+        tendon.routingPoints.map(rp => {
+          const linkObj = objectRefs.get(rp.linkId);
+          if (!linkObj) return null;
+          const localPos = new THREE.Vector3(...rp.localPosition);
+          const worldPos = linkObj.localToWorld(localPos.clone());
+          return (
+            <mesh key={rp.id} position={worldPos}>
+              <sphereGeometry args={[0.003, 8, 8]} />
+              <meshStandardMaterial color={tendon.color} emissive={tendon.color} emissiveIntensity={0.5} />
+            </mesh>
+          );
+        })
+      )}
+    </>
+  );
+};
+
+// --- Obstacle Renderer: fixed-position boxes/spheres/cylinders ---
+const ObstacleRenderer = () => {
+  const obstacles = useRobotStore(s => s.obstacles);
+
+  return (
+    <>
+      {Object.values(obstacles).filter(o => o.enabled).map(obstacle => {
+        const pos = obstacle.position as [number, number, number];
+        const rot = obstacle.rotation as [number, number, number];
+        const dim = obstacle.dimensions as [number, number, number];
+        const color = obstacle.color;
+
+        return (
+          <group key={obstacle.id} position={pos} rotation={rot}>
+            {obstacle.shape === 'box' && (
+              <mesh>
+                <boxGeometry args={dim} />
+                <meshStandardMaterial color={color} transparent opacity={0.7} />
+              </mesh>
+            )}
+            {obstacle.shape === 'sphere' && (
+              <mesh>
+                <sphereGeometry args={[dim[0], 16, 16]} />
+                <meshStandardMaterial color={color} transparent opacity={0.7} />
+              </mesh>
+            )}
+            {obstacle.shape === 'cylinder' && (
+              <mesh>
+                <cylinderGeometry args={[dim[0], dim[0], dim[1], 16]} />
+                <meshStandardMaterial color={color} transparent opacity={0.7} />
+              </mesh>
+            )}
+            {/* Wireframe overlay */}
+            {obstacle.shape === 'box' && (
+              <mesh>
+                <boxGeometry args={dim} />
+                <meshBasicMaterial color={color} wireframe />
+              </mesh>
+            )}
+            {obstacle.shape === 'sphere' && (
+              <mesh>
+                <sphereGeometry args={[dim[0], 16, 16]} />
+                <meshBasicMaterial color={color} wireframe />
+              </mesh>
+            )}
+            {obstacle.shape === 'cylinder' && (
+              <mesh>
+                <cylinderGeometry args={[dim[0], dim[0], dim[1], 16]} />
+                <meshBasicMaterial color={color} wireframe />
+              </mesh>
+            )}
+            {/* Label */}
+            <Html position={[0, dim[1] / 2 + 0.02, 0]} center>
+              <div className="text-[10px] text-white bg-red-800/80 px-1 rounded whitespace-nowrap">
+                {obstacle.name}
+              </div>
+            </Html>
+          </group>
+        );
+      })}
+    </>
+  );
+};
+
+// --- Sensor Markers: small spheres on link surfaces ---
+const SensorMarkers = ({ objectRefs }: { objectRefs: RefMap }) => {
+  const sensors = useRobotStore(s => s.sensors);
+  const [worldPositions, setWorldPositions] = useState<Record<string, THREE.Vector3>>({});
+
+  useFrame(() => {
+    const newPositions: Record<string, THREE.Vector3> = {};
+    for (const sensor of Object.values(sensors)) {
+      const linkObj = objectRefs.get(sensor.linkId);
+      if (linkObj) {
+        const localPos = new THREE.Vector3(...sensor.localPosition);
+        newPositions[sensor.id] = linkObj.localToWorld(localPos.clone());
+      }
+    }
+    setWorldPositions(newPositions);
+  });
+
+  return (
+    <>
+      {Object.values(sensors).map(sensor => {
+        const worldPos = worldPositions[sensor.id];
+        if (!worldPos) return null;
+        return (
+          <mesh key={sensor.id} position={worldPos}>
+            <sphereGeometry args={[0.004, 8, 8]} />
+            <meshStandardMaterial
+              color={sensor.type === 'touch' ? '#00ff88' : '#ffaa00'}
+              emissive={sensor.type === 'touch' ? '#00ff88' : '#ffaa00'}
+              emissiveIntensity={0.5}
+            />
+          </mesh>
+        );
+      })}
+    </>
+  );
+};
+
+// --- Interaction Handler: handles 3D clicks for tendon routing and sensor placement ---
+const InteractionHandler = ({ objectRefs }: { objectRefs: RefMap }) => {
+  const { raycaster, camera, gl } = useThree();
+  const interactionMode = useRobotStore(s => s.interactionMode);
+  const activeTendonId = useRobotStore(s => s.activeTendonId);
+  const addTendonRoutingPoint = useRobotStore(s => s.addTendonRoutingPoint);
+  const addSensor = useRobotStore(s => s.addSensor);
+  const links = useRobotStore(s => s.links);
+
+  useEffect(() => {
+    if (interactionMode === 'select') return;
+
+    const handleClick = (event: MouseEvent) => {
+      // Compute normalized device coordinates
+      const rect = gl.domElement.getBoundingClientRect();
+      const mouse = new THREE.Vector2(
+        ((event.clientX - rect.left) / rect.width) * 2 - 1,
+        -((event.clientY - rect.top) / rect.height) * 2 + 1
+      );
+
+      raycaster.setFromCamera(mouse, camera);
+
+      // Collect all link meshes to raycast against
+      const meshTargets: THREE.Object3D[] = [];
+      for (const [id, obj] of objectRefs.entries()) {
+        if (links[id]) {
+          obj.traverse(child => {
+            if ((child as THREE.Mesh).isMesh) {
+              meshTargets.push(child);
+            }
+          });
+        }
+      }
+
+      const intersects = raycaster.intersectObjects(meshTargets, false);
+      if (intersects.length === 0) return;
+
+      const hit = intersects[0];
+      const worldPoint = hit.point.clone();
+
+      // Find which link was hit
+      let hitLinkId: string | null = null;
+      for (const [id, obj] of objectRefs.entries()) {
+        if (links[id]) {
+          let found = false;
+          obj.traverse(child => {
+            if (child === hit.object) found = true;
+          });
+          if (found) {
+            hitLinkId = id;
+            break;
+          }
+        }
+      }
+
+      if (!hitLinkId) return;
+
+      // Convert world point to link-local coordinates
+      const linkObj = objectRefs.get(hitLinkId)!;
+      const localPoint = linkObj.worldToLocal(worldPoint.clone());
+      const localPos: [number, number, number] = [localPoint.x, localPoint.y, localPoint.z];
+
+      if (interactionMode === 'tendon-routing' && activeTendonId) {
+        addTendonRoutingPoint(activeTendonId, hitLinkId, localPos);
+      } else if (interactionMode === 'sensor-placement') {
+        addSensor('touch', hitLinkId, localPos);
+      }
+    };
+
+    gl.domElement.addEventListener('click', handleClick);
+    return () => {
+      gl.domElement.removeEventListener('click', handleClick);
+    };
+  }, [interactionMode, activeTendonId, objectRefs, links, raycaster, camera, gl, addTendonRoutingPoint, addSensor]);
+
+  // Change cursor when in special mode
+  useEffect(() => {
+    if (interactionMode !== 'select') {
+      gl.domElement.style.cursor = 'crosshair';
+    } else {
+      gl.domElement.style.cursor = 'default';
+    }
+    return () => { gl.domElement.style.cursor = 'default'; };
+  }, [interactionMode, gl]);
+
+  return null;
 };
 
 export default RobotVisualizer;
