@@ -28,6 +28,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                             <li><strong>Fixed Joint:</strong> Does not move. Good for glueing parts together.</li>
                             <li><strong>Revolute Joint:</strong> Rotates around an axis (Roll/Pitch/Yaw).</li>
                             <li><strong>Prismatic Joint:</strong> Slides along an axis (Displacement).</li>
+                            <li><strong>Rolling Contact Joint:</strong> Models rolling surfaces with curvature radius and contact friction (convex/concave).</li>
                         </ul>
                     </section>
 
@@ -46,7 +47,50 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                     </section>
 
                     <section>
-                        <h3 className="text-xl font-semibold text-white mb-3">3. Managing Projects</h3>
+                        <h3 className="text-xl font-semibold text-white mb-3">3. Advanced Simulation Features</h3>
+                        
+                        <div className="space-y-4">
+                            <div className="bg-gray-900 p-4 rounded border-l-4 border-orange-500">
+                                <h4 className="font-bold text-orange-400 mb-2">🧵 Tendon System</h4>
+                                <p className="text-sm text-gray-300 mb-2">
+                                    Model underactuated mechanisms with tendon-driven systems (like robotic hands).
+                                </p>
+                                <ul className="list-disc ml-5 space-y-1 text-xs text-gray-400">
+                                    <li><strong>Active Tendons:</strong> Motor-driven, pulls on joints via moment arm.</li>
+                                    <li><strong>Passive Tendons:</strong> Spring-based, adds compliance to the structure.</li>
+                                    <li><strong>3D Routing:</strong> Click "Add Points" in tendon editor, then click on link surfaces to define the path.</li>
+                                    <li>Configure stiffness, damping, rest length, and moment arm parameters.</li>
+                                </ul>
+                            </div>
+
+                            <div className="bg-gray-900 p-4 rounded border-l-4 border-red-500">
+                                <h4 className="font-bold text-red-400 mb-2">🪨 Obstacles</h4>
+                                <p className="text-sm text-gray-300 mb-2">
+                                    Add fixed-position obstacles (Box, Sphere, Cylinder) for contact simulation testing.
+                                </p>
+                                <ul className="list-disc ml-5 space-y-1 text-xs text-gray-400">
+                                    <li>Adjust position, rotation, dimensions, and physics parameters (friction, solref, solimp).</li>
+                                    <li>Toggle enabled/disabled without deleting.</li>
+                                    <li>Useful for testing finger contact resistance and grasp planning.</li>
+                                </ul>
+                            </div>
+
+                            <div className="bg-gray-900 p-4 rounded border-l-4 border-green-500">
+                                <h4 className="font-bold text-green-400 mb-2">📡 Sensor Placement</h4>
+                                <p className="text-sm text-gray-300 mb-2">
+                                    Place touch and force sensors on link surfaces with precise 3D click positioning.
+                                </p>
+                                <ul className="list-disc ml-5 space-y-1 text-xs text-gray-400">
+                                    <li>Click "Place Touch Sensor" button to enter placement mode.</li>
+                                    <li>Click on any link surface in the 3D view to add a sensor at that exact location.</li>
+                                    <li>Sensors export to MuJoCo with link-local coordinates for accurate simulation.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section>
+                        <h3 className="text-xl font-semibold text-white mb-3">4. Managing Projects</h3>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                             <div className="bg-gray-900 p-4 rounded">
                                 <h4 className="font-bold text-indigo-400 mb-1">Saving</h4>
@@ -63,7 +107,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                         </div>
                     </section>
                     <section>
-                        <h3 className="text-xl font-semibold text-white mb-3">4. Collision Detection</h3>
+                        <h3 className="text-xl font-semibold text-white mb-3">5. Collision Detection</h3>
                         <p className="mb-2">
                             Use the <strong>Settings</strong> button (Gear icon, bottom-left) to enable collision detection.
                         </p>
@@ -87,7 +131,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                     </section>
 
                     <section>
-                        <h3 className="text-xl font-semibold text-white mb-3">5. Webcam Hand Control 🎬</h3>
+                        <h3 className="text-xl font-semibold text-white mb-3">6. Webcam Hand Control 🎬</h3>
                         <div className="bg-gray-900 p-4 rounded border-l-4 border-purple-500">
                             <div className="flex items-start gap-4">
                                 <div className="text-3xl">🖐️</div>
@@ -108,7 +152,7 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                     </section>
 
                     <section>
-                        <h3 className="text-xl font-semibold text-white mb-3">6. Motion Recording & Timeline 🎞️</h3>
+                        <h3 className="text-xl font-semibold text-white mb-3">7. Motion Recording & Timeline 🎞️</h3>
                         <p className="mb-4 text-gray-300">
                             Create complex animations by recording sequences and fine-tuning them in the timeline editor.
                         </p>
@@ -148,9 +192,9 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                         </div>
                     </section>
                     <section>
-                        <h3 className="text-xl font-semibold text-white mb-3">7. Exporting to ROS</h3>
+                        <h3 className="text-xl font-semibold text-white mb-3">8. Exporting to ROS & MuJoCo</h3>
                         <p className="mb-2">
-                            Click <strong>Export</strong> to generate a ROS-compatible package.
+                            Click <strong>Export</strong> to generate simulation-ready packages.
                         </p>
                         <table className="w-full text-left text-sm">
                             <thead>
@@ -164,9 +208,13 @@ const HelpModal: React.FC<HelpModalProps> = ({ onClose }) => {
                                     <td className="py-2 font-mono text-yellow-500">URDF (ROS1)</td>
                                     <td className="py-2">Standard URDF file with relative mesh paths. Good for classic ROS / Gazebo.</td>
                                 </tr>
-                                <tr>
+                                <tr className="border-b border-gray-800">
                                     <td className="py-2 font-mono text-orange-500">URDF (ROS2)</td>
                                     <td className="py-2">Includes `package.xml`, `CMakeLists.txt`, and Python launch files. Ready to `colcon build`.</td>
+                                </tr>
+                                <tr>
+                                    <td className="py-2 font-mono text-purple-500">MJCF (MuJoCo)</td>
+                                    <td className="py-2">Full MuJoCo XML with tendons, obstacles, sensors, rolling joints, and motor validation tools.</td>
                                 </tr>
                             </tbody>
                         </table>

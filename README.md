@@ -7,12 +7,18 @@
 ## 🚀 Key Features
 
 *   **Visual Editor**: Build robot models by adding links and joints. Drag & drop STL meshes or use primitive shapes.
+*   **Advanced Joint Types**:
+    *   **Rolling Contact Joints**: Model curvature-based contact (convex/concave surfaces) with friction.
+    *   **Tendon-Driven Systems**: Active (motor-driven) and passive (spring) tendons with 3D click-based routing.
+*   **Simulation Environment**:
+    *   **Obstacles**: Add fixed-position obstacles (box/sphere/cylinder) for contact simulation.
+    *   **Sensors**: Place touch and force sensors on link surfaces with 3D click placement.
 *   **Motion Recording**:
     *   **Timeline Editor**: precise keyframe control and interpolation modification.
     *   **Hand Control**: Control your robot in real-time using your webcam (MediaPipe Hand Tracking).
 *   **Export Ready**:
     *   **ROS 2**: Generates a full ament_cmake package with valid URDF, RViz config, and replay scripts.
-    *   **MuJoCo**: Generates MJCF XML with calculated inertia, sensors, and simulation scripts.
+    *   **MuJoCo**: Generates MJCF XML with calculated inertia, tendons, obstacles, sensors, and simulation scripts.
 *   **Replay Support**: Automatically generates Python scripts to replay your recorded motions in the target environment.
 
 ---
@@ -56,14 +62,38 @@ Open your browser to `http://localhost:5173`.
 *   Use the **Sidebar** to add Links and Joints.
 *   **Upload Meshes**: Supports STL files for detailed visuals.
 *   **Configurations**: Adjust joint limits, axis (Roll/Pitch/Yaw/Prismatic), and parent-child relationships.
+*   **Joint Types**:
+    *   **Fixed**: No movement, used to glue parts together.
+    *   **Rotational**: Revolute joints with 1-3 DoF (Roll/Pitch/Yaw).
+    *   **Prismatic**: Linear sliding motion.
+    *   **Rolling Contact**: Models rolling surfaces with curvature radius and contact friction.
 
-### 2. Motion Recording
+### 2. Advanced Simulation Features
+
+#### Tendon System 🧵
+*   Add **Active Tendons** (motor-driven) or **Passive Tendons** (spring-based).
+*   **3D Click Routing**: Enter routing mode, then click on link surfaces to define the tendon path.
+*   Configure stiffness, damping, rest length, and moment arm.
+*   Exports to MuJoCo `<tendon><spatial>` with automatic site generation.
+
+#### Obstacles 🪨
+*   Add fixed-position obstacles (Box, Sphere, Cylinder) for contact simulation.
+*   Adjust position, rotation, dimensions, color, and physics parameters (friction, solref, solimp).
+*   Toggle enabled/disabled without deleting.
+*   Exports to MuJoCo as fixed `<body>` elements with contact properties.
+
+#### Sensors 📡
+*   **3D Click Placement**: Enter sensor placement mode and click on link surfaces.
+*   Automatically creates touch sensors at precise locations.
+*   Exports to MuJoCo `<sensor><touch>` with link-local coordinates.
+
+### 3. Motion Recording
 *   Click **"Recording"** in the sidebar.
 *   **Slider Mode**: Move joints manually and click **"Capture Keyframe"**.
 *   **Timeline**: Drag keyframes to adjust timing. Modify transition bars to change speed.
 *   **Webcam Mode**: Toggle "Camera" to control the robot with your hand.
 
-### 3. Export & Replay (ROS 2)
+### 4. Export & Replay (ROS 2)
 When you export to ROS 2, you get a ZIP file containing a complete ROS 2 package.
 
 #### Setup
@@ -92,9 +122,9 @@ Runs the replay node to move the robot.
 *   `replay_0`, `replay_1`, etc. correspond to your saved recordings.
 *   Progress will be logged to the terminal: `Progress: 1.5s / 10.0s (15.0%)`.
 
-### 4. Export & Replay (MuJoCo)
+### 5. Export & Replay (MuJoCo)
 
-MuJoCo export includes motor sizing validation tools for mechanical engineers.
+MuJoCo export includes motor sizing validation tools for mechanical engineers, plus advanced features like tendons, obstacles, and sensors.
 
 #### Setup
 1. Extract the ZIP file
