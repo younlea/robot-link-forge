@@ -35,6 +35,36 @@ export const CameraManager: React.FC = () => {
         const controls = controlsRef.current;
         if (!controls) return;
 
+        // Mouse middle button drag for rotation
+        const handleMouseDown = (e: MouseEvent) => {
+            if (e.button === 1) { // Middle mouse button
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', handleMouseUp);
+            }
+        };
+
+        const handleMouseMove = (e: MouseEvent) => {
+            const deltaX = e.movementX * 0.005; // Adjust sensitivity
+            const deltaY = e.movementY * 0.005;
+            controls.rotate(deltaX, deltaY, true);
+        };
+
+        const handleMouseUp = () => {
+            document.removeEventListener('mousemove', handleMouseMove);
+            document.removeEventListener('mouseup', handleMouseUp);
+        };
+
+        window.addEventListener('mousedown', handleMouseDown);
+
+        return () => {
+            window.removeEventListener('mousedown', handleMouseDown);
+        };
+    }, [controlsRef]);
+
+    useEffect(() => {
+        const controls = controlsRef.current;
+        if (!controls) return;
+
         const handleKeyDown = (e: KeyboardEvent) => {
             if (document.activeElement && document.activeElement.tagName === 'INPUT') {
                 return;
@@ -43,32 +73,20 @@ export const CameraManager: React.FC = () => {
             let dx = 0, dy = 0;
             const delta = 0.1;
 
-            if (cameraMode === 'pan') {
-                switch (e.key) {
-                    case 'ArrowUp': dy = delta; break;
-                    case 'ArrowDown': dy = -delta; break;
-                    case 'ArrowLeft': dx = -delta; break;
-                    case 'ArrowRight': dx = delta; break;
-                }
-                if (dx !== 0 || dy !== 0) {
-                    controls.truck(dx, dy, true);
-                }
-            } else { // 'rotate' mode
-                switch (e.key) {
-                    case 'ArrowUp': dx = -delta * 2; break; // Pitch up
-                    case 'ArrowDown': dx = delta * 2; break; // Pitch down
-                    case 'ArrowLeft': dy = -delta * 2; break; // Yaw left
-                    case 'ArrowRight': dy = delta * 2; break; // Yaw right
-                }
-                if (dx !== 0 || dy !== 0) {
-                   controls.rotate(dx, dy, true);
-                }
+            switch (e.key) {
+                case 'ArrowUp': dx = -delta * 2; break; // Pitch up
+                case 'ArrowDown': dx = delta * 2; break; // Pitch down
+                case 'ArrowLeft': dy = -delta * 2; break; // Yaw left
+                case 'ArrowRight': dy = delta * 2; break; // Yaw right
+            }
+            if (dx !== 0 || dy !== 0) {
+                controls.rotate(dy, dx, true); // Note: dy for yaw, dx for pitch
             }
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [cameraMode, controlsRef.current]);
+    }, [cameraMode, controlsRef]);
 
     return <CameraControls ref={controlsRef} />;
 };
